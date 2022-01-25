@@ -26,7 +26,7 @@ bool Parser::parseImports()
 bool Parser::parseModuleDecl()
 {
     bool ret = false;
-    if (!consume(TokenType::Module)) return false;
+    consume(TokenType::Module);
     if (!expect(TokenType::Identifier)) return false;
     mainModuleNode = new ModuleStatementNode(new VariableExprNode(token.data), new BlockExprNode());
     advance();
@@ -79,66 +79,49 @@ FieldDecNode* Parser::parseFieldDecl(std::vector<FieldDecNode *> &fields, std::s
     std::string name;
     std::string type;
     bool isPrivate = false;
-    if (token.type == TokenType::VisibilityType)
+    Token tok = consume(TokenType::VisibilityType);
+    if (token.data == "private") isPrivate = true;
+    consume(TokenType::Field);
+    consume(TokenType::Minus);
+    tok = consume(TokenType::Identifier);
+    type = tok.data;
+    if (type == "array")
     {
-        if (token.data == "private") isPrivate = true;
-        advance();
-        if (token.type == TokenType::Field)
+        // parse array
+    }
+    else
+    {
+        if (type == thisClassName || currentScope->lookup(new VariableExprNode(type)) || oneOfDefaultTypes(type))
         {
-            advance();
-            if (token.type == TokenType::Minus)
+            tok = consume(TokenType::Identifier);
+            name = tok.data;
+            if (!isFieldNameCorrect(fields, name))
             {
-                advance();
-                if (token.type == TokenType::Identifier)
-                {
-                    type = token.data;
-                    if (type == "array")
-                    {
-                        // parse array
-                    }
-                    else
-                    {
-                        if (type == thisClassName || currentScope->lookup(new VariableExprNode(type)) ||
-                                oneOfDefaultTypes(type))
-                        {
-                            advance();
-                            if (token.type == TokenType::Identifier)
-                            {
-                                name = token.data;
-                                if (!isFieldNameCorrect(fields, name))
-                                {
-                                    llvm::errs() << "[ERROR] Field \"" << name << "\" already declared in class \"" << thisClassName << "\".\n";
-                                    return nullptr; // error field already exists
-                                }
-                                advance();
-                                if (token.type == TokenType::Assign || token.type == TokenType::Semicolon)
-                                {
-                                    bool init = token.type == TokenType::Assign;
-                                    if (init) advance();
-                                    TokenType dataType = init ? token.type : TokenType::Nil;
-                                    std::string data = init ? token.data : "";
-                                    if (oneOfDefaultTypes(type))
-                                    {
-                                        field = initDefaultType(isPrivate, name, type, dataType, data);
-                                    }
-                                    else
-                                    {
-                                        // object fields
-                                    }
-                                    if (init)
-                                    {
-                                        advance();
-                                        if (token.type == TokenType::Semicolon)
-                                        {
+                llvm::errs() << "[ERROR] Field \"" << name << "\" already declared in class \"" << thisClassName << "\".\n";
+                exit(0); // error field already exists
+            }
 
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+            if (token.type == TokenType::Assign || token.type == TokenType::Semicolon)
+            {
+                bool init = token.type == TokenType::Assign;
+                if (init) advance();
+                TokenType dataType = init ? token.type : TokenType::Nil;
+                std::string data = init ? token.data : "";
+                if (oneOfDefaultTypes(type))
+                {
+                    field = initDefaultType(isPrivate, name, type, dataType, data);
+                }
+                else
+                {
+                    // object fields
+                }
+                if (init)
+                {
+                    advance();
+                    expect(TokenType::Semicolon);
                 }
             }
+            else error();
         }
     }
     return field;

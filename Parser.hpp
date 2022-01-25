@@ -37,7 +37,7 @@ public:
 
     void error()
     {
-        llvm::errs() << "Unexpected: " << Lexer::getTokenName(token.type) << "\n";
+        llvm::errs() << "[ERROR] Unexpected token \"" << Lexer::getTokenName(token.type) << "\".\n";
         hasError = true;
     }
 
@@ -45,20 +45,22 @@ public:
     {
         if (token.type != tokenType)
         {
-            error();
+            llvm::errs() << "[ERROR] Unexpected token \"" << Lexer::getTokenName(token.type) + "\", expected \"" + Lexer::getTokenName(tokenType) + "\".\n";
+            hasError = true;
             return false;
         }
         return true;
     }
 
-    bool consume(TokenType tokenType)
+    Token consume(TokenType tokenType)
     {
-        if (expect(tokenType)) {
-            advance();
-            return true;
+        if (!expect(tokenType)) {
+
+            //exit(0);
         }
+        Token tok = token;
         advance();
-        return false;
+        return tok;
     }
 
     bool oneOfDefaultTypes(const std::string &name)

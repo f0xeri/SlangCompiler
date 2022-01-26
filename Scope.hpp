@@ -13,7 +13,7 @@ class Scope
 {
 public:
     Scope *parent = nullptr;
-    llvm::StringMap<DeclarationNode*> symbols;
+    std::map<std::string, DeclarationNode*> symbols;
     Scope() = default;
     Scope(Scope *parent) : parent(parent) {};
     bool insert(DeclarationNode *declarationNode)
@@ -26,8 +26,9 @@ public:
         Scope *s = this;
         while (s)
         {
-            llvm::StringMap<DeclarationNode*>::iterator i = s->symbols.find(name->value);
-            if (i != s->symbols.end()) return i->second;
+            /*llvm::StringMap<DeclarationNode*>::iterator i = s->symbols.find(name->value);
+            if (i != s->symbols.end()) return i->second;*/
+            if (symbols.contains(name->value)) return symbols[name->value];
             s = s->parent;
         }
         return nullptr;

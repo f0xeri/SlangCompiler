@@ -1,6 +1,6 @@
 module main
     public class Time inherits Object
-        public field-string s := "field s"
+        public field-string s := "field s";
         public field-integer int := 5;
         public field-real r := 15.25;
         public field-boolean b := true;
@@ -12,6 +12,7 @@ module main
         public field-boolean b1;
         public field-character ch1;
 
+        public field-Time time;
 
         public field-array[10] integer arr;
         public field-array[3] array[5] integer arr;
@@ -28,6 +29,11 @@ module main
     public class ABC inherits Time
 
     end ABC;
+
+    public function first(in string a):string
+        return 1 == 2;
+    end first;
+
 start
     variable-ABC abc;
     variable-boolean a := 5.3 <= 3;

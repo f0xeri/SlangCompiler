@@ -36,7 +36,11 @@ public:
     E_TYPE _type = E_UNKNOWN;
 };
 
-class StatementNode : public Node{};
+class StatementNode : public Node
+{
+public:
+    virtual ~StatementNode() = default;
+};
 
 class IntExprNode : public ExprNode
 {
@@ -167,9 +171,10 @@ public:
 class DeclarationNode : public StatementNode
 {
 public:
+    virtual ~DeclarationNode() = default;
     VariableExprNode *name;
 
-    explicit DeclarationNode(VariableExprNode *name) : name(name){};
+    DeclarationNode(VariableExprNode *name) : name(name){};
 };
 
 class VarDecStatementNode : public DeclarationNode {
@@ -245,22 +250,26 @@ class MethodDecNode : public DeclarationNode
 {
 public:
     std::string type;
-    std::vector<VarDecStatementNode*> *args;
-    BlockExprNode *block;
+    VariableExprNode *thisName;
+    std::vector<VarDecStatementNode*> *args = nullptr;
+    BlockExprNode *block = nullptr;
     bool isPrivate;
 
-    MethodDecNode(std::string type, VariableExprNode *name, bool isPrivate, std::vector<VarDecStatementNode*> *args, BlockExprNode *block):
-            type(std::move(type)), DeclarationNode(name), isPrivate(isPrivate), args(args), block(block) {};
+    MethodDecNode(std::string type, VariableExprNode *name, bool isPrivate, VariableExprNode *thisName, std::vector<VarDecStatementNode*> *args, BlockExprNode *block):
+            type(std::move(type)), DeclarationNode(name), isPrivate(isPrivate), thisName(thisName), args(args), block(block) {};
 };
 
-class TypeDecStatementNode : public DeclarationNode {
+class TypeDecStatementNode : public DeclarationNode
+{
 public:
-    std::vector<FieldDecNode*> *fields;
-    std::vector<MethodDecNode*> *methods;
-    TypeDecStatementNode *parentType;
-
+    //std::vector<FieldDecNode*> *fields = nullptr;
+    //std::vector<MethodDecNode*> *methods = nullptr;
+    //TypeDecStatementNode *parentType = nullptr;
+    std::vector<FieldDecNode*> *fields = nullptr;
+    std::vector<MethodDecNode*> *methods = nullptr;
+    TypeDecStatementNode *parentType = nullptr;
     TypeDecStatementNode(VariableExprNode *name, std::vector<FieldDecNode*> *fields, std::vector<MethodDecNode*> *methods, TypeDecStatementNode *parentType = nullptr):
-                         DeclarationNode(name), parentType(parentType), fields(fields), methods(methods) {};
+                         DeclarationNode(name), fields(fields), methods(methods), parentType(parentType) {};
 };
 
 class ExternFuncDecStatementNode : public DeclarationNode {

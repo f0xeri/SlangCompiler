@@ -11,6 +11,8 @@
 #include "AST.hpp"
 #include "Scope.hpp"
 
+using Parameter = std::pair<std::string, std::string>;
+
 class Parser {
 public:
     std::vector<Token> tokens;
@@ -22,7 +24,7 @@ public:
         tokensIterator = tokens.begin();
         token = *tokensIterator;
         currentScope = new Scope();
-        currentScope->insert(new TypeDecStatementNode(new VariableExprNode("Object"), nullptr, nullptr, nullptr));
+        currentScope->insert(new TypeDecStatementNode(new VariableExprNode("Object"), {}, {}, nullptr));
         this->tokens = tokens;
     }
 
@@ -69,14 +71,16 @@ public:
         return false;
     }
 
-    bool isFieldNameCorrect(std::vector<FieldDecNode *> &fields, const std::string &name)
+    bool isFieldNameCorrect(std::vector<FieldDecNode *> *fields, const std::string &name)
     {
-        if (std::find_if(fields.begin(), fields.end(), [&name](FieldDecNode *field){ return field->name->value == name; }) != fields.end())
+        if (std::find_if(fields->begin(), fields->end(), [&name](FieldDecNode *field){ return field->name->value == name; }) != fields->end())
         {
             return false;
         }
         return true;
     }
+
+    std::vector<VarDecStatementNode *>* parseFuncParameters();
 
     FieldVarDecNode* initDefaultType(bool isPrivate, const std::string &name, const std::string &type, TokenType dataType, const std::string &data)
     {
@@ -132,8 +136,6 @@ public:
         {
             field = new FieldVarDecNode(new VariableExprNode(name), isPrivate, type, new StringExprNode(data));
         }
-
-        if (DEBUG) llvm::outs() << "parsed field " << type << " " << name << " - " << data << "\n";
         return field;
     }
 
@@ -145,8 +147,8 @@ public:
     bool parseVisibilityOperator();
     bool parseStatement();
     bool parseFuncDecl();
-    FieldDecNode* parseFieldDecl(std::vector<FieldDecNode *> &fields, std::string &thisClassName);
-    MethodDecNode* parseMethodDecl(std::vector<MethodDecNode*> &methods, std::string &thisClassName);
+    FieldDecNode* parseFieldDecl(std::vector<FieldDecNode *> *fields, std::string &thisClassName);
+    MethodDecNode* parseMethodDecl(std::vector<MethodDecNode*> *methods, std::string &thisClassName);
     bool parseTypeDecl();
 };
 

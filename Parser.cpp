@@ -104,21 +104,30 @@ FieldDecNode* Parser::parseFieldDecl(std::vector<FieldDecNode *> *fields, std::s
             if (token.type == TokenType::Assign || token.type == TokenType::Semicolon)
             {
                 bool init = token.type == TokenType::Assign;
-                if (init) advance();
-                TokenType dataType = init ? token.type : TokenType::Nil;
-                std::string data = init ? token.data : "";
-                if (oneOfDefaultTypes(type))
-                {
-                    field = initDefaultType(isPrivate, name, type, dataType, data);
-                    if (DEBUG) llvm::outs() << "parsed field " << type << " " << name << " - " << data << "\n";
+                ExprNode* expr;
+                if (init) {
+                    advance();
+                    expr = parseExpression();
+                    field = new FieldVarDecNode(new VariableExprNode(name), isPrivate, type, expr);
+                    if (DEBUG) llvm::outs() << "parsed field " << type << " " << name << "\n";
                 }
                 else
                 {
-                    // object fields
+                    TokenType dataType = init ? token.type : TokenType::Nil;
+                    std::string data = init ? token.data : "";
+                    if (oneOfDefaultTypes(type))
+                    {
+                        field = initDefaultType(isPrivate, name, type, dataType, data);
+                        if (DEBUG) llvm::outs() << "parsed field " << type << " " << name << " - " << data << "\n";
+                    }
+                    else
+                    {
+                        // object fields
+                    }
                 }
                 if (init)
                 {
-                    advance();
+                    //advance();
                     expect(TokenType::Semicolon);
                 }
             }
@@ -281,4 +290,179 @@ bool Parser::parseTypeDecl() {
         return false;
     }
     return true;
+}
+
+ExprNode *Parser::parseExpression() {
+    return parseStrInterpolation();
+}
+
+ExprNode *Parser::parseStrInterpolation() {
+    auto result = parseOr();
+
+    return result;
+}
+
+ExprNode *Parser::parseOr() {
+    auto result = parseAnd();
+
+    while (true)
+    {
+        if (match(TokenType::Or)) {
+            result = new ConditionalExprNode(result, TokenType::Or, parseAnd());
+            continue;
+        }
+        break;
+    }
+
+    return result;
+}
+
+ExprNode *Parser::parseAnd() {
+    auto result = parseEquality();
+
+    while (true)
+    {
+        if (match(TokenType::And)) {
+            result = new ConditionalExprNode(result, TokenType::And, parseEquality());
+            continue;
+        }
+        break;
+    }
+
+    return result;
+}
+
+ExprNode *Parser::parseEquality() {
+    auto result = parseConditional();
+
+    while (true)
+    {
+        if (match(TokenType::Equal)) {
+            result = new ConditionalExprNode(result, TokenType::Equal, parseConditional());
+            continue;
+        }
+        if (match(TokenType::NotEqual)) {
+            result = new ConditionalExprNode(result, TokenType::NotEqual, parseConditional());
+            continue;
+        }
+        break;
+    }
+
+    return result;
+}
+
+ExprNode *Parser::parseConditional() {
+    auto result = parseAddSub();
+
+    while (true)
+    {
+        if (match(TokenType::Less)) {
+            result = new ConditionalExprNode(result, TokenType::Less, parseAddSub());
+            continue;
+        }
+        if (match(TokenType::LessOrEqual)) {
+            result = new ConditionalExprNode(result, TokenType::LessOrEqual, parseAddSub());
+            continue;
+        }
+        if (match(TokenType::Greater)) {
+            result = new ConditionalExprNode(result, TokenType::Greater, parseAddSub());
+            continue;
+        }
+        if (match(TokenType::GreaterOrEqual)) {
+            result = new ConditionalExprNode(result, TokenType::GreaterOrEqual, parseAddSub());
+            continue;
+        }
+        break;
+    }
+
+    return result;
+}
+
+ExprNode *Parser::parseAddSub() {
+    auto result = parseMulDiv();
+
+    while (true)
+    {
+        if (match(TokenType::Plus)) {
+            result = new OperatorExprNode(result, Operations::Plus, parseMulDiv());
+            continue;
+        }
+        if (match(TokenType::Minus)) {
+            result = new OperatorExprNode(result, Operations::Minus, parseMulDiv());
+        }
+        break;
+    }
+
+    return result;
+}
+
+ExprNode *Parser::parseMulDiv() {
+    auto result = parseUnary();
+
+    while (true)
+    {
+        if (match(TokenType::Multiplication)) {
+            result = new OperatorExprNode(result, Operations::Multiply, parseUnary());
+            continue;
+        }
+        if (match(TokenType::Division)) {
+            result = new OperatorExprNode(result, Operations::Divide, parseUnary());
+        }
+        break;
+    }
+
+    return result;
+}
+
+ExprNode *Parser::parseUnary() {
+    return match(TokenType::Minus) ? new UnaryOperatorExprNode(Operations::Minus, parsePrimary()) : parsePrimary();
+}
+
+ExprNode *Parser::parsePrimary() {
+
+    Token tok = token;
+    advance();
+    if (tok.type == TokenType::Boolean) return new BooleanExprNode(tok.data == "true");
+    else if (tok.type == TokenType::String)
+    {
+        if (tok.data.size() == 1) return new CharExprNode(tok.data[0]);
+        else return new StringExprNode(tok.data);
+    }
+    else if (tok.type == TokenType::Identifier)
+    {
+        // vars, funcs, arrays, fields
+        return nullptr;
+    }
+    else if (tok.type == TokenType::Integer) return new IntExprNode(std::stoi(tok.data));
+    else if (tok.type == TokenType::Real) return new RealExprNode(std::stod(tok.data));
+    else if (tok.type == TokenType::LParen)
+    {
+        auto result = parseExpression();
+        consume(TokenType::RParen);
+        return result;
+    }
+    llvm::errs() << "[ERROR] Failed to parse expression.\n";
+    return nullptr;
+}
+
+ExprNode *Parser::parseVarOrCall() {
+    Token tok = consume(TokenType::Identifier);
+    std::string name = tok.data;
+    if (token.type != TokenType::LParen) return new VariableExprNode(name);
+    consume(TokenType::LParen);
+    auto *params = new std::vector<ExprNode*>();
+    if (token.type != TokenType::RParen)
+    {
+        while (1)
+        {
+            if (auto arg = parseExpression())
+                params->push_back(arg);
+            else return nullptr;
+            advance();
+            if (token.type == TokenType::RParen) break;
+            consume(TokenType::Comma);
+        }
+    }
+    advance();
+    return new CallExprNode(new VariableExprNode(name), params);
 }

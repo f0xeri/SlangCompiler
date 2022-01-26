@@ -65,6 +65,16 @@ public:
         return tok;
     }
 
+    bool match(TokenType tokenType)
+    {
+        if (token.type != tokenType) {
+
+            return false;
+        }
+        advance();
+        return true;
+    }
+
     bool oneOfDefaultTypes(const std::string &name)
     {
         if (name == "integer" || name == "real" || name == "boolean" || name == "string" || name == "character") return true;
@@ -150,6 +160,17 @@ public:
     FieldDecNode* parseFieldDecl(std::vector<FieldDecNode *> *fields, std::string &thisClassName);
     MethodDecNode* parseMethodDecl(std::vector<MethodDecNode*> *methods, std::string &thisClassName);
     bool parseTypeDecl();
+    ExprNode* parseVarOrCall();
+    ExprNode* parseExpression();
+    ExprNode* parseStrInterpolation();
+    ExprNode* parseOr();
+    ExprNode* parseAnd();
+    ExprNode* parseEquality();
+    ExprNode* parseConditional();
+    ExprNode* parseAddSub();
+    ExprNode* parseMulDiv();
+    ExprNode* parseUnary();
+    ExprNode* parsePrimary();
 };
 
 

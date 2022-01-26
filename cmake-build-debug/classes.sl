@@ -1,9 +1,10 @@
 module main
     public class Time inherits Object
-        public field-string s := "field s";
-        public field-integer int := 5;
+        public field-boolean b := 1 > 5;
+        public field-string s := "test string!" + "aaa";
+        public field-integer int := 2 + (1 + 4) * 2;
         public field-real r := 15.25;
-        public field-boolean b := true;
+
         public field-character ch := "!";
 
         public field-string s1;

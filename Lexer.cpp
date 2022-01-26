@@ -38,8 +38,8 @@ std::map<std::string, TokenType> Lexer::tokensMap = {{"import",    TokenType::Im
 
                                                      {"+",         TokenType::Plus},
                                                      {"-",         TokenType::Minus},
-                                                     {"*",         TokenType::Division},
-                                                     {"/",         TokenType::Multiplication},
+                                                     {"/",         TokenType::Division},
+                                                     {"*",         TokenType::Multiplication},
 
                                                      {"(",         TokenType::LParen},
                                                      {")",         TokenType::RParen},

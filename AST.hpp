@@ -8,6 +8,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "TokenType.hpp"
 
 enum E_TYPE {
     E_UNKNOWN = -1,
@@ -21,6 +22,14 @@ enum E_TYPE {
     E_STRING,
     E_PTR,
     E_FUNC,
+};
+
+enum Operations
+{
+    Plus,
+    Minus,
+    Multiply,
+    Divide,
 };
 
 class Node
@@ -107,18 +116,34 @@ public:
 
 class UnaryOperatorExprNode: public ExprNode {
 public:
-    int op;
+    Operations op;
     ExprNode *right;
 
-    UnaryOperatorExprNode(int op, ExprNode *right): right(right), ExprNode(), op(op) {}
+    UnaryOperatorExprNode(Operations op, ExprNode *right): right(right), ExprNode(), op(op) {}
 };
 
 class OperatorExprNode: public ExprNode {
 public:
-    int op;
+    Operations op;
     ExprNode *left, *right;
 
-    OperatorExprNode(ExprNode *left, int op, ExprNode *right): left(left), right(right), op(op) {}
+    OperatorExprNode(ExprNode *left, Operations op, ExprNode *right): left(left), right(right), op(op) {}
+};
+
+class ConditionalExprNode: public ExprNode {
+public:
+    TokenType op;
+    ExprNode *left, *right;
+
+    ConditionalExprNode(ExprNode *left, TokenType op, ExprNode *right): left(left), right(right), op(op) {}
+};
+
+class CallExprNode : public ExprNode {
+public:
+    VariableExprNode *name;
+    std::vector<ExprNode*> *args;
+
+    CallExprNode(VariableExprNode *name, std::vector<ExprNode*> *args) : name(name), args(args) {}
 };
 
 class BlockExprNode: public ExprNode {

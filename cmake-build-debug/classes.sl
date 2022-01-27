@@ -50,5 +50,9 @@ start
 
     if (5 > 3 && 5 > 2) then
         output "test";
+    elseif (1 = 1) then
+
+    else
+
     end if;
 end main.

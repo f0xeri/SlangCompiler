@@ -200,6 +200,13 @@ public:
     explicit ReturnStatementNode(ExprNode *expr): expr(expr) {}
 };
 
+class OutputStatementNode : public StatementNode {
+public:
+    ExprNode *expr;
+
+    explicit OutputStatementNode(ExprNode *expr): expr(expr) {}
+};
+
 class DeclarationNode : public StatementNode
 {
 public:
@@ -259,8 +266,8 @@ class FuncDecStatementNode : public DeclarationNode {
 public:
     std::string type;
     std::vector<FuncParamDecStatementNode*> *args = nullptr;
-    bool isPrivate;
     BlockExprNode *block = nullptr;
+    bool isPrivate = false;
 
     FuncDecStatementNode(std::string type, VariableExprNode *name, bool isPrivate, std::vector<FuncParamDecStatementNode*> *args, BlockExprNode *block): type(std::move(type)), DeclarationNode(name), isPrivate(isPrivate), args(args), block(block) {}
 };
@@ -305,14 +312,12 @@ public:
 class TypeDecStatementNode : public DeclarationNode
 {
 public:
-    //std::vector<FieldDecNode*> *fields = nullptr;
-    //std::vector<MethodDecNode*> *methods = nullptr;
-    //TypeDecStatementNode *parentType = nullptr;
     std::vector<FieldDecNode*> *fields = nullptr;
     std::vector<MethodDecNode*> *methods = nullptr;
     TypeDecStatementNode *parentType = nullptr;
-    TypeDecStatementNode(VariableExprNode *name, std::vector<FieldDecNode*> *fields, std::vector<MethodDecNode*> *methods, TypeDecStatementNode *parentType = nullptr):
-                         DeclarationNode(name), fields(fields), methods(methods), parentType(parentType) {};
+    bool isPrivate = false;
+    TypeDecStatementNode(VariableExprNode *name, bool isPrivate, std::vector<FieldDecNode*> *fields, std::vector<MethodDecNode*> *methods, TypeDecStatementNode *parentType = nullptr):
+                         DeclarationNode(name), isPrivate(isPrivate), fields(fields), methods(methods), parentType(parentType) {};
 };
 
 class ExternFuncDecStatementNode : public DeclarationNode {
@@ -325,14 +330,24 @@ public:
     }
 };
 
+class ElseIfStatementNode : public StatementNode {
+public:
+    ExprNode *condExpr;
+    BlockExprNode *trueBlock;
+
+    ElseIfStatementNode(ExprNode *condExpr, BlockExprNode *trueBlock): condExpr(condExpr), trueBlock(trueBlock) {}
+};
+
 class IfStatementNode : public StatementNode {
 public:
     ExprNode *condExpr;
     BlockExprNode *trueBlock;
     BlockExprNode *falseBlock;
+    std::vector<ElseIfStatementNode*> *elseifNodes = nullptr;
 
     IfStatementNode(ExprNode *condExpr, BlockExprNode *trueBlock): condExpr(condExpr), trueBlock(trueBlock), falseBlock(new BlockExprNode()) {}
     IfStatementNode(ExprNode *condExpr, BlockExprNode *trueBlock, BlockExprNode *falseBlock): condExpr(condExpr), trueBlock(trueBlock), falseBlock(falseBlock) {}
+    IfStatementNode(ExprNode *condExpr, BlockExprNode *trueBlock, std::vector<ElseIfStatementNode*> *elseifNodes, BlockExprNode *falseBlock): condExpr(condExpr), trueBlock(trueBlock), elseifNodes(elseifNodes), falseBlock(falseBlock) {}
 };
 
 class ForStatementNode : public StatementNode {

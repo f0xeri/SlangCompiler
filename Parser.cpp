@@ -9,6 +9,7 @@ void Parser::parse()
 {
     parseImports();
     parseModuleDecl();
+    mainModuleNode->block = parseBlock(*mainModuleNode->name);
 }
 
 bool Parser::parseImports()
@@ -33,7 +34,7 @@ bool Parser::parseModuleDecl()
     while (token.type != TokenType::Start)
     {
         if (token.type == TokenType::VisibilityType) ret = parseVisibilityOperator();
-        else if (token.type == TokenType::Variable)       ret = parseVariableDecl();
+        else if (token.type == TokenType::Variable)  ret = parseVariableDecl();
         else return false;
         advance();
     }
@@ -41,21 +42,30 @@ bool Parser::parseModuleDecl()
     return ret;
 }
 
-bool Parser::parseBlock(VariableExprNode &name) {
+BlockExprNode* Parser::parseBlock(VariableExprNode &name) {
     bool blockEnd = false;
+    auto *statements = new std::vector<StatementNode*>();
+    auto *block = new BlockExprNode(statements);
     while (!blockEnd)
     {
-        // parse statements
         advance();
-        if (token.type != TokenType::End)
+        if (token.type == TokenType::If) statements->push_back(parseIfStatement());
+        else if (token.type == TokenType::Variable) statements->push_back(parseVariableDecl());
+        else if (token.type == TokenType::Output) statements->push_back(parseOutputStatement());
+        if (token.type == TokenType::End)
         {
-            consume(TokenType::Identifier);
+            advance();
+            std::string endName = consume(TokenType::Identifier).data;
+            if (endName == name.value)
+                blockEnd = true;
+            else
+            {
+                llvm::errs() << "[ERROR] Expected end of block \"" << name.value << "\", not \"" << endName << "\".\n";
+                return block;
+            }
         }
-        if (token.data == name.value)
-            blockEnd = true;
-        else return false;
     }
-    return true;
+    return block;
 }
 
 bool Parser::parseVisibilityOperator() {
@@ -88,7 +98,7 @@ FieldDecNode* Parser::parseFieldDecl(std::vector<FieldDecNode *> *fields, std::s
     }
     else
     {
-        if (type == thisClassName || currentScope->lookup(new VariableExprNode(type)) || oneOfDefaultTypes(type))
+        if (type == thisClassName || currentScope->lookup(type) || oneOfDefaultTypes(type))
         {
             tok = consume(TokenType::Identifier);
             name = tok.data;
@@ -224,6 +234,7 @@ bool Parser::parseTypeDecl() {
     auto *methods = new std::vector<MethodDecNode*>();
     std::string name;
     TypeDecStatementNode *parent;
+    bool isPrivate = token.data == "private";
     advance();
     if (token.type == TokenType::Identifier)
     {
@@ -234,7 +245,7 @@ bool Parser::parseTypeDecl() {
             advance();
             if (token.type == TokenType::Identifier)
             {
-                DeclarationNode *decl = currentScope->lookup(new VariableExprNode(token.data));
+                DeclarationNode *decl = currentScope->lookup(token.data);
                 if (decl != nullptr)
                 {
                     parent = dynamic_cast<TypeDecStatementNode*>(decl);
@@ -284,7 +295,7 @@ bool Parser::parseTypeDecl() {
                     if (token.type == TokenType::Identifier && token.data == name && advance().type == TokenType::Semicolon)
                     {
                         currentScope = scope->parent;
-                        typeNode = new TypeDecStatementNode(new VariableExprNode(name), fields, methods, parent);
+                        typeNode = new TypeDecStatementNode(new VariableExprNode(name), isPrivate, fields, methods, parent);
                         currentScope->insert(typeNode);
                     }
                 }
@@ -492,7 +503,17 @@ VarDecStatementNode* Parser::parseVariableDecl() {
     }
     else
     {
+        auto typeStatement = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(type));
+        if (typeStatement == nullptr)
+        {
+            llvm::errs() << "[ERROR] Unknown type \"" << type << "\".\n";
+        }
+        name = consume(TokenType::Identifier).data;
         // arrays and objects
+    }
+    if (currentScope->lookup(name) != nullptr || oneOfDefaultTypes(name))
+    {
+        llvm::errs() << "[ERROR] Name conflict - \"" << name << "\".\n";
     }
     auto result = new VarDecStatementNode(type, new VariableExprNode(name), expr);
     currentScope->insert(result);
@@ -540,4 +561,45 @@ FuncDecStatementNode *Parser::parseFunctionDecl() {
     auto function = new FuncDecStatementNode(type, new VariableExprNode(name), isPrivate, params, nullptr);
     currentScope->insert(function);
     return function;
+}
+
+IfStatementNode *Parser::parseIfStatement() {
+    consume(TokenType::If);
+    auto expr = parseExpression();
+    consume(TokenType::Then);
+    BlockExprNode *trueBlock = nullptr;
+    BlockExprNode *falseBlock = nullptr;
+    auto *elseifNodes = new std::vector<ElseIfStatementNode*>();
+    while (token.type != TokenType::End)
+    {
+        if (token.type != TokenType::Else && token.type != TokenType::Elseif)
+        {
+            // parse true block
+            trueBlock = new BlockExprNode(nullptr);
+        }
+        else
+        {
+            if (token.type == TokenType::Elseif) elseifNodes->push_back(parseElseIfBlock());
+            else if (token.type == TokenType::Else) falseBlock = parseElseBlock();
+        }
+        advance();
+    }
+    consume(TokenType::End);
+    consume(TokenType::If);
+    consume(TokenType::Semicolon);
+    return new IfStatementNode(expr, trueBlock, elseifNodes, falseBlock);
+}
+
+ElseIfStatementNode *Parser::parseElseIfBlock() {
+    return nullptr;
+}
+
+BlockExprNode *Parser::parseElseBlock() {
+    return nullptr;
+}
+
+OutputStatementNode *Parser::parseOutputStatement() {
+    consume(TokenType::Output);
+    auto expr = parseExpression();
+    return new OutputStatementNode(expr);
 }

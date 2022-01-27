@@ -21,14 +21,14 @@ public:
         return symbols.insert({declarationNode->name->value, declarationNode}).second;
     }
 
-    DeclarationNode* lookup(VariableExprNode *name)
+    DeclarationNode* lookup(const std::string &name)
     {
         Scope *s = this;
         while (s)
         {
             /*llvm::StringMap<DeclarationNode*>::iterator i = s->symbols.find(name->value);
             if (i != s->symbols.end()) return i->second;*/
-            if (symbols.contains(name->value)) return symbols[name->value];
+            if (symbols.contains(name)) return symbols[name];
             s = s->parent;
         }
         return nullptr;

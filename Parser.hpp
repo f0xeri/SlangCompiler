@@ -30,6 +30,11 @@ public:
 
     Token advance()
     {
+        if (token.type == TokenType::EndOfFile)
+        {
+            llvm::errs() << "[ERROR] Unexpected EOF token.\n";
+            return token;
+        }
         tokensIterator++;
         token = *tokensIterator;
         return token;
@@ -153,13 +158,17 @@ public:
     ModuleStatementNode *mainModuleNode;
     bool parseImports();
     bool parseModuleDecl();
-    bool parseBlock(VariableExprNode &name);
+    BlockExprNode* parseBlock(VariableExprNode &name);
     bool parseVisibilityOperator();
     VarDecStatementNode* parseVariableDecl();
     bool parseStatement();
     FieldDecNode* parseFieldDecl(std::vector<FieldDecNode *> *fields, std::string &thisClassName);
     MethodDecNode* parseMethodDecl(std::vector<MethodDecNode*> *methods, std::string &thisClassName);
     FuncDecStatementNode* parseFunctionDecl();
+    IfStatementNode* parseIfStatement();
+    ElseIfStatementNode* parseElseIfBlock();
+    BlockExprNode* parseElseBlock();
+    OutputStatementNode* parseOutputStatement();
     bool parseTypeDecl();
     ExprNode* parseVarOrCall();
     ExprNode* parseExpression();

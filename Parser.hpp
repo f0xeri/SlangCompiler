@@ -90,7 +90,7 @@ public:
         return true;
     }
 
-    std::vector<VarDecStatementNode *>* parseFuncParameters();
+    std::vector<FuncParamDecStatementNode *>* parseFuncParameters();
 
     FieldVarDecNode* initDefaultType(bool isPrivate, const std::string &name, const std::string &type, TokenType dataType, const std::string &data)
     {
@@ -155,10 +155,11 @@ public:
     bool parseModuleDecl();
     bool parseBlock(VariableExprNode &name);
     bool parseVisibilityOperator();
+    VarDecStatementNode* parseVariableDecl();
     bool parseStatement();
-    bool parseFuncDecl();
     FieldDecNode* parseFieldDecl(std::vector<FieldDecNode *> *fields, std::string &thisClassName);
     MethodDecNode* parseMethodDecl(std::vector<MethodDecNode*> *methods, std::string &thisClassName);
+    FuncDecStatementNode* parseFunctionDecl();
     bool parseTypeDecl();
     ExprNode* parseVarOrCall();
     ExprNode* parseExpression();

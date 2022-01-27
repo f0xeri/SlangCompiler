@@ -33,6 +33,7 @@ bool Parser::parseModuleDecl()
     while (token.type != TokenType::Start)
     {
         if (token.type == TokenType::VisibilityType) ret = parseVisibilityOperator();
+        else if (token.type == TokenType::Variable)       ret = parseVariableDecl();
         else return false;
         advance();
     }
@@ -59,18 +60,14 @@ bool Parser::parseBlock(VariableExprNode &name) {
 
 bool Parser::parseVisibilityOperator() {
     advance();
-    bool ret = false;
-    if (token.type == TokenType::Function) ret = parseFuncDecl();
-    else if (token.type == TokenType::Procedure) ret = parseFuncDecl();
-    else if (token.type == TokenType::Class) ret = parseTypeDecl();
-    return ret;
+    //bool ret = false;
+    if (token.type == TokenType::Function) parseFunctionDecl();
+    else if (token.type == TokenType::Procedure) parseFunctionDecl();
+    else if (token.type == TokenType::Class) parseTypeDecl();
+    return true;
 }
 
 bool Parser::parseStatement() {
-    return false;
-}
-
-bool Parser::parseFuncDecl() {
     return false;
 }
 
@@ -137,18 +134,27 @@ FieldDecNode* Parser::parseFieldDecl(std::vector<FieldDecNode *> *fields, std::s
     return field;
 }
 
-std::vector<VarDecStatementNode*> *Parser::parseFuncParameters()
+std::vector<FuncParamDecStatementNode*> *Parser::parseFuncParameters()
 {
-    auto* params = new std::vector<VarDecStatementNode*>();
+    auto* params = new std::vector<FuncParamDecStatementNode*>();
     consume(TokenType::LParen);
     while (token.type != TokenType::RParen)
     {
         std::string type, name;
+        ParameterType parameterType{};
+        std::string ptype = consume(TokenType::Identifier).data;
+        if (ptype == "in") parameterType = ParameterType::In;
+        else if (ptype == "var") parameterType = ParameterType::Var;
+        else if (ptype == "out") parameterType = ParameterType::Out;        // probably we dont need "out" type
         type = consume(TokenType::Identifier).data;
         name = consume(TokenType::Identifier).data;
-        params->push_back(new VarDecStatementNode(type, new VariableExprNode(name)));
-        advance();
-        if (expect(TokenType::Comma)) advance();
+        params->push_back(new FuncParamDecStatementNode(type, new VariableExprNode(name), parameterType));
+        //advance();
+        if (token.type != TokenType::Comma)
+        {
+            expect(TokenType::RParen);
+        }
+        else advance();
     }
     return params;
 }
@@ -465,4 +471,73 @@ ExprNode *Parser::parseVarOrCall() {
     }
     advance();
     return new CallExprNode(new VariableExprNode(name), params);
+}
+
+VarDecStatementNode* Parser::parseVariableDecl() {
+    std::string type;
+    std::string name;
+    advance();
+    consume(TokenType::Minus);
+    ExprNode *expr = nullptr;
+    type = consume(TokenType::Identifier).data;
+    if (oneOfDefaultTypes(type))
+    {
+        name = consume(TokenType::Identifier).data;
+        if (token.type == TokenType::Assign)
+        {
+            advance();
+            expr = parseExpression();
+        }
+        expect(TokenType::Semicolon);
+    }
+    else
+    {
+        // arrays and objects
+    }
+    auto result = new VarDecStatementNode(type, new VariableExprNode(name), expr);
+    currentScope->insert(result);
+    return result;
+}
+
+FuncDecStatementNode *Parser::parseFunctionDecl() {
+    tokensIterator--;
+    token = *tokensIterator;
+    bool isPrivate = false;
+    if (token.data == "private") isPrivate = true;
+    advance();
+    bool isFunction = false;
+    if (match(TokenType::Function)) isFunction = true;
+    else {
+        consume(TokenType::Procedure);
+    }
+    std::string name = consume(TokenType::Identifier).data;
+    std::string type;
+    auto params = parseFuncParameters();
+    if (isFunction)
+    {
+        advance();
+        consume(TokenType::Colon);
+        type = consume(TokenType::Identifier).data;
+    }
+    // parse statements
+
+    while (token.type != TokenType::End)
+    {
+        advance();
+    }
+    advance();
+    Token tok = consume(TokenType::Identifier);
+    if (tok.data != name)
+    {
+        llvm::errs() << "[ERROR] Expected end of block \"" << name + "\", not \"" << tok.data << "\".\n";
+        hasError = true;
+    }
+    if (token.type != TokenType::Semicolon)
+    {
+        llvm::errs() << "[ERROR] Unexpected token \"" << token.data + "\", expected \"" + Lexer::getTokenName(TokenType::Semicolon) + "\".\n";
+        hasError = true;
+    }
+    auto function = new FuncDecStatementNode(type, new VariableExprNode(name), isPrivate, params, nullptr);
+    currentScope->insert(function);
+    return function;
 }

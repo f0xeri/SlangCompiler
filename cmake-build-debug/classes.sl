@@ -1,4 +1,6 @@
 module main
+    variable-string globalstr := "global string";
+    variable-integer globalint := 15;
     public class Time inherits Object
         public field-boolean b := 1 > 5;
         public field-string s := "test string!" + "aaa";
@@ -26,7 +28,7 @@ module main
             return this.s;
         end p2;
     end Time;
-
+    variable-real globalreal := 100.1;
     public class ABC inherits Time
 
     end ABC;
@@ -34,6 +36,10 @@ module main
     public function first(in string a):string
         return 1 == 2;
     end first;
+
+    private procedure second(in string a, var integer b)
+
+    end second;
 
 start
     variable-ABC abc;

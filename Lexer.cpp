@@ -19,7 +19,7 @@ std::map<std::string, TokenType> Lexer::tokensMap = {{"import",    TokenType::Im
                                                      {"field",     TokenType::Field},
                                                      {"method",    TokenType::Method},
                                                      {"function",  TokenType::Function},
-                                                     {"Procedure", TokenType::Procedure},
+                                                     {"procedure", TokenType::Procedure},
                                                      {"call",      TokenType::Call},
                                                      {"return",    TokenType::Return},
 

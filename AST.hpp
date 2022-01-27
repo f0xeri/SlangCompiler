@@ -32,6 +32,13 @@ enum Operations
     Divide,
 };
 
+enum ParameterType
+{
+    In,
+    Out,
+    Var
+};
+
 class Node
 {
 public:
@@ -211,6 +218,16 @@ public:
     VarDecStatementNode(std::string type, VariableExprNode *name, ExprNode *expr): type(std::move(type)), DeclarationNode(name), expr(expr) {}
 };
 
+class FuncParamDecStatementNode : public DeclarationNode {
+public:
+    ParameterType parameterType;
+    std::string type;
+    ExprNode *expr;
+
+    FuncParamDecStatementNode(std::string type, VariableExprNode *name, ParameterType parameterType): type(std::move(type)), DeclarationNode(name), parameterType(parameterType), expr(nullptr) {}
+    FuncParamDecStatementNode(std::string type, VariableExprNode *name, ParameterType parameterType, ExprNode *expr): type(std::move(type)), DeclarationNode(name), parameterType(parameterType), expr(expr) {}
+};
+
 class ArrayDecStatementNode : public DeclarationNode {
 public:
     std::string type;
@@ -240,11 +257,12 @@ public:
 
 class FuncDecStatementNode : public DeclarationNode {
 public:
-    VariableExprNode *type;
-    std::vector<VarDecStatementNode*> *args;
-    BlockExprNode *block;
+    std::string type;
+    std::vector<FuncParamDecStatementNode*> *args = nullptr;
+    bool isPrivate;
+    BlockExprNode *block = nullptr;
 
-    FuncDecStatementNode(VariableExprNode *type, VariableExprNode *name, std::vector<VarDecStatementNode*> *args, BlockExprNode *block): type(type), DeclarationNode(name), args(args), block(block) {}
+    FuncDecStatementNode(std::string type, VariableExprNode *name, bool isPrivate, std::vector<FuncParamDecStatementNode*> *args, BlockExprNode *block): type(std::move(type)), DeclarationNode(name), isPrivate(isPrivate), args(args), block(block) {}
 };
 
 class FieldDecNode : public DeclarationNode
@@ -276,11 +294,11 @@ class MethodDecNode : public DeclarationNode
 public:
     std::string type;
     VariableExprNode *thisName;
-    std::vector<VarDecStatementNode*> *args = nullptr;
+    std::vector<FuncParamDecStatementNode*> *args = nullptr;
     BlockExprNode *block = nullptr;
-    bool isPrivate;
+    bool isPrivate = false;
 
-    MethodDecNode(std::string type, VariableExprNode *name, bool isPrivate, VariableExprNode *thisName, std::vector<VarDecStatementNode*> *args, BlockExprNode *block):
+    MethodDecNode(std::string type, VariableExprNode *name, bool isPrivate, VariableExprNode *thisName, std::vector<FuncParamDecStatementNode*> *args, BlockExprNode *block):
             type(std::move(type)), DeclarationNode(name), isPrivate(isPrivate), thisName(thisName), args(args), block(block) {};
 };
 

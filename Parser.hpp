@@ -27,6 +27,11 @@ public:
         currentScope->insert(new TypeDecStatementNode(new VariableExprNode("Object"), {}, {}, nullptr));
         this->tokens = tokens;
     }
+    ~Parser()
+    {
+        delete currentScope;
+        delete mainModuleNode;
+    };
 
     Token advance()
     {
@@ -86,9 +91,9 @@ public:
         return false;
     }
 
-    bool isFieldNameCorrect(std::vector<FieldDecNode *> *fields, const std::string &name)
+    bool isFieldNameCorrect(std::vector<FieldVarDecNode *> *fields, const std::string &name)
     {
-        if (std::find_if(fields->begin(), fields->end(), [&name](FieldDecNode *field){ return field->name->value == name; }) != fields->end())
+        if (std::find_if(fields->begin(), fields->end(), [&name](FieldVarDecNode *field){ return field->name->value == name; }) != fields->end())
         {
             return false;
         }
@@ -160,14 +165,15 @@ public:
     bool parseModuleDecl();
     BlockExprNode* parseBlock(VariableExprNode &name);
     bool parseVisibilityOperator();
-    VarDecStatementNode* parseVariableDecl();
+    VarDecStatementNode* parseVariableDecl(bool isGlobal = false);
     bool parseStatement();
-    FieldDecNode* parseFieldDecl(std::vector<FieldDecNode *> *fields, std::string &thisClassName);
+    FieldVarDecNode* parseFieldDecl(std::vector<FieldVarDecNode *> *fields, std::string &thisClassName, bool &constructorRequired);
     MethodDecNode* parseMethodDecl(std::vector<MethodDecNode*> *methods, std::string &thisClassName);
     FuncDecStatementNode* parseFunctionDecl();
     IfStatementNode* parseIfStatement();
     ElseIfStatementNode* parseElseIfBlock();
     BlockExprNode* parseElseBlock();
+    AssignExprNode* parseAssignStatement();
     OutputStatementNode* parseOutputStatement();
     bool parseTypeDecl();
     ExprNode* parseVarOrCall();

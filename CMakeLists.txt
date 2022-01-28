@@ -1,15 +1,24 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.17)
 project(slangParser)
 
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_BUILD_TYPE Debug)
-find_package(LLVM REQUIRED CONFIG)
+
+#DEBUG
+message("Building in DEBUG mode.")
+set(LLVM-debug_DIR "C:\\Program Files (x86)\\LLVM-debug\\lib\\cmake\\llvm")
+find_package(LLVM-debug REQUIRED CONFIG)
+
+#RELEASE
+#message("Building in RELEASE mode.")
+#set(CMAKE_BUILD_TYPE Release)
+#find_package(LLVM REQUIRED CONFIG)
+
 message("Found LLVM ${LLVM_PACKAGE_VERSION}, build type ${LLVM_BUILD_TYPE}")
 list(APPEND CMAKE_MODULE_PATH ${LLVM_DIR})
 
 add_definitions(${LLVM_DEFINITIONS})
 include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
-llvm_map_components_to_libnames(llvm_libs Core support)
+llvm_map_components_to_libnames(llvm_libs support core irreader)
 
 add_executable(slangParser main.cpp Lexer.hpp Lexer.cpp TokenType.hpp Logger.hpp Parser.cpp Parser.hpp AST.cpp AST.hpp Scope.hpp)
 target_link_libraries(slangParser PRIVATE ${llvm_libs})

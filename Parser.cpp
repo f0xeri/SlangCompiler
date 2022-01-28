@@ -34,7 +34,7 @@ bool Parser::parseModuleDecl()
     while (token.type != TokenType::Start)
     {
         if (token.type == TokenType::VisibilityType) ret = parseVisibilityOperator();
-        else if (token.type == TokenType::Variable)  ret = parseVariableDecl();
+        else if (token.type == TokenType::Variable)  ret = parseVariableDecl(true);
         else return false;
         advance();
     }
@@ -81,8 +81,8 @@ bool Parser::parseStatement() {
     return false;
 }
 
-FieldDecNode* Parser::parseFieldDecl(std::vector<FieldDecNode *> *fields, std::string &thisClassName) {
-    FieldDecNode *field = nullptr;
+FieldVarDecNode* Parser::parseFieldDecl(std::vector<FieldVarDecNode *> *fields, std::string &thisClassName, bool &constructorRequired) {
+    FieldVarDecNode *field = nullptr;
     std::string name;
     std::string type;
     bool isPrivate = false;
@@ -116,6 +116,7 @@ FieldDecNode* Parser::parseFieldDecl(std::vector<FieldDecNode *> *fields, std::s
                     advance();
                     expr = parseExpression();
                     field = new FieldVarDecNode(new VariableExprNode(name), isPrivate, type, expr);
+                    constructorRequired = true;
                     if (DEBUG) llvm::outs() << "parsed field " << type << " " << name << "\n";
                 }
                 else
@@ -230,12 +231,13 @@ MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std
 
 bool Parser::parseTypeDecl() {
     TypeDecStatementNode *typeNode;
-    auto *fields = new std::vector<FieldDecNode*>();
+    auto *fields = new std::vector<FieldVarDecNode*>();
     auto *methods = new std::vector<MethodDecNode*>();
     std::string name;
     TypeDecStatementNode *parent;
     bool isPrivate = token.data == "private";
     advance();
+    bool constructorRequired = false;
     if (token.type == TokenType::Identifier)
     {
         name = token.data;
@@ -268,7 +270,7 @@ bool Parser::parseTypeDecl() {
                             {
                                 tokensIterator--;
                                 token = *tokensIterator;
-                                auto field = parseFieldDecl(fields, name);
+                                auto field = parseFieldDecl(fields, name, constructorRequired);
                                 if (field != nullptr)
                                 {
                                     fields->push_back(field);
@@ -291,6 +293,23 @@ bool Parser::parseTypeDecl() {
                             }
                         }
                     }
+
+                    if (constructorRequired)
+                    {
+                        std::string constructorName = name + "DefaultConstructor";
+                        std::string constructorType = "";
+                        bool constructorIsPrivate = false;
+                        auto *constructorStatements = new std::vector<StatementNode*>();
+                        //constructorStatements->push_back(new AssignExprNode());
+                        for (auto field : *fields)
+                        {
+                            constructorStatements->push_back(new AssignExprNode(field->name, field->expr));
+                        }
+                        auto constructor = new MethodDecNode(constructorType, new VariableExprNode(constructorName), constructorIsPrivate, new VariableExprNode(name),
+                                                   nullptr, new BlockExprNode(constructorStatements));
+                        methods->push_back(constructor);
+                    }
+
                     advance();
                     if (token.type == TokenType::Identifier && token.data == name && advance().type == TokenType::Semicolon)
                     {
@@ -484,7 +503,7 @@ ExprNode *Parser::parseVarOrCall() {
     return new CallExprNode(new VariableExprNode(name), params);
 }
 
-VarDecStatementNode* Parser::parseVariableDecl() {
+VarDecStatementNode* Parser::parseVariableDecl(bool isGlobal) {
     std::string type;
     std::string name;
     advance();
@@ -515,8 +534,8 @@ VarDecStatementNode* Parser::parseVariableDecl() {
     {
         llvm::errs() << "[ERROR] Name conflict - \"" << name << "\".\n";
     }
-    auto result = new VarDecStatementNode(type, new VariableExprNode(name), expr);
-    currentScope->insert(result);
+    auto result = new VarDecStatementNode(type, new VariableExprNode(name), expr, isGlobal);
+    if (isGlobal) currentScope->insert(result);
     return result;
 }
 
@@ -602,4 +621,12 @@ OutputStatementNode *Parser::parseOutputStatement() {
     consume(TokenType::Output);
     auto expr = parseExpression();
     return new OutputStatementNode(expr);
+}
+
+AssignExprNode *Parser::parseAssignStatement() {
+    consume(TokenType::Let);
+    std::string varName = consume(TokenType::Identifier).data;
+    consume(TokenType::Assign);
+    auto expr = parseExpression();
+    return new AssignExprNode(new VariableExprNode(varName), expr);
 }

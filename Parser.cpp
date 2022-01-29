@@ -9,7 +9,7 @@ void Parser::parse()
 {
     parseImports();
     parseModuleDecl();
-    mainModuleNode->block = parseBlock(*mainModuleNode->name);
+    mainModuleNode->block = parseBlock(mainModuleNode->name);
 }
 
 bool Parser::parseImports()
@@ -42,7 +42,7 @@ bool Parser::parseModuleDecl()
     return ret;
 }
 
-BlockExprNode* Parser::parseBlock(VariableExprNode &name) {
+BlockExprNode* Parser::parseBlock(VariableExprNode *name) {
     bool blockEnd = false;
     auto *statements = new std::vector<StatementNode*>();
     auto *block = new BlockExprNode(statements);
@@ -52,15 +52,17 @@ BlockExprNode* Parser::parseBlock(VariableExprNode &name) {
         if (token.type == TokenType::If) statements->push_back(parseIfStatement());
         else if (token.type == TokenType::Variable) statements->push_back(parseVariableDecl());
         else if (token.type == TokenType::Output) statements->push_back(parseOutputStatement());
+        else if (token.type == TokenType::Return) statements->push_back(parseReturnStatement());
+        else if (token.type == TokenType::Let) statements->push_back(parseAssignStatement());
         if (token.type == TokenType::End)
         {
             advance();
             std::string endName = consume(TokenType::Identifier).data;
-            if (endName == name.value)
+            if (endName == name->value)
                 blockEnd = true;
             else
             {
-                llvm::errs() << "[ERROR] Expected end of block \"" << name.value << "\", not \"" << endName << "\".\n";
+                llvm::errs() << "[ERROR] Expected end of block \"" << name->value << "\", not \"" << endName << "\".\n";
                 return block;
             }
         }
@@ -469,7 +471,7 @@ ExprNode *Parser::parsePrimary() {
     else if (tok.type == TokenType::Identifier)
     {
         // vars, funcs, arrays, fields
-        return nullptr;
+        return reinterpret_cast<ExprNode *>(parseVarOrCall());
     }
     else if (tok.type == TokenType::Integer) return new IntExprNode(std::stoi(tok.data));
     else if (tok.type == TokenType::Real) return new RealExprNode(std::stod(tok.data));
@@ -483,9 +485,12 @@ ExprNode *Parser::parsePrimary() {
     return nullptr;
 }
 
-ExprNode *Parser::parseVarOrCall() {
-    Token tok = consume(TokenType::Identifier);
+StatementNode* Parser::parseVarOrCall() {
+    tokensIterator--;
+    token = *tokensIterator;
+    Token tok = token;
     std::string name = tok.data;
+    advance();
     if (token.type != TokenType::LParen) return new VariableExprNode(name);
     consume(TokenType::LParen);
     auto *params = new std::vector<ExprNode*>();
@@ -496,7 +501,6 @@ ExprNode *Parser::parseVarOrCall() {
             if (auto arg = parseExpression())
                 params->push_back(arg);
             else return nullptr;
-            advance();
             if (token.type == TokenType::RParen) break;
             consume(TokenType::Comma);
         }
@@ -559,27 +563,18 @@ FuncDecStatementNode *Parser::parseFunctionDecl() {
     {
         advance();
         consume(TokenType::Colon);
-        type = consume(TokenType::Identifier).data;
+        expect(TokenType::Identifier);
+        type = token.data;
     }
-    // parse statements
 
-    while (token.type != TokenType::End)
-    {
-        advance();
-    }
-    advance();
-    Token tok = consume(TokenType::Identifier);
-    if (tok.data != name)
-    {
-        llvm::errs() << "[ERROR] Expected end of block \"" << name + "\", not \"" << tok.data << "\".\n";
-        hasError = true;
-    }
+    auto block = parseBlock(new VariableExprNode(name));
+
     if (token.type != TokenType::Semicolon)
     {
         llvm::errs() << "[ERROR] Unexpected token \"" << token.data + "\", expected \"" + Lexer::getTokenName(TokenType::Semicolon) + "\".\n";
         hasError = true;
     }
-    auto function = new FuncDecStatementNode(type, new VariableExprNode(name), isPrivate, params, nullptr);
+    auto function = new FuncDecStatementNode(type, new VariableExprNode(name), isPrivate, params, block);
     currentScope->insert(function);
     return function;
 }
@@ -631,4 +626,10 @@ AssignExprNode *Parser::parseAssignStatement() {
     consume(TokenType::Assign);
     auto expr = parseExpression();
     return new AssignExprNode(new VariableExprNode(varName), expr);
+}
+
+ReturnStatementNode *Parser::parseReturnStatement() {
+    consume(TokenType::Return);
+    auto expr = parseExpression();
+    return new ReturnStatementNode(expr);
 }

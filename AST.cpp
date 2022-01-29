@@ -31,7 +31,19 @@ llvm::Value *BooleanExprNode::codegen(CodeGenContext &cgconext) {
 }
 
 llvm::Value *VariableExprNode::codegen(CodeGenContext &cgconext) {
-    return nullptr;
+    Value* val;
+    Type* type;
+    if (cgconext.locals().find(value) == cgconext.locals().end())
+    {
+        llvm::errs() << "[ERROR] Undeclared Variable \"" << value << "\".\n";
+        return nullptr;
+    }
+    else
+    {
+        val = cgconext.locals()[value];
+        type = val->getType()->getPointerElementType();
+    }
+    return new LoadInst(type, val, "", false, cgconext.currentBlock());
 }
 
 llvm::Value *UnaryOperatorExprNode::codegen(CodeGenContext &cgconext) {
@@ -64,7 +76,14 @@ llvm::Value *ConditionalExprNode::codegen(CodeGenContext &cgconext) {
 }
 
 llvm::Value *CallExprNode::codegen(CodeGenContext &cgconext) {
-    return nullptr;
+    Function *function = cgconext.mModule->getFunction(name->value);
+    if (function == nullptr)
+        llvm::errs() << "[ERROR] Codegen - no such function \"" << name->value << "\".\n";
+    std::vector<Value*> argsRef;
+    for (auto it = args->begin(); it != args->end(); it++)
+        argsRef.push_back((*it)->codegen(cgconext));
+    CallInst *call = CallInst::Create(function, makeArrayRef(argsRef), "", cgconext.currentBlock());
+    return call;
 }
 
 llvm::Value *BlockExprNode::codegen(CodeGenContext &cgconext) {
@@ -88,7 +107,7 @@ llvm::Value *ExprStatementNode::codegen(CodeGenContext &cgconext) {
 }
 
 llvm::Value *ReturnStatementNode::codegen(CodeGenContext &cgconext) {
-    return nullptr;
+    return cgconext.Builder.CreateRet(expr->codegen(cgconext));
 }
 
 llvm::Value *OutputStatementNode::codegen(CodeGenContext &cgconext) {
@@ -117,6 +136,23 @@ static Type *typeOf(CodeGenContext &cgconext, const std::string &var) {
     return type;
 }
 
+static Type *ptrToTypeOf(CodeGenContext &cgconext, const std::string &var) {
+    Type *type = nullptr;
+    if (var == "integer")
+        type = Type::getInt64PtrTy(getGlobalContext());
+    else if (var == "character")
+        type = Type::getInt8PtrTy(getGlobalContext());
+    else if (var == "real")
+        type = Type::getDoublePtrTy(getGlobalContext());
+    else if (var.empty())
+        type = Type::getVoidTy(getGlobalContext());
+    else
+    {
+        if (cgconext.allocatedClasses.contains(var))
+            type = cgconext.allocatedClasses[var]->getPointerTo();
+    }
+    return type;
+}
 
 llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgconext) {
     Value* newVar = nullptr;
@@ -169,22 +205,57 @@ std::string getParameterTypeName(ParameterType type)
 
 llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgconext) {
     std::vector<llvm::Type*> argTypes;
+    std::vector<int> refParams;
+    int i = 1;
     for (auto arg : *args)
     {
-        argTypes.push_back(typeOf(cgconext, arg->type));
+        Type* argType = typeOf(cgconext, arg->type);
+        if (arg->parameterType == ParameterType::Out || arg->parameterType == ParameterType::Var)
+        {
+            argTypes.push_back(ptrToTypeOf(cgconext, arg->type));
+            refParams.push_back(i);
+        }
+        else
+        {
+            argTypes.push_back(typeOf(cgconext, arg->type));
+        }
+        i++;
     }
     FunctionType* funcType = FunctionType::get(typeOf(cgconext, type), argTypes, false);
     auto function = Function::Create(funcType, GlobalValue::ExternalLinkage, name->value, cgconext.mModule);
+    for (auto paramID : refParams)
+    {
+        // TODO Set Dereferenceable attributy for ref params
+        //function->addAttribute(paramID, Attribute::Dereferenceable);
+    }
     BasicBlock *bb = BasicBlock::Create(getGlobalContext(), type + name->value + "Entry", function, 0);
     cgconext.pushBlock(bb);
-    //cgconext.Builder.SetInsertPoint(bb);
+    cgconext.Builder.SetInsertPoint(bb);
     Function::arg_iterator argsValues = function->arg_begin();
     for (auto it = args->begin(); it != args->end(); it++, argsValues++) {
-        auto var = new AllocaInst(typeOf(cgconext, (*it)->type), 0, nullptr, (*it)->name->value, bb);
-        cgconext.locals()[(*it)->name->value] = var;
-        Value *argumentValue = &(*argsValues);
-        argumentValue->setName(getParameterTypeName((*it)->parameterType) + (*it)->name->value);
-        StoreInst *inst = new StoreInst(argumentValue, cgconext.locals()[(*it)->name->value], false, bb);
+        if ((*it)->parameterType == ParameterType::Out || (*it)->parameterType == ParameterType::Var)
+        {
+            auto var = new AllocaInst(ptrToTypeOf(cgconext, (*it)->type), 0, nullptr, (*it)->name->value, bb);
+            cgconext.locals()[(*it)->name->value] = var;
+            Value *argumentValue = &(*argsValues);
+            argumentValue->setName(getParameterTypeName((*it)->parameterType) + (*it)->name->value);
+            StoreInst *inst = new StoreInst(argumentValue, cgconext.locals()[(*it)->name->value], false, bb);
+        }
+        else
+        {
+            auto var = new AllocaInst(typeOf(cgconext, (*it)->type), 0, nullptr, (*it)->name->value, bb);
+            cgconext.locals()[(*it)->name->value] = var;
+            Value *argumentValue = &(*argsValues);
+            argumentValue->setName(getParameterTypeName((*it)->parameterType) + (*it)->name->value);
+            StoreInst *inst = new StoreInst(argumentValue, cgconext.locals()[(*it)->name->value], false, bb);
+        }
+    }
+    if (block != nullptr)
+    {
+        for (auto statement : *block->statements)
+        {
+            statement->codegen(cgconext);
+        }
     }
     cgconext.popBlock();
     //cgconext.Builder.SetInsertPoint(cgconext.currentBlock());

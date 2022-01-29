@@ -163,7 +163,7 @@ public:
     ModuleStatementNode *mainModuleNode;
     bool parseImports();
     bool parseModuleDecl();
-    BlockExprNode* parseBlock(VariableExprNode &name);
+    BlockExprNode* parseBlock(VariableExprNode *name);
     bool parseVisibilityOperator();
     VarDecStatementNode* parseVariableDecl(bool isGlobal = false);
     bool parseStatement();
@@ -175,8 +175,9 @@ public:
     BlockExprNode* parseElseBlock();
     AssignExprNode* parseAssignStatement();
     OutputStatementNode* parseOutputStatement();
+    ReturnStatementNode* parseReturnStatement();
     bool parseTypeDecl();
-    ExprNode* parseVarOrCall();
+    StatementNode * parseVarOrCall();
     ExprNode* parseExpression();
     ExprNode* parseStrInterpolation();
     ExprNode* parseOr();

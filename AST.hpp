@@ -158,7 +158,7 @@ public:
     virtual llvm::Value *codegen(CodeGenContext &cgconext);
 };
 
-class VariableExprNode: public ExprNode {
+class VariableExprNode: public ExprNode, public StatementNode {
 public:
     std::string value;
 
@@ -195,7 +195,7 @@ public:
     virtual llvm::Value *codegen(CodeGenContext &cgconext);
 };
 
-class CallExprNode : public ExprNode {
+class CallExprNode : public ExprNode, public StatementNode {
 public:
     VariableExprNode *name;
     std::vector<ExprNode*> *args;

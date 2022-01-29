@@ -5,6 +5,8 @@
 #ifndef SLANGPARSER_SCOPE_HPP
 #define SLANGPARSER_SCOPE_HPP
 
+#include <algorithm>
+#include <ranges>
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "AST.hpp"
@@ -13,12 +15,23 @@ class Scope
 {
 public:
     Scope *parent = nullptr;
-    std::map<std::string, DeclarationNode*> symbols;
+    //std::unordered_map<std::string, DeclarationNode*> symbols;
+    std::vector<std::pair<std::string, DeclarationNode*>> symbols;
     Scope() = default;
     Scope(Scope *parent) : parent(parent) {};
-    bool insert(DeclarationNode *declarationNode)
+    void insert(DeclarationNode *declarationNode)
     {
-        return symbols.insert({declarationNode->name->value, declarationNode}).second;
+        symbols.emplace_back(declarationNode->name->value, declarationNode);
+    }
+
+    bool contains(const std::string &name)
+    {
+        return std::ranges::find(symbols, name, &std::pair<std::string, DeclarationNode*>::first) != symbols.end();
+    }
+
+    DeclarationNode* get(const std::string &name)
+    {
+        return (*(std::ranges::find(symbols, name, &std::pair<std::string, DeclarationNode*>::first))).second;
     }
 
     DeclarationNode* lookup(const std::string &name)
@@ -28,7 +41,7 @@ public:
         {
             /*llvm::StringMap<DeclarationNode*>::iterator i = s->symbols.find(name->value);
             if (i != s->symbols.end()) return i->second;*/
-            if (symbols.contains(name)) return symbols[name];
+            if (contains(name)) return get(name);
             s = s->parent;
         }
         return nullptr;

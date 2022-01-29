@@ -32,11 +32,19 @@ llvm::Value *BooleanExprNode::codegen(CodeGenContext &cgconext) {
 
 llvm::Value *VariableExprNode::codegen(CodeGenContext &cgconext) {
     Value* val;
-    Type* type;
+    Type *type = nullptr;
     if (cgconext.locals().find(value) == cgconext.locals().end())
     {
-        llvm::errs() << "[ERROR] Undeclared Variable \"" << value << "\".\n";
-        return nullptr;
+        if(cgconext.globals().find(value) == cgconext.globals().end())
+        {
+            llvm::errs() << "[ERROR] Undeclared Variable \"" << value << "\".\n";
+            return nullptr;
+        }
+        else
+        {
+            val = cgconext.globals()[value];
+            type = val->getType()->getPointerElementType();
+        }
     }
     else
     {
@@ -47,7 +55,7 @@ llvm::Value *VariableExprNode::codegen(CodeGenContext &cgconext) {
 }
 
 llvm::Value *UnaryOperatorExprNode::codegen(CodeGenContext &cgconext) {
-    return nullptr;
+    return BinaryOperator::CreateNeg(right->codegen(cgconext), "", cgconext.currentBlock());
 }
 
 llvm::Value *OperatorExprNode::codegen(CodeGenContext &cgconext) {
@@ -91,7 +99,19 @@ llvm::Value *BlockExprNode::codegen(CodeGenContext &cgconext) {
 }
 
 llvm::Value *AssignExprNode::codegen(CodeGenContext &cgconext) {
-    return nullptr;
+    Value* var;
+    auto assignData = right->codegen(cgconext);
+    if (cgconext.locals().find(left->value) == cgconext.locals().end())
+    {
+        llvm::errs() << "[ERROR] Undeclared Variable \"" << left->value << "\".\n";
+        return nullptr;
+    }
+    else
+    {
+        var = cgconext.locals()[left->value];
+    }
+
+    return new StoreInst(assignData, var, false, cgconext.currentBlock());
 }
 
 llvm::Value *FuncExprNode::codegen(CodeGenContext &cgconext) {
@@ -161,13 +181,14 @@ llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgconext) {
     {
         cgconext.mModule->getOrInsertGlobal(name->value, typeOf(cgconext, type));
         auto gVar = cgconext.mModule->getNamedGlobal(name->value);
-        gVar->setLinkage(GlobalValue::CommonLinkage);
+        gVar->setLinkage(GlobalValue::ExternalLinkage);
         if (expr != NULL)
         {
             rightVal = expr->codegen(cgconext);
             gVar->setInitializer(static_cast<Constant *>(rightVal));
         }
         gVar->setAlignment(Align(8));
+        cgconext.globals()[name->value] = gVar;
     }
     else
     {
@@ -225,7 +246,7 @@ llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgconext) {
     auto function = Function::Create(funcType, GlobalValue::ExternalLinkage, name->value, cgconext.mModule);
     for (auto paramID : refParams)
     {
-        // TODO Set Dereferenceable attributy for ref params
+        // TODO Set Dereferenceable attribute for ref params
         //function->addAttribute(paramID, Attribute::Dereferenceable);
     }
     BasicBlock *bb = BasicBlock::Create(getGlobalContext(), type + name->value + "Entry", function, 0);

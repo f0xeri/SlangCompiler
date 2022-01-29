@@ -482,7 +482,7 @@ class CodeGenContext {
     // use a “stack” of blocks in our CodeGenContext class to keep the last entered block
     // (because instructions are added to blocks)
     std::stack <CodeGenBlock*> blocks;
-
+    std::map <std::string, llvm::Value*> globalVariables;
     llvm::Function* mMainFunction;
 public:
     llvm::Module* mModule;
@@ -493,12 +493,13 @@ public:
     }
     ~CodeGenContext() = default;
 
-    void generateCode(ModuleStatementNode *mainModule, const std::map<std::string, DeclarationNode*>& symbols)
+    void generateCode(ModuleStatementNode *mainModule, const std::vector<std::pair<std::string, DeclarationNode*>>& symbols)
     {
         for (auto g : symbols)
         {
             g.second->codegen(*this);
         }
+
 
         FunctionType *mainType = FunctionType::get(Builder.getInt32Ty(), false);
         Function *main = Function::Create(mainType, Function::ExternalLinkage, "main",
@@ -516,6 +517,9 @@ public:
 
     std::map <std::string, llvm::Value*>& locals() {
         return blocks.top()->locals;
+    }
+    std::map<string, Value*>& globals() {
+        return globalVariables;
     }
 
     llvm::BasicBlock* currentBlock() {

@@ -273,6 +273,7 @@ bool Parser::parseTypeDecl() {
                                 auto field = parseFieldDecl(fields, name, constructorRequired);
                                 if (field != nullptr)
                                 {
+                                    // TODO Check if field name already exists in fields
                                     fields->push_back(field);
                                     //if (DEBUG) llvm::outs() << "parsed field " << field->name->value << " " << field->isPrivate << "\n";
                                 }
@@ -288,6 +289,7 @@ bool Parser::parseTypeDecl() {
                                 auto method = parseMethodDecl(methods, name);
                                 if (method != nullptr)
                                 {
+                                    // TODO Check if method name already exists in methods
                                     methods->push_back(method);
                                 }
                             }

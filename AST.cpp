@@ -107,8 +107,8 @@ static Type *typeOf(CodeGenContext &cgconext, const std::string &var) {
         type = Type::getInt8Ty(getGlobalContext());
     else if (var == "real")
         type = Type::getDoubleTy(getGlobalContext());
-    /*else if (var->value == "void")
-        type = Type::getVoidTy(TheContext);*/
+    else if (var.empty())
+        type = Type::getVoidTy(getGlobalContext());
     else
     {
         if (cgconext.allocatedClasses.contains(var))
@@ -159,6 +159,14 @@ llvm::Value *IndexExprNode::codegen(CodeGenContext &cgconext) {
     return nullptr;
 }
 
+std::string getParameterTypeName(ParameterType type)
+{
+    if (type == In) return "in";
+    if (type == Out) return "out";
+    if (type == Var) return "var";
+    return "";
+}
+
 llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgconext) {
     std::vector<llvm::Type*> argTypes;
     for (auto arg : *args)
@@ -175,7 +183,7 @@ llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgconext) {
         auto var = new AllocaInst(typeOf(cgconext, (*it)->type), 0, nullptr, (*it)->name->value, bb);
         cgconext.locals()[(*it)->name->value] = var;
         Value *argumentValue = &(*argsValues);
-        argumentValue->setName((*it)->name->value.c_str());
+        argumentValue->setName(getParameterTypeName((*it)->parameterType) + (*it)->name->value);
         StoreInst *inst = new StoreInst(argumentValue, cgconext.locals()[(*it)->name->value], false, bb);
     }
     cgconext.popBlock();

@@ -62,14 +62,6 @@ enum E_TYPE {
     E_FUNC,
 };
 
-enum Operations
-{
-    Plus,
-    Minus,
-    Multiply,
-    Divide,
-};
-
 enum ParameterType
 {
     In,
@@ -170,19 +162,19 @@ public:
 
 class UnaryOperatorExprNode: public ExprNode {
 public:
-    Operations op;
+    TokenType op;
     ExprNode *right;
 
-    UnaryOperatorExprNode(Operations op, ExprNode *right): right(right), ExprNode(), op(op) {}
+    UnaryOperatorExprNode(TokenType op, ExprNode *right): right(right), ExprNode(), op(op) {}
     virtual llvm::Value *codegen(CodeGenContext &cgconext);
 };
 
 class OperatorExprNode: public ExprNode {
 public:
-    Operations op;
+    TokenType op;
     ExprNode *left, *right;
 
-    OperatorExprNode(ExprNode *left, Operations op, ExprNode *right): left(left), right(right), op(op) {}
+    OperatorExprNode(ExprNode *left, TokenType op, ExprNode *right): left(left), right(right), op(op) {}
     virtual llvm::Value *codegen(CodeGenContext &cgconext);
 };
 

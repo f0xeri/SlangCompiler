@@ -348,7 +348,7 @@ ExprNode *Parser::parseOr() {
     while (true)
     {
         if (match(TokenType::Or)) {
-            result = new ConditionalExprNode(result, TokenType::Or, parseAnd());
+            result = new OperatorExprNode(result, TokenType::Or, parseAnd());
             continue;
         }
         break;
@@ -378,11 +378,11 @@ ExprNode *Parser::parseEquality() {
     while (true)
     {
         if (match(TokenType::Equal)) {
-            result = new ConditionalExprNode(result, TokenType::Equal, parseConditional());
+            result = new OperatorExprNode(result, TokenType::Equal, parseConditional());
             continue;
         }
         if (match(TokenType::NotEqual)) {
-            result = new ConditionalExprNode(result, TokenType::NotEqual, parseConditional());
+            result = new OperatorExprNode(result, TokenType::NotEqual, parseConditional());
             continue;
         }
         break;
@@ -397,19 +397,19 @@ ExprNode *Parser::parseConditional() {
     while (true)
     {
         if (match(TokenType::Less)) {
-            result = new ConditionalExprNode(result, TokenType::Less, parseAddSub());
+            result = new OperatorExprNode(result, TokenType::Less, parseAddSub());
             continue;
         }
         if (match(TokenType::LessOrEqual)) {
-            result = new ConditionalExprNode(result, TokenType::LessOrEqual, parseAddSub());
+            result = new OperatorExprNode(result, TokenType::LessOrEqual, parseAddSub());
             continue;
         }
         if (match(TokenType::Greater)) {
-            result = new ConditionalExprNode(result, TokenType::Greater, parseAddSub());
+            result = new OperatorExprNode(result, TokenType::Greater, parseAddSub());
             continue;
         }
         if (match(TokenType::GreaterOrEqual)) {
-            result = new ConditionalExprNode(result, TokenType::GreaterOrEqual, parseAddSub());
+            result = new OperatorExprNode(result, TokenType::GreaterOrEqual, parseAddSub());
             continue;
         }
         break;
@@ -424,11 +424,11 @@ ExprNode *Parser::parseAddSub() {
     while (true)
     {
         if (match(TokenType::Plus)) {
-            result = new OperatorExprNode(result, Operations::Plus, parseMulDiv());
+            result = new OperatorExprNode(result, TokenType::Plus, parseMulDiv());
             continue;
         }
         if (match(TokenType::Minus)) {
-            result = new OperatorExprNode(result, Operations::Minus, parseMulDiv());
+            result = new OperatorExprNode(result, TokenType::Minus, parseMulDiv());
         }
         break;
     }
@@ -442,11 +442,11 @@ ExprNode *Parser::parseMulDiv() {
     while (true)
     {
         if (match(TokenType::Multiplication)) {
-            result = new OperatorExprNode(result, Operations::Multiply, parseUnary());
+            result = new OperatorExprNode(result, TokenType::Multiplication, parseUnary());
             continue;
         }
         if (match(TokenType::Division)) {
-            result = new OperatorExprNode(result, Operations::Divide, parseUnary());
+            result = new OperatorExprNode(result, TokenType::Division, parseUnary());
         }
         break;
     }
@@ -455,7 +455,7 @@ ExprNode *Parser::parseMulDiv() {
 }
 
 ExprNode *Parser::parseUnary() {
-    return match(TokenType::Minus) ? new UnaryOperatorExprNode(Operations::Minus, parsePrimary()) : parsePrimary();
+    return match(TokenType::Minus) ? new UnaryOperatorExprNode(TokenType::Minus, parsePrimary()) : parsePrimary();
 }
 
 ExprNode *Parser::parsePrimary() {
@@ -586,32 +586,86 @@ IfStatementNode *Parser::parseIfStatement() {
     BlockExprNode *trueBlock = nullptr;
     BlockExprNode *falseBlock = nullptr;
     auto *elseifNodes = new std::vector<ElseIfStatementNode*>();
-    while (token.type != TokenType::End)
+    tokensIterator--;
+    token = *tokensIterator;
+
+    if (token.type != TokenType::Else && token.type != TokenType::Elseif)
     {
-        if (token.type != TokenType::Else && token.type != TokenType::Elseif)
+        bool blockEnd = false;
+        auto *statements = new std::vector<StatementNode*>();
+        auto *block = new BlockExprNode(statements);
+        while (!blockEnd)
         {
-            // parse true block
-            trueBlock = new BlockExprNode(nullptr);
+            advance();
+            if (token.type == TokenType::If) statements->push_back(parseIfStatement());
+            else if (token.type == TokenType::Variable) statements->push_back(parseVariableDecl());
+            else if (token.type == TokenType::Output) statements->push_back(parseOutputStatement());
+            else if (token.type == TokenType::Return) statements->push_back(parseReturnStatement());
+            else if (token.type == TokenType::Let) statements->push_back(parseAssignStatement());
+            if (token.type == TokenType::End || token.type == TokenType::Else || token.type == TokenType::Elseif)
+            {
+                blockEnd = true;
+            }
         }
-        else
-        {
-            if (token.type == TokenType::Elseif) elseifNodes->push_back(parseElseIfBlock());
-            else if (token.type == TokenType::Else) falseBlock = parseElseBlock();
-        }
-        advance();
+        trueBlock = new BlockExprNode(statements);
     }
+    if (token.type == TokenType::Elseif) elseifNodes->push_back(parseElseIfBlock());
+    if (token.type == TokenType::Else) falseBlock = parseElseBlock();
+    //advance();
     consume(TokenType::End);
     consume(TokenType::If);
-    consume(TokenType::Semicolon);
+    expect(TokenType::Semicolon);
     return new IfStatementNode(expr, trueBlock, elseifNodes, falseBlock);
 }
 
 ElseIfStatementNode *Parser::parseElseIfBlock() {
-    return nullptr;
+    bool blockEnd = false;
+    auto *statements = new std::vector<StatementNode*>();
+
+    consume(TokenType::Elseif);
+    auto expr = parseExpression();
+    consume(TokenType::Then);
+    ElseIfStatementNode *block = nullptr;
+    tokensIterator--;
+    token = *tokensIterator;
+
+    while (!blockEnd)
+    {
+        advance();
+        if (token.type == TokenType::If) statements->push_back(parseIfStatement());
+        else if (token.type == TokenType::Variable) statements->push_back(parseVariableDecl());
+        else if (token.type == TokenType::Output) statements->push_back(parseOutputStatement());
+        else if (token.type == TokenType::Return) statements->push_back(parseReturnStatement());
+        else if (token.type == TokenType::Let) statements->push_back(parseAssignStatement());
+        if (token.type == TokenType::Else)
+        {
+            blockEnd = true;
+        }
+    }
+    block = new ElseIfStatementNode(expr, new BlockExprNode(statements));
+    return block;
 }
 
 BlockExprNode *Parser::parseElseBlock() {
-    return nullptr;
+    BlockExprNode *falseBlock = nullptr;
+    bool blockEnd = false;
+    auto *statements = new std::vector<StatementNode*>();
+    auto *block = new BlockExprNode(statements);
+    while (!blockEnd)
+    {
+        advance();
+        if (token.type == TokenType::If) statements->push_back(parseIfStatement());
+        else if (token.type == TokenType::Variable) statements->push_back(parseVariableDecl());
+        else if (token.type == TokenType::Output) statements->push_back(parseOutputStatement());
+        else if (token.type == TokenType::Return) statements->push_back(parseReturnStatement());
+        else if (token.type == TokenType::Let) statements->push_back(parseAssignStatement());
+        if (token.type == TokenType::End)
+        {
+            blockEnd = true;
+        }
+    }
+    falseBlock = new BlockExprNode(statements);
+    return falseBlock;
 }
 
 OutputStatementNode *Parser::parseOutputStatement() {

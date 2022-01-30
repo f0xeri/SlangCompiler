@@ -6,6 +6,40 @@
 
 using namespace llvm;
 
+static Value* mycast(Value* value, Type* type, CodeGenContext& context) {
+    if (type == value->getType())
+        return value;
+    if (type == Type::getDoubleTy(getGlobalContext())) {
+        if (value->getType() == Type::getInt64Ty(getGlobalContext()) || value->getType() == Type::getInt8Ty(getGlobalContext()))
+            value = new SIToFPInst(value, type, "", context.currentBlock());
+        else
+            llvm::errs() << "[ERROR] Cannot mycast this value.\n";
+    }
+    else if (type == Type::getInt64Ty(getGlobalContext())) {
+        if (value->getType() == Type::getDoubleTy(getGlobalContext()))
+            value = new FPToSIInst(value, type, "", context.currentBlock());
+        else if (value->getType() == Type::getInt8Ty(getGlobalContext()))
+            value = new SExtInst(value, type, "", context.currentBlock());
+        else if (value->getType() == Type::getInt32Ty(getGlobalContext()))
+            value = new ZExtInst(value, type, "", context.currentBlock());
+        else if (value->getType() == Type::getInt8PtrTy(getGlobalContext()))
+            value = new PtrToIntInst(value, type, "", context.currentBlock());
+        else if (value->getType() == Type::getInt64PtrTy(getGlobalContext()))
+            value = new PtrToIntInst(value, type, "", context.currentBlock());
+        else
+            llvm::errs() << "[ERROR] Cannot mycast this value.\n";
+    } else if (type == Type::getInt8Ty(getGlobalContext())) {
+        if (value->getType() == Type::getDoubleTy(getGlobalContext()))
+            value = new FPToSIInst(value, type, "", context.currentBlock());
+        else if (value->getType() == Type::getInt64Ty(getGlobalContext()))
+            value = new TruncInst(value, type, "", context.currentBlock());
+        else
+            llvm::errs() << "[ERROR] Cannot mycast this value.\n";
+    } else
+        llvm::errs() << "[ERROR] Cannot mycast this value.\n";
+    return value;
+}
+
 llvm::Value *IntExprNode::codegen(CodeGenContext &cgconext) {
     return ConstantInt::get(Type::getInt64Ty(getGlobalContext()), value, true);
 }
@@ -61,22 +95,74 @@ llvm::Value *UnaryOperatorExprNode::codegen(CodeGenContext &cgconext) {
 llvm::Value *OperatorExprNode::codegen(CodeGenContext &cgconext) {
     Value* leftVal = left->codegen(cgconext);
     Value* rightVal = right->codegen(cgconext);
+    bool floatOp = false;
+    if (leftVal->getType()->isDoubleTy() || rightVal->getType()->isDoubleTy()) {
+        leftVal = mycast(leftVal, Type::getDoubleTy(getGlobalContext()), cgconext);
+        rightVal = mycast(rightVal, Type::getDoubleTy(getGlobalContext()), cgconext);
+        floatOp = true;
+    } else if (leftVal->getType() == rightVal->getType()) {
+    } else {
+        leftVal = mycast(leftVal, Type::getInt64Ty(getGlobalContext()), cgconext);
+        rightVal = mycast(rightVal, Type::getInt64Ty(getGlobalContext()), cgconext);
+    }
     if (!leftVal || !rightVal)
         return nullptr;
-    switch (op) {
-        case Plus:
-            return BinaryOperator::Create(Instruction::Add, leftVal, rightVal, "", cgconext.currentBlock());
-            break;
-        case Minus:
-            return BinaryOperator::Create(Instruction::Sub, leftVal, rightVal, "", cgconext.currentBlock());
-            break;
-        case Multiply:
-            return BinaryOperator::Create(Instruction::Mul, leftVal, rightVal, "", cgconext.currentBlock());
-            break;
-        case Divide:
-            return BinaryOperator::Create(Instruction::SDiv, leftVal, rightVal, "", cgconext.currentBlock());
-            break;
+    if (!floatOp)
+    {
+        switch (op) {
+            case TokenType::Plus:
+                return BinaryOperator::Create(Instruction::Add, leftVal, rightVal, "", cgconext.currentBlock());
+            case TokenType::Minus:
+                return BinaryOperator::Create(Instruction::Sub, leftVal, rightVal, "", cgconext.currentBlock());
+            case TokenType::Multiplication:
+                return BinaryOperator::Create(Instruction::Mul, leftVal, rightVal, "", cgconext.currentBlock());
+            case TokenType::Division:
+                return BinaryOperator::Create(Instruction::SDiv, leftVal, rightVal, "", cgconext.currentBlock());
+            case TokenType::Equal:
+                return new ICmpInst(*cgconext.currentBlock(), ICmpInst::ICMP_EQ, leftVal, rightVal, "");
+            case TokenType::NotEqual:
+                return new ICmpInst(*cgconext.currentBlock(), ICmpInst::ICMP_NE, leftVal, rightVal, "");
+            case TokenType::Greater:
+                return new ICmpInst(*cgconext.currentBlock(), ICmpInst::ICMP_SGT, leftVal, rightVal, "");
+            case TokenType::GreaterOrEqual:
+                return new ICmpInst(*cgconext.currentBlock(), ICmpInst::ICMP_SGE, leftVal, rightVal, "");
+            case TokenType::Less:
+                return new ICmpInst(*cgconext.currentBlock(), ICmpInst::ICMP_SLT, leftVal, rightVal, "");
+            case TokenType::LessOrEqual:
+                return new ICmpInst(*cgconext.currentBlock(), ICmpInst::ICMP_SLE, leftVal, rightVal, "");
+            case TokenType::And:
+                return BinaryOperator::Create(Instruction::And, leftVal, rightVal, "", cgconext.currentBlock());
+            case TokenType::Or:
+                return BinaryOperator::Create(Instruction::Or, leftVal, rightVal, "", cgconext.currentBlock());
+        }
     }
+    else
+    {
+        switch (op) {
+            case TokenType::Plus:
+                return BinaryOperator::Create(Instruction::FAdd, leftVal, rightVal, "", cgconext.currentBlock());
+            case TokenType::Minus:
+                return BinaryOperator::Create(Instruction::FSub, leftVal, rightVal, "", cgconext.currentBlock());
+            case TokenType::Multiplication:
+                return BinaryOperator::Create(Instruction::FMul, leftVal, rightVal, "", cgconext.currentBlock());
+            case TokenType::Division:
+                return BinaryOperator::Create(Instruction::FDiv, leftVal, rightVal, "", cgconext.currentBlock());
+            case TokenType::Equal:
+                return new ICmpInst(*cgconext.currentBlock(), ICmpInst::FCMP_OEQ, leftVal, rightVal, "");
+            case TokenType::NotEqual:
+                return new ICmpInst(*cgconext.currentBlock(), ICmpInst::FCMP_ONE, leftVal, rightVal, "");
+            case TokenType::Greater:
+                return new ICmpInst(*cgconext.currentBlock(), ICmpInst::FCMP_OGT, leftVal, rightVal, "");
+            case TokenType::GreaterOrEqual:
+                return new ICmpInst(*cgconext.currentBlock(), ICmpInst::FCMP_OGE, leftVal, rightVal, "");
+            case TokenType::Less:
+                return new ICmpInst(*cgconext.currentBlock(), ICmpInst::FCMP_OLT, leftVal, rightVal, "");
+            case TokenType::LessOrEqual:
+                return new ICmpInst(*cgconext.currentBlock(), ICmpInst::FCMP_OLE, leftVal, rightVal, "");
+        }
+    }
+    llvm::errs() << "[ERROR] Unknown or wrong operator.\n";
+    return nullptr;
 }
 
 llvm::Value *ConditionalExprNode::codegen(CodeGenContext &cgconext) {

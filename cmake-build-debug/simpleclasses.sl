@@ -31,12 +31,28 @@ module main
     end first;
 
 start
-    variable-character c := "!";
+    variable-character c := "c";
     variable-Time time;
     variable-integer refarg := globalint + 10;
     variable-integer fcall := first(100, refarg);
     output first(100, 90);
     output refarg;
     let refarg := 10;
-    output refarg;
+
+    variable-integer n = 0;
+    variable-integer result := 1;
+    if n < 0 then
+        let result := 0;
+        if result == 0 then
+          output 999;
+        end if;
+        output result;
+    elseif n == 0 then
+        let result := 1;
+        output result;
+    else
+        let result := -1;
+        output result;
+    end if;
+    output refarg + 5;
 end main.

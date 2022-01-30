@@ -497,11 +497,11 @@ public:
 
     void generateCode(ModuleStatementNode *mainModule, const std::vector<std::pair<std::string, DeclarationNode*>>& symbols)
     {
+        printfFunction();
         for (auto g : symbols)
         {
             g.second->codegen(*this);
         }
-        printfFunction();
         FunctionType *mainType = FunctionType::get(Builder.getInt32Ty(), false);
         Function *main = Function::Create(mainType, Function::ExternalLinkage, "main",
                                           mModule);

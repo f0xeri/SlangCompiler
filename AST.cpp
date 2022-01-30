@@ -13,7 +13,7 @@ static Value* mycast(Value* value, Type* type, CodeGenContext& context) {
         if (value->getType() == Type::getInt64Ty(getGlobalContext()) || value->getType() == Type::getInt8Ty(getGlobalContext()))
             value = new SIToFPInst(value, type, "", context.currentBlock());
         else
-            llvm::errs() << "[ERROR] Cannot mycast this value.\n";
+            llvm::errs() << "[ERROR] Cannot cast this value.\n";
     }
     else if (type == Type::getInt64Ty(getGlobalContext())) {
         if (value->getType() == Type::getDoubleTy(getGlobalContext()))
@@ -27,16 +27,16 @@ static Value* mycast(Value* value, Type* type, CodeGenContext& context) {
         else if (value->getType() == Type::getInt64PtrTy(getGlobalContext()))
             value = new PtrToIntInst(value, type, "", context.currentBlock());
         else
-            llvm::errs() << "[ERROR] Cannot mycast this value.\n";
+            llvm::errs() << "[ERROR] Cannot cast this value.\n";
     } else if (type == Type::getInt8Ty(getGlobalContext())) {
         if (value->getType() == Type::getDoubleTy(getGlobalContext()))
             value = new FPToSIInst(value, type, "", context.currentBlock());
         else if (value->getType() == Type::getInt64Ty(getGlobalContext()))
             value = new TruncInst(value, type, "", context.currentBlock());
         else
-            llvm::errs() << "[ERROR] Cannot mycast this value.\n";
+            llvm::errs() << "[ERROR] Cannot cast this value.\n";
     } else
-        llvm::errs() << "[ERROR] Cannot mycast this value.\n";
+        llvm::errs() << "[ERROR] Cannot cast this value.\n";
     return value;
 }
 
@@ -212,7 +212,13 @@ llvm::Value *ReturnStatementNode::codegen(CodeGenContext &cgconext) {
 llvm::Value *OutputStatementNode::codegen(CodeGenContext &cgconext) {
     Value *value = expr->codegen(cgconext);
     std::vector<Value *> printArgs;
-    Value *formatStr = cgconext.Builder.CreateGlobalStringPtr("%d\n");
+    Value *formatStr = cgconext.Builder.CreateGlobalStringPtr("%s\n");
+    if (value->getType()->isIntegerTy()) {
+        formatStr = cgconext.Builder.CreateGlobalStringPtr("%d\n");
+    }
+    else if (value->getType()->isDoubleTy()) {
+        formatStr = cgconext.Builder.CreateGlobalStringPtr("%f\n");
+    }
     printArgs.push_back(formatStr);
     printArgs.push_back(value);
     cgconext.Builder.CreateCall(cgconext.mModule->getFunction("printf"), printArgs);

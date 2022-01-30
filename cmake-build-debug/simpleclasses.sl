@@ -30,21 +30,23 @@ module main
         return ra;
     end first;
 
+    public function factorial(int integer n): integer
+        variable-integer result := 1;
+            if n < 0 then
+                let result := 0;
+            else if n == 0 then
+                let result := 1;
+            else
+                variable-integer i := 1;
+                while i <= n repeat
+                    let result := result * i;
+                    let i := i + 1;
+                end while;
+            end if;
+            end if;
+        return result;
+    end factorial;
 start
-    variable-integer n := 5;
-
-    variable-integer result := 1;
-    if n < 0 then
-        let result := 0;
-    else if n == 0 then
-        let result := 1;
-    else
-        variable-integer i := 1;
-        while i <= n repeat
-            let result := result * i;
-            let i := i + 1;
-        end while;
-    end if;
-    end if;
-    output result;
+    output factorial(5);
+    output 5;
 end main.

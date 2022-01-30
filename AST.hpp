@@ -479,13 +479,14 @@ public:
 };
 
 class CodeGenContext {
-    // use a “stack” of blocks in our CodeGenContext class to keep the last entered block
-    // (because instructions are added to blocks)
-    std::stack <CodeGenBlock*> blocks;
+
     std::map <std::string, llvm::Value*> globalVariables;
     llvm::Function* mMainFunction;
 public:
     llvm::Module* mModule;
+    // use a “stack” of blocks in our CodeGenContext class to keep the last entered block
+    // (because instructions are added to blocks)
+    std::stack <CodeGenBlock*> blocks;
     std::map<std::string, StructType *> allocatedClasses;
     CodeGenContext() : Builder(getGlobalContext())
     {
@@ -493,14 +494,23 @@ public:
     }
     ~CodeGenContext() = default;
 
+
+    Function* printfFunction() {
+        vector<Type*> printfArgs;
+        printfArgs.push_back(Type::getInt8PtrTy(getGlobalContext()));
+        FunctionType* printfType = FunctionType::get(Type::getInt32Ty(getGlobalContext()), printfArgs, true);
+        Function *printfFunc = Function::Create(printfType, Function::ExternalLinkage, Twine("printf"), mModule);
+        printfFunc->setCallingConv(CallingConv::C);
+        return printfFunc;
+    }
+
     void generateCode(ModuleStatementNode *mainModule, const std::vector<std::pair<std::string, DeclarationNode*>>& symbols)
     {
         for (auto g : symbols)
         {
             g.second->codegen(*this);
         }
-
-
+        printfFunction();
         FunctionType *mainType = FunctionType::get(Builder.getInt32Ty(), false);
         Function *main = Function::Create(mainType, Function::ExternalLinkage, "main",
                                           mModule);

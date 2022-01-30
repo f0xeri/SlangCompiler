@@ -131,6 +131,12 @@ llvm::Value *ReturnStatementNode::codegen(CodeGenContext &cgconext) {
 }
 
 llvm::Value *OutputStatementNode::codegen(CodeGenContext &cgconext) {
+    Value *value = expr->codegen(cgconext);
+    std::vector<Value *> printArgs;
+    Value *formatStr = cgconext.Builder.CreateGlobalStringPtr("%d\n");
+    printArgs.push_back(formatStr);
+    printArgs.push_back(value);
+    cgconext.Builder.CreateCall(cgconext.mModule->getFunction("printf"), printArgs);
     return nullptr;
 }
 

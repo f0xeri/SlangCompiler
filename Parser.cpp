@@ -58,7 +58,8 @@ BlockExprNode* Parser::parseBlock(VariableExprNode *name) {
         if (token.type == TokenType::End)
         {
             advance();
-            std::string endName = consume(TokenType::Identifier).data;
+            std::string endName = token.data;
+            advance();
             if (endName == name->value)
                 blockEnd = true;
             else
@@ -692,7 +693,7 @@ ReturnStatementNode *Parser::parseReturnStatement() {
 }
 
 WhileStatementNode *Parser::parseWhileStatement() {
-    consume(TokenType::Identifier);
+    consume(TokenType::While);
     auto expr = parseExpression();
     expect(TokenType::Repeat);
     BlockExprNode* block = parseBlock(new VariableExprNode("while"));

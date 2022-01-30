@@ -31,9 +31,20 @@ module main
     end first;
 
 start
-    variable-integer i := 0;
-    while i <= 10 repeat
-      output i;
-      let i := i + 1;
-    end while;
+    variable-integer n := 5;
+
+    variable-integer result := 1;
+    if n < 0 then
+        let result := 0;
+    else if n == 0 then
+        let result := 1;
+    else
+        variable-integer i := 1;
+        while i <= n repeat
+            let result := result * i;
+            let i := i + 1;
+        end while;
+    end if;
+    end if;
+    output result;
 end main.

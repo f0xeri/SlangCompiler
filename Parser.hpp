@@ -176,6 +176,7 @@ public:
     AssignExprNode* parseAssignStatement();
     OutputStatementNode* parseOutputStatement();
     ReturnStatementNode* parseReturnStatement();
+    WhileStatementNode* parseWhileStatement();
     bool parseTypeDecl();
     StatementNode * parseVarOrCall();
     ExprNode* parseExpression();

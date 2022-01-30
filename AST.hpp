@@ -476,9 +476,8 @@ class CodeGenContext {
     llvm::Function* mMainFunction;
 public:
     llvm::Module* mModule;
-    // use a “stack” of blocks in our CodeGenContext class to keep the last entered block
-    // (because instructions are added to blocks)
-    std::stack <CodeGenBlock*> blocks;
+
+    std::vector<CodeGenBlock*> blocks;
     std::map<std::string, StructType *> allocatedClasses;
     CodeGenContext() : Builder(getGlobalContext())
     {
@@ -518,24 +517,40 @@ public:
     }
 
     std::map <std::string, llvm::Value*>& locals() {
-        return blocks.top()->locals;
+        return blocks.back()->locals;
     }
+
+    llvm::Value* localsLookup(const std::string &name) {
+        Value *value = nullptr;
+        for (auto &b : blocks)
+        {
+            if (b->locals.contains(name))
+            {
+                value = b->locals[name];
+                break;
+            }
+        }
+        return value;
+    }
+
     std::map<string, Value*>& globals() {
         return globalVariables;
     }
 
     llvm::BasicBlock* currentBlock() {
-        return blocks.top()->block;
+        return blocks.back()->block;
     }
 
+    void ret(BasicBlock* block) { blocks.back()->block = block; }
+
     void pushBlock(llvm::BasicBlock* block) {
-        blocks.push(new CodeGenBlock());
-        blocks.top()->block = block;
+        blocks.push_back(new CodeGenBlock());
+        blocks.back()->block = block;
     }
 
     void popBlock() {
-        CodeGenBlock* top = blocks.top();
-        blocks.pop();
+        CodeGenBlock* top = blocks.back();
+        blocks.pop_back();
         delete top;
     }
 

@@ -67,7 +67,8 @@ llvm::Value *BooleanExprNode::codegen(CodeGenContext &cgconext) {
 llvm::Value *VariableExprNode::codegen(CodeGenContext &cgconext) {
     Value* val;
     Type *type = nullptr;
-    if (cgconext.locals().find(value) == cgconext.locals().end())
+    val = cgconext.localsLookup(value);
+    if (val == nullptr)
     {
         if(cgconext.globals().find(value) == cgconext.globals().end())
         {
@@ -77,14 +78,9 @@ llvm::Value *VariableExprNode::codegen(CodeGenContext &cgconext) {
         else
         {
             val = cgconext.globals()[value];
-            type = val->getType()->getPointerElementType();
         }
     }
-    else
-    {
-        val = cgconext.locals()[value];
-        type = val->getType()->getPointerElementType();
-    }
+    type = val->getType()->getPointerElementType();
     return new LoadInst(type, val, "", false, cgconext.currentBlock());
 }
 
@@ -187,14 +183,11 @@ llvm::Value *BlockExprNode::codegen(CodeGenContext &cgconext) {
 llvm::Value *AssignExprNode::codegen(CodeGenContext &cgconext) {
     Value* var;
     auto assignData = right->codegen(cgconext);
-    if (cgconext.locals().find(left->value) == cgconext.locals().end())
+    var = cgconext.localsLookup(left->value);
+    if (var == nullptr)
     {
         llvm::errs() << "[ERROR] Undeclared Variable \"" << left->value << "\".\n";
         return nullptr;
-    }
-    else
-    {
-        var = cgconext.locals()[left->value];
     }
 
     return new StoreInst(assignData, var, false, cgconext.currentBlock());
@@ -423,7 +416,41 @@ llvm::Value *ElseIfStatementNode::codegen(CodeGenContext &cgconext) {
 }
 
 llvm::Value *IfStatementNode::codegen(CodeGenContext &cgconext) {
-    return nullptr;
+    Function *TheFunction = cgconext.Builder.GetInsertBlock()->getParent();
+    BasicBlock* ifTrue = BasicBlock::Create(getGlobalContext(), "", TheFunction, 0);
+    BasicBlock* ifFalse = BasicBlock::Create(getGlobalContext(), "", TheFunction, 0);
+    BasicBlock* ifEnd = BasicBlock::Create(getGlobalContext(), "", TheFunction, 0);
+    BranchInst::Create(ifTrue, ifFalse, condExpr->codegen(cgconext), cgconext.currentBlock());
+    // Entering IF
+    cgconext.pushBlock(ifTrue);
+    cgconext.Builder.SetInsertPoint(ifTrue);
+    if (trueBlock != nullptr)
+    {
+        for (auto statement : *trueBlock->statements)
+        {
+            statement->codegen(cgconext);
+        }
+    }
+    // JMP to END
+    BranchInst::Create(ifEnd, cgconext.currentBlock());
+    cgconext.popBlock();
+    // Entering ELSE
+    cgconext.pushBlock(ifFalse);
+    cgconext.Builder.SetInsertPoint(ifFalse);
+    if (falseBlock != nullptr)
+    {
+        for (auto statement : *falseBlock->statements)
+        {
+            statement->codegen(cgconext);
+        }
+    }
+    // JMP to END
+    BranchInst::Create(ifEnd, cgconext.currentBlock());
+    cgconext.popBlock();
+    // Return END
+    cgconext.ret(ifEnd);
+    cgconext.Builder.SetInsertPoint(ifEnd);
+    return ifEnd;
 }
 
 llvm::Value *ForStatementNode::codegen(CodeGenContext &cgconext) {
@@ -431,7 +458,34 @@ llvm::Value *ForStatementNode::codegen(CodeGenContext &cgconext) {
 }
 
 llvm::Value *WhileStatementNode::codegen(CodeGenContext &cgconext) {
-    return nullptr;
+    Function *TheFunction = cgconext.Builder.GetInsertBlock()->getParent();
+    BasicBlock* whileIter = BasicBlock::Create(getGlobalContext(), "", TheFunction, 0);
+    BasicBlock* whileEnd = BasicBlock::Create(getGlobalContext(), "", TheFunction, 0);
+    BasicBlock* whileCheck = BasicBlock::Create(getGlobalContext(), "", TheFunction, 0);
+    // Check condition satisfaction
+    BranchInst::Create(whileCheck, cgconext.currentBlock());
+    cgconext.pushBlock(whileCheck);
+    cgconext.Builder.SetInsertPoint(whileCheck);
+    // Whether break the loop
+    BranchInst::Create(whileIter, whileEnd, whileExpr->codegen(cgconext), cgconext.currentBlock());
+    cgconext.popBlock();
+    // Entering loop block
+    cgconext.pushBlock(whileIter);
+    cgconext.Builder.SetInsertPoint(whileIter);
+    if (block != nullptr)
+    {
+        for (auto statement : *block->statements)
+        {
+            statement->codegen(cgconext);
+        }
+    }
+    // Jump back to condition checking
+    BranchInst::Create(whileCheck, cgconext.currentBlock());
+    cgconext.popBlock();
+    // Return END
+    cgconext.ret(whileEnd);
+    cgconext.Builder.SetInsertPoint(whileEnd);
+    return whileEnd;
 }
 
 llvm::Value *ModuleStatementNode::codegen(CodeGenContext &cgconext) {

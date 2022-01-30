@@ -54,6 +54,7 @@ BlockExprNode* Parser::parseBlock(VariableExprNode *name) {
         else if (token.type == TokenType::Output) statements->push_back(parseOutputStatement());
         else if (token.type == TokenType::Return) statements->push_back(parseReturnStatement());
         else if (token.type == TokenType::Let) statements->push_back(parseAssignStatement());
+        else if (token.type == TokenType::While) statements->push_back(parseWhileStatement());
         if (token.type == TokenType::End)
         {
             advance();
@@ -659,6 +660,7 @@ BlockExprNode *Parser::parseElseBlock() {
         else if (token.type == TokenType::Output) statements->push_back(parseOutputStatement());
         else if (token.type == TokenType::Return) statements->push_back(parseReturnStatement());
         else if (token.type == TokenType::Let) statements->push_back(parseAssignStatement());
+        else if (token.type == TokenType::While) statements->push_back(parseWhileStatement());
         if (token.type == TokenType::End)
         {
             blockEnd = true;
@@ -685,5 +687,15 @@ AssignExprNode *Parser::parseAssignStatement() {
 ReturnStatementNode *Parser::parseReturnStatement() {
     consume(TokenType::Return);
     auto expr = parseExpression();
+    expect(TokenType::Semicolon);
     return new ReturnStatementNode(expr);
+}
+
+WhileStatementNode *Parser::parseWhileStatement() {
+    consume(TokenType::Identifier);
+    auto expr = parseExpression();
+    expect(TokenType::Repeat);
+    BlockExprNode* block = parseBlock(new VariableExprNode("while"));
+    expect(TokenType::Semicolon);
+    return new WhileStatementNode(expr, block);
 }

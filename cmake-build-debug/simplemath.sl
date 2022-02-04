@@ -1,7 +1,7 @@
 module main
 start
-    output "Программа: арифметические операции \n";
     variable-integer i := 2 + (1 + 4) * 2;
-    variable-integer r := 3 * 8;
-    output "2 + (1 + 4) * 2 = ${i}";
+    variable-real r := 3.1415 * 2;
+    output i;
+    output r;
 end main.

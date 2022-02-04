@@ -504,7 +504,7 @@ public:
             g.second->codegen(*this);
         }
         FunctionType *mainType = FunctionType::get(Builder.getInt32Ty(), false);
-        Function *mMainFunction = Function::Create(mainType, Function::ExternalLinkage, "main",
+        mMainFunction = Function::Create(mainType, Function::ExternalLinkage, "main",
                                           mModule);
         BasicBlock *entry = BasicBlock::Create(TheContext, "entry", mMainFunction);
         Builder.SetInsertPoint(entry);

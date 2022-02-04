@@ -98,7 +98,7 @@ void Lexer::tokenize() {
         } else if (isdigit(symbol)) {
             tokenizeNumber();
         } else if (symbol == '\n') {
-            std::cout << "\n";
+            if (DEBUG) std::cout << "\n";
         } else if (isdigit(symbol)) {
             tokenizeNumber();
         } else if (symbol == ' ') {
@@ -109,7 +109,7 @@ void Lexer::tokenize() {
         pos++;
     }
     tokens.push_back({TokenType::EndOfFile, ""});
-    std::cout << "\n\n";
+    if (DEBUG) std::cout << "\n\n";
 }
 
 void Lexer::tokenizeNumber() {
@@ -132,7 +132,7 @@ void Lexer::tokenizeNumber() {
         exit(1);
     }
     pos--;
-    std::cout << "NUMBER(" << str << ") ";
+    if (DEBUG) std::cout << "NUMBER(" << str << ") ";
     tokens.push_back({real ? TokenType::Real : TokenType::Integer, str});
 }
 
@@ -143,7 +143,7 @@ void Lexer::tokenizeString() {
         str += symbol;
         symbol = sourceCode[++pos];
     }
-    std::cout << "STRING(" << str << ") ";
+    if (DEBUG) std::cout << "STRING(" << str << ") ";
     tokens.push_back({TokenType::String, str});
 }
 
@@ -159,14 +159,14 @@ void Lexer::tokenizeWord() {
     pos = tpos - 1;
     if (tokensMap.contains(word)) {
         if (tokensMap.find(word)->second == TokenType::VisibilityType) {
-            std::cout << "VISIBILITYTYPE(" << word << ") ";
+            if (DEBUG) std::cout << "VISIBILITYTYPE(" << word << ") ";
         } else {
-            std::cout << "WORD(" << word << ") ";
+            if (DEBUG) std::cout << "WORD(" << word << ") ";
         }
 
         tokens.push_back({tokensMap.find(word)->second, word});
     } else {
-        std::cout << "ID" << "(" << word << ") ";
+        if (DEBUG) std::cout << "ID" << "(" << word << ") ";
         tokens.push_back({TokenType::Identifier, word});
     }
 
@@ -187,6 +187,6 @@ void Lexer::tokenizeChar() {
 
     if (tokensMap.contains(word)) {
         tokens.push_back({tokensMap.find(word)->second});
-        std::cout << "(" << word << ") ";
+        if (DEBUG) std::cout << "(" << word << ") ";
     }
 }

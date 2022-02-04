@@ -3,8 +3,6 @@
 //
 #include "Parser.hpp"
 
-#define DEBUG 1
-
 void Parser::parse()
 {
     parseImports();

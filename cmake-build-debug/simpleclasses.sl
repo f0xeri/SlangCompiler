@@ -30,7 +30,7 @@ module main
         return ra;
     end first;
 
-    public function factorial(int integer n): integer
+    public function factorial(in integer n): integer
         variable-integer result := 1;
             if n < 0 then
                 let result := 0;
@@ -48,5 +48,8 @@ module main
     end factorial;
 start
     output factorial(5);
-    output 5;
+    output globalreal + globalint;
+    output globalint + globalreal;
+    variable-real aaa := globalint / 2.0;
+    output aaa;
 end main.

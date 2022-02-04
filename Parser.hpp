@@ -4,8 +4,6 @@
 #ifndef SLANGPARSER_PARSER_HPP
 #define SLANGPARSER_PARSER_HPP
 
-#define DEBUG 1
-
 #include <llvm/Support/raw_ostream.h>
 #include "Lexer.hpp"
 #include "AST.hpp"
@@ -178,7 +176,7 @@ public:
     ReturnStatementNode* parseReturnStatement();
     WhileStatementNode* parseWhileStatement();
     bool parseTypeDecl();
-    StatementNode * parseVarOrCall();
+    StatementNode* parseVarOrCall();
     ExprNode* parseExpression();
     ExprNode* parseStrInterpolation();
     ExprNode* parseOr();

@@ -11,7 +11,6 @@ enum class TokenType
     Module,
     Start,
     End,
-    AccessModifier,
     Class,
     Inherits,
     Base,

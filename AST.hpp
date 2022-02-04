@@ -482,6 +482,7 @@ public:
     CodeGenContext() : Builder(getGlobalContext())
     {
         mModule = new Module("main", getGlobalContext());
+        mModule->setTargetTriple("x86_64-w64-windows-gnu");
     }
     ~CodeGenContext() = default;
 
@@ -503,9 +504,9 @@ public:
             g.second->codegen(*this);
         }
         FunctionType *mainType = FunctionType::get(Builder.getInt32Ty(), false);
-        Function *main = Function::Create(mainType, Function::ExternalLinkage, "main",
+        Function *mMainFunction = Function::Create(mainType, Function::ExternalLinkage, "main",
                                           mModule);
-        BasicBlock *entry = BasicBlock::Create(TheContext, "entry", main);
+        BasicBlock *entry = BasicBlock::Create(TheContext, "entry", mMainFunction);
         Builder.SetInsertPoint(entry);
         pushBlock(entry);
 

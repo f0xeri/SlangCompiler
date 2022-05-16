@@ -53,6 +53,7 @@ BlockExprNode* Parser::parseBlock(VariableExprNode *name) {
         else if (token.type == TokenType::Return) statements->push_back(parseReturnStatement());
         else if (token.type == TokenType::Let) statements->push_back(parseAssignStatement());
         else if (token.type == TokenType::While) statements->push_back(parseWhileStatement());
+        else if (token.type == TokenType::Call) statements->push_back(parseCall());
         if (token.type == TokenType::End)
         {
             advance();
@@ -574,7 +575,7 @@ FuncDecStatementNode *Parser::parseFunctionDecl() {
         llvm::errs() << "[ERROR] Unexpected token \"" << token.data + "\", expected \"" + Lexer::getTokenName(TokenType::Semicolon) + "\".\n";
         hasError = true;
     }
-    auto function = new FuncDecStatementNode(type, new VariableExprNode(name), isPrivate, params, block);
+    auto function = new FuncDecStatementNode(type, new VariableExprNode(name), isPrivate, isFunction, params, block);
     currentScope->insert(function);
     return function;
 }
@@ -602,6 +603,7 @@ IfStatementNode *Parser::parseIfStatement() {
             else if (token.type == TokenType::Output) statements->push_back(parseOutputStatement());
             else if (token.type == TokenType::Return) statements->push_back(parseReturnStatement());
             else if (token.type == TokenType::Let) statements->push_back(parseAssignStatement());
+            else if (token.type == TokenType::Call) statements->push_back(parseCall());
             if (token.type == TokenType::End || token.type == TokenType::Else || token.type == TokenType::Elseif)
             {
                 blockEnd = true;
@@ -637,6 +639,7 @@ ElseIfStatementNode *Parser::parseElseIfBlock() {
         else if (token.type == TokenType::Output) statements->push_back(parseOutputStatement());
         else if (token.type == TokenType::Return) statements->push_back(parseReturnStatement());
         else if (token.type == TokenType::Let) statements->push_back(parseAssignStatement());
+        else if (token.type == TokenType::Call) statements->push_back(parseCall());
         if (token.type == TokenType::Else)
         {
             blockEnd = true;
@@ -660,6 +663,7 @@ BlockExprNode *Parser::parseElseBlock() {
         else if (token.type == TokenType::Return) statements->push_back(parseReturnStatement());
         else if (token.type == TokenType::Let) statements->push_back(parseAssignStatement());
         else if (token.type == TokenType::While) statements->push_back(parseWhileStatement());
+        else if (token.type == TokenType::Call) statements->push_back(parseCall());
         if (token.type == TokenType::End)
         {
             blockEnd = true;
@@ -697,4 +701,26 @@ WhileStatementNode *Parser::parseWhileStatement() {
     BlockExprNode* block = parseBlock(new VariableExprNode("while"));
     expect(TokenType::Semicolon);
     return new WhileStatementNode(expr, block);
+}
+
+CallExprNode *Parser::parseCall() {
+    consume(TokenType::Call);
+    Token tok = token;
+    std::string name = tok.data;
+    advance();
+    consume(TokenType::LParen);
+    auto *params = new std::vector<ExprNode*>();
+    if (token.type != TokenType::RParen)
+    {
+        while (1)
+        {
+            if (auto arg = parseExpression())
+                params->push_back(arg);
+            else return nullptr;
+            if (token.type == TokenType::RParen) break;
+            consume(TokenType::Comma);
+        }
+    }
+    advance();
+    return new CallExprNode(new VariableExprNode(name), params);
 }

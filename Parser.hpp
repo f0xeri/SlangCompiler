@@ -177,6 +177,7 @@ public:
     WhileStatementNode* parseWhileStatement();
     bool parseTypeDecl();
     StatementNode* parseVarOrCall();
+    CallExprNode* parseCall();
     ExprNode* parseExpression();
     ExprNode* parseStrInterpolation();
     ExprNode* parseOr();

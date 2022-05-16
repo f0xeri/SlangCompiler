@@ -1,8 +1,11 @@
 cmake_minimum_required(VERSION 3.17)
 project(slangc)
 
-set(CMAKE_CXX_STANDARD 20)
+#set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
+#set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+#set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
 
+set(CMAKE_CXX_STANDARD 20)
 #DEBUG
 #message("Building in DEBUG mode.")
 #set(LLVM-debug_DIR "C:\\Program Files (x86)\\LLVM-debug\\lib\\cmake\\llvm")
@@ -24,6 +27,6 @@ add_executable(slangc main.cpp Lexer.hpp Lexer.cpp TokenType.hpp Logger.hpp Pars
 target_link_libraries(slangc PRIVATE ${llvm_libs})
 
 #DEBUG
-#target_compile_definitions(slangCompiler PRIVATE DEBUG=1)
+#target_compile_definitions(slangc PRIVATE DEBUG=1)
 #RELEASE
 target_compile_definitions(slangc PRIVATE DEBUG=0)

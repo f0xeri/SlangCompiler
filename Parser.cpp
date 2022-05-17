@@ -6,7 +6,6 @@
 void Parser::parse()
 {
     parseImports();
-    parseModuleDecl();
     for (auto &module : *importedModules)
     {
         for (auto &decl : module->currentScope->symbols)
@@ -34,6 +33,7 @@ void Parser::parse()
             }
         }
     }
+    parseModuleDecl();
     mainModuleNode->block = parseBlock(mainModuleNode->name);
 }
 

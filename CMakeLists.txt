@@ -7,14 +7,14 @@ project(slangc)
 
 set(CMAKE_CXX_STANDARD 20)
 #DEBUG
-#message("Building in DEBUG mode.")
-#set(LLVM-debug_DIR "C:\\Program Files (x86)\\LLVM-debug\\lib\\cmake\\llvm")
-#find_package(LLVM-debug REQUIRED CONFIG)
+message("Building in DEBUG mode.")
+set(LLVM-debug_DIR "C:\\Program Files (x86)\\LLVM-debug\\lib\\cmake\\llvm")
+find_package(LLVM-debug REQUIRED CONFIG)
 #RELEASE
-message("Building in RELEASE mode.")
-set(CMAKE_BUILD_TYPE Release)
-find_package(LLVM REQUIRED CONFIG)
-add_definitions(-DDEBUG=0)
+#message("Building in RELEASE mode.")
+#set(CMAKE_BUILD_TYPE Release)
+#find_package(LLVM REQUIRED CONFIG)
+#add_definitions(-DDEBUG=0)
 
 message("Found LLVM ${LLVM_PACKAGE_VERSION}, build type ${LLVM_BUILD_TYPE}")
 list(APPEND CMAKE_MODULE_PATH ${LLVM_DIR})
@@ -27,6 +27,6 @@ add_executable(slangc main.cpp Lexer.hpp Lexer.cpp TokenType.hpp Logger.hpp Pars
 target_link_libraries(slangc PRIVATE ${llvm_libs})
 
 #DEBUG
-#target_compile_definitions(slangc PRIVATE DEBUG=1)
+target_compile_definitions(slangc PRIVATE DEBUG=1)
 #RELEASE
-target_compile_definitions(slangc PRIVATE DEBUG=0)
+#target_compile_definitions(slangc PRIVATE DEBUG=0)

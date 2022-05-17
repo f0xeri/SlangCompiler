@@ -70,14 +70,16 @@ llvm::Value *VariableExprNode::codegen(CodeGenContext &cgcontext) {
     val = cgcontext.localsLookup(value);
     if (val == nullptr)
     {
-        if(cgcontext.globals().find(value) == cgcontext.globals().end())
+        if(cgcontext.globals().find(cgcontext.moduleName + "." + value) == cgcontext.globals().end())
         {
-            llvm::errs() << "[ERROR] Undeclared Variable \"" << value << "\".\n";
-            return nullptr;
+            if (cgcontext.globals().find(value) == cgcontext.globals().end())
+                llvm::errs() << "[ERROR] Undeclared Variable \"" << value << "\".\n";
+            else
+                val = cgcontext.globals()[value];
         }
         else
         {
-            val = cgcontext.globals()[value];
+            val = cgcontext.globals()[cgcontext.moduleName + "." + value];
         }
     }
     type = val->getType()->getPointerElementType();
@@ -184,6 +186,20 @@ llvm::Value *AssignExprNode::codegen(CodeGenContext &cgcontext) {
     Value* var;
     auto assignData = right->codegen(cgcontext);
     var = cgcontext.localsLookup(left->value);
+    if (var == nullptr)
+    {
+        if(cgcontext.globals().find(cgcontext.moduleName + "." + left->value) == cgcontext.globals().end())
+        {
+            if (cgcontext.globals().find(left->value) == cgcontext.globals().end())
+                llvm::errs() << "[ERROR] Undeclared Variable \"" << left->value << "\".\n";
+            else
+                var = cgcontext.globals()[left->value];
+        }
+        else
+        {
+            var = cgcontext.globals()[cgcontext.moduleName + "." + left->value];
+        }
+    }
     if (var == nullptr)
     {
         llvm::errs() << "[ERROR] Undeclared Variable \"" << left->value << "\".\n";
@@ -340,63 +356,53 @@ llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
         // TODO Set Dereferenceable attribute for ref params
         //function->addAttribute(paramID, Attribute::Dereferenceable);
     }
-    BasicBlock *bb = BasicBlock::Create(*cgcontext.context, type + name->value + "Entry", function, 0);
-    cgcontext.pushBlock(bb);
-    cgcontext.builder->SetInsertPoint(bb);
-    Function::arg_iterator argsValues = function->arg_begin();
-    for (auto it = args->begin(); it != args->end(); it++, argsValues++) {
-        if ((*it)->parameterType == ParameterType::Out || (*it)->parameterType == ParameterType::Var)
-        {
-            auto var = new AllocaInst(ptrToTypeOf(cgcontext, (*it)->type), 0, nullptr, (*it)->name->value, bb);
-            cgcontext.locals()[(*it)->name->value] = var;
-            Value *argumentValue = &(*argsValues);
-            argumentValue->setName(getParameterTypeName((*it)->parameterType) + (*it)->name->value);
-            StoreInst *inst = new StoreInst(argumentValue, cgcontext.locals()[(*it)->name->value], false, bb);
+    if (block != nullptr) {
+        BasicBlock *bb = BasicBlock::Create(*cgcontext.context, cgcontext.moduleName + type + name->value + "Entry",
+                                            function, 0);
+        cgcontext.pushBlock(bb);
+        cgcontext.builder->SetInsertPoint(bb);
+        Function::arg_iterator argsValues = function->arg_begin();
+        for (auto it = args->begin(); it != args->end(); it++, argsValues++) {
+            if ((*it)->parameterType == ParameterType::Out || (*it)->parameterType == ParameterType::Var) {
+                auto var = new AllocaInst(ptrToTypeOf(cgcontext, (*it)->type), 0, nullptr, (*it)->name->value, bb);
+                cgcontext.locals()[(*it)->name->value] = var;
+                Value *argumentValue = &(*argsValues);
+                argumentValue->setName(getParameterTypeName((*it)->parameterType) + (*it)->name->value);
+                StoreInst *inst = new StoreInst(argumentValue, cgcontext.locals()[(*it)->name->value], false, bb);
+            } else {
+                auto var = new AllocaInst(typeOf(cgcontext, (*it)->type), 0, nullptr, (*it)->name->value, bb);
+                cgcontext.locals()[(*it)->name->value] = var;
+                Value *argumentValue = &(*argsValues);
+                argumentValue->setName(getParameterTypeName((*it)->parameterType) + (*it)->name->value);
+                StoreInst *inst = new StoreInst(argumentValue, cgcontext.locals()[(*it)->name->value], false, bb);
+            }
         }
-        else
-        {
-            auto var = new AllocaInst(typeOf(cgcontext, (*it)->type), 0, nullptr, (*it)->name->value, bb);
-            cgcontext.locals()[(*it)->name->value] = var;
-            Value *argumentValue = &(*argsValues);
-            argumentValue->setName(getParameterTypeName((*it)->parameterType) + (*it)->name->value);
-            StoreInst *inst = new StoreInst(argumentValue, cgcontext.locals()[(*it)->name->value], false, bb);
-        }
-    }
 
-    bool isRet = false;
-    if (block != nullptr)
-    {
-        for (auto statement : *block->statements)
-        {
+        bool isRet = false;
+        for (auto statement: *block->statements) {
             //if (isRet) llvm::errs() << "[WARN] Code after return statement in block is unreachable.\n";
             statement->codegen(cgcontext);
-            if (dynamic_cast<ReturnStatementNode*>(statement) != nullptr)
-            {
+            if (dynamic_cast<ReturnStatementNode *>(statement) != nullptr) {
                 isRet = true;
                 break;
             }
         }
-    }
 
-    if (!isFunction) cgcontext.builder->CreateRetVoid();
-    else
-    {
-        if (cgcontext.currentBlock()->empty())
-        {
-            cgcontext.builder->CreateCall(cgcontext.mModule->getFunction("llvm.trap"), {});
-            cgcontext.builder->CreateUnreachable();
-        }
-        else
-        {
-            if (cgcontext.currentBlock()->getTerminator() == nullptr)
-            {
+        if (!isFunction) cgcontext.builder->CreateRetVoid();
+        else {
+            if (cgcontext.currentBlock()->empty()) {
                 cgcontext.builder->CreateCall(cgcontext.mModule->getFunction("llvm.trap"), {});
                 cgcontext.builder->CreateUnreachable();
+            } else {
+                if (cgcontext.currentBlock()->getTerminator() == nullptr) {
+                    cgcontext.builder->CreateCall(cgcontext.mModule->getFunction("llvm.trap"), {});
+                    cgcontext.builder->CreateUnreachable();
+                }
             }
         }
-    }
 
-    cgcontext.popBlock();
+        cgcontext.popBlock();
+    }
     //cgcontext.builder->SetInsertPoint(cgcontext.currentBlock());
     return nullptr;
 }

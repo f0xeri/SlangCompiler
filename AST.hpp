@@ -478,12 +478,17 @@ public:
     std::vector<CodeGenBlock*> blocks;
     std::map<std::string, StructType *> allocatedClasses;
     FuncDecStatementNode *currentFunc = nullptr;
-    CodeGenContext()
+    bool isMainModule = false;
+    std::string moduleName;
+
+    CodeGenContext(ModuleStatementNode *moduleStatement, bool isMainModule)
     {
         context = make_unique<llvm::LLVMContext>();
         builder = std::make_unique<llvm::IRBuilder<>>(*context);
-        mModule = new Module("main", *context);
+        mModule = new Module(moduleStatement->name->value, *context);
         mModule->setTargetTriple("x86_64-w64-windows-gnu");
+        this->isMainModule = isMainModule;
+        moduleName = moduleStatement->name->value;
     }
     ~CodeGenContext() = default;
 
@@ -513,20 +518,23 @@ public:
         {
             g.second->codegen(*this);
         }
-        FunctionType *mainType = FunctionType::get(builder->getInt32Ty(), false);
-        mMainFunction = Function::Create(mainType, Function::ExternalLinkage, "main",
-                                          mModule);
-        BasicBlock *entry = BasicBlock::Create(*context, "entry", mMainFunction);
-        builder->SetInsertPoint(entry);
-        pushBlock(entry);
 
-        for (auto decl : *mainModule->block->statements)
+        if (isMainModule)
         {
-            decl->codegen(*this);
-        }
+            FunctionType *mainType = FunctionType::get(builder->getInt32Ty(), false);
+            mMainFunction = Function::Create(mainType, Function::ExternalLinkage, "main",
+                                             mModule);
+            BasicBlock *entry = BasicBlock::Create(*context, "entry", mMainFunction);
+            builder->SetInsertPoint(entry);
 
-        auto var = builder->CreateRet(ConstantInt::get(*context, APInt(32, 0)));
-        popBlock();
+            pushBlock(entry);
+            for (auto decl : *mainModule->block->statements)
+            {
+                decl->codegen(*this);
+            }
+            auto var = builder->CreateRet(ConstantInt::get(*context, APInt(32, 0)));
+            popBlock();
+        }
     }
 
     std::map <std::string, llvm::Value*>& locals() {

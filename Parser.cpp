@@ -7,6 +7,33 @@ void Parser::parse()
 {
     parseImports();
     parseModuleDecl();
+    for (auto &module : *importedModules)
+    {
+        for (auto &decl : module->currentScope->symbols)
+        {
+            if (dynamic_cast<FuncDecStatementNode*>(decl.second) != nullptr)
+            {
+                auto func = dynamic_cast<FuncDecStatementNode*>(decl.second);
+                if (!func->isPrivate)
+                {
+                    auto declFunc = new FuncDecStatementNode(*func);
+                    declFunc->block = nullptr;
+                    currentScope->insert(declFunc);
+                }
+            }
+            else if (dynamic_cast<TypeDecStatementNode*>(decl.second) != nullptr)
+            {
+
+            }
+            else if (dynamic_cast<VarDecStatementNode*>(decl.second) != nullptr)
+            {
+                auto var = dynamic_cast<VarDecStatementNode*>(decl.second);
+                auto declVar = new VarDecStatementNode(*var);
+                declVar->expr = nullptr;
+                currentScope->insert(declVar);
+            }
+        }
+    }
     mainModuleNode->block = parseBlock(mainModuleNode->name);
 }
 
@@ -16,7 +43,22 @@ bool Parser::parseImports()
     {
         consume(TokenType::Import);
         if (!expect(TokenType::Identifier)) return false;
-        // import module
+        std::string moduleName = token.data;
+        advance();
+
+        Lexer lexer(moduleName + ".sl");
+        lexer.tokenize();
+        Parser* parser = new Parser(lexer.tokens);
+        parser->parse();
+        CodeGenContext codeGenContext(parser->mainModuleNode, false);
+        codeGenContext.generateCode(parser->mainModuleNode, parser->currentScope->symbols);
+        if (DEBUG) codeGenContext.mModule->print(llvm::dbgs(), nullptr);
+        std::error_code EC;
+        auto outFileStream = llvm::raw_fd_ostream(moduleName + ".ll", EC, sys::fs::OF_None);
+        codeGenContext.mModule->print(outFileStream, nullptr);
+
+        importedModules->push_back(parser);
+
         advance();
     }
     return true;
@@ -492,6 +534,38 @@ StatementNode* Parser::parseVarOrCall() {
     Token tok = token;
     std::string name = tok.data;
     advance();
+    // if we have dot
+    if (token.type == TokenType::Dot)
+    {
+        // is it module or class name
+        bool moduleOrClass = false;
+        Parser *moduleP = nullptr;
+        for (auto &module : *importedModules)
+        {
+            if (module->mainModuleNode->name->value == name)
+            {
+                moduleOrClass = true;
+                moduleP = module;
+                break;
+            }
+        }
+        if (!moduleOrClass)
+        {
+            auto type = currentScope->lookup(name);
+            if (dynamic_cast<TypeDecStatementNode*>(type) != nullptr) moduleOrClass = true;
+        }
+        if (!moduleOrClass)
+        {
+            llvm::errs() << "[ERROR] " + name + " is not declared.\n";
+        }
+        advance();
+        expect(TokenType::Identifier);
+        if (moduleP->currentScope->lookup(name + "." + token.data) != nullptr)
+            name += "." + token.data;
+        else
+            llvm::errs() << "[ERROR] " + name + "." + token.data + " is not declared.\n";
+        advance();
+    }
     if (token.type != TokenType::LParen) return new VariableExprNode(name);
     consume(TokenType::LParen);
     auto *params = new std::vector<ExprNode*>();
@@ -541,6 +615,7 @@ VarDecStatementNode* Parser::parseVariableDecl(bool isGlobal) {
     {
         llvm::errs() << "[ERROR] Name conflict - \"" << name << "\".\n";
     }
+    if (isGlobal) name = mainModuleNode->name->value + "." + name;
     auto result = new VarDecStatementNode(type, new VariableExprNode(name), expr, isGlobal);
     if (isGlobal) currentScope->insert(result);
     return result;
@@ -575,7 +650,7 @@ FuncDecStatementNode *Parser::parseFunctionDecl() {
         llvm::errs() << "[ERROR] Unexpected token \"" << token.data + "\", expected \"" + Lexer::getTokenName(TokenType::Semicolon) + "\".\n";
         hasError = true;
     }
-    auto function = new FuncDecStatementNode(type, new VariableExprNode(name), isPrivate, isFunction, params, block);
+    auto function = new FuncDecStatementNode(type, new VariableExprNode(mainModuleNode->name->value + "." + name), isPrivate, isFunction, params, block);
     currentScope->insert(function);
     return function;
 }
@@ -681,10 +756,17 @@ OutputStatementNode *Parser::parseOutputStatement() {
 
 AssignExprNode *Parser::parseAssignStatement() {
     consume(TokenType::Let);
-    std::string varName = consume(TokenType::Identifier).data;
+    advance();
+    auto varName = dynamic_cast<VariableExprNode *>(parseVarOrCall());
+    if (varName == nullptr)
+    {
+        llvm::errs() << "[ERROR] " + varName->value + " is not a variable.\n";
+    }
+    tokensIterator--;
     consume(TokenType::Assign);
+    advance();
     auto expr = parseExpression();
-    return new AssignExprNode(new VariableExprNode(varName), expr);
+    return new AssignExprNode(varName, expr);
 }
 
 ReturnStatementNode *Parser::parseReturnStatement() {

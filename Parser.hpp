@@ -15,7 +15,9 @@ class Parser {
 public:
     std::vector<Token> tokens;
     std::vector<Token>::iterator tokensIterator;
-    Scope *currentScope;
+    Scope* currentScope;
+
+    std::vector<Parser*>* importedModules;
 
     Parser(std::vector<Token> &tokens)
     {
@@ -23,6 +25,7 @@ public:
         token = *tokensIterator;
         currentScope = new Scope();
         currentScope->insert(new TypeDecStatementNode(new VariableExprNode("Object"), {}, {}, nullptr));
+        importedModules = new std::vector<Parser*>();
         this->tokens = tokens;
     }
     ~Parser()
@@ -65,7 +68,6 @@ public:
     Token consume(TokenType tokenType)
     {
         if (!expect(tokenType)) {
-
             //exit(0);
         }
         Token tok = token;

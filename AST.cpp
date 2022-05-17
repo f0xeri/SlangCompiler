@@ -67,11 +67,15 @@ llvm::Value *BooleanExprNode::codegen(CodeGenContext &cgcontext) {
 llvm::Value *VariableExprNode::codegen(CodeGenContext &cgcontext) {
     Value* val;
     Type *type = nullptr;
+    // check local variables
     val = cgcontext.localsLookup(value);
+    // check global variables if there is no local
     if (val == nullptr)
     {
+        // check global variable declared in current module
         if(cgcontext.globals().find(cgcontext.moduleName + "." + value) == cgcontext.globals().end())
         {
+            // check other global variables
             if (cgcontext.globals().find(value) == cgcontext.globals().end())
                 llvm::errs() << "[ERROR] Undeclared Variable \"" << value << "\".\n";
             else

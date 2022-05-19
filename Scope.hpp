@@ -39,7 +39,7 @@ public:
         Scope *s = this;
         while (s)
         {
-            /*llvm::StringMap<DeclarationNode*>::iterator i = s->symbols.find(name->value);
+            /*llvm::StringMap<DeclarationNode*>::iterator i = s->symbols.find(value->value);
             if (i != s->symbols.end()) return i->second;*/
             if (contains(name)) return get(name);
             s = s->parent;

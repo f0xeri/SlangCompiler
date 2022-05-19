@@ -33,7 +33,8 @@ int main(int argc, char **argv) {
         codeGenContext.mModule->print(outFileStream, nullptr);
         std::string filenamesString;
         for (const auto &name : filenames) filenamesString += name + ".ll ";
-        std::string clangCall = std::filesystem::current_path().string() + "\\mingw64\\bin\\clang " + filenamesString + "-o " + mainFilename + ".exe";
+        std::string mingw64path = std::filesystem::current_path().string() + "\\mingw64\\";
+        std::string clangCall = mingw64path + "\\bin\\clang " + filenamesString + "-lgc-lib -o " + mainFilename + ".exe";
         system(clangCall.c_str());
     }
     /*std::string Str;

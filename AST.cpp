@@ -98,12 +98,17 @@ llvm::Value *OperatorExprNode::codegen(CodeGenContext &cgcontext) {
     Value* leftVal = left->codegen(cgcontext);
     Value* rightVal = right->codegen(cgcontext);
     bool floatOp = false;
-    if (leftVal->getType()->isDoubleTy() || rightVal->getType()->isDoubleTy()) {
+    if (leftVal->getType()->isDoubleTy() || rightVal->getType()->isDoubleTy())
+    {
         leftVal = mycast(leftVal, Type::getDoubleTy(*cgcontext.context), cgcontext);
         rightVal = mycast(rightVal, Type::getDoubleTy(*cgcontext.context), cgcontext);
         floatOp = true;
-    } else if (leftVal->getType() == rightVal->getType()) {
-    } else {
+    }
+    else if (leftVal->getType() == rightVal->getType())
+    {
+
+    }
+    else {
         leftVal = mycast(leftVal, Type::getInt64Ty(*cgcontext.context), cgcontext);
         rightVal = mycast(rightVal, Type::getInt64Ty(*cgcontext.context), cgcontext);
     }
@@ -207,6 +212,13 @@ llvm::Value *AssignExprNode::codegen(CodeGenContext &cgcontext) {
     if (var == nullptr)
     {
         llvm::errs() << "[ERROR] Undeclared Variable \"" << left->value << "\".\n";
+        return nullptr;
+    }
+
+    if (dynamic_cast<IndexExprNode*>(left) != nullptr)
+    {
+        auto element_ptr = cgcontext.builder->CreateInBoundsGEP(var, dynamic_cast<IndexExprNode*>(left)->indexExpr->codegen(cgcontext));
+        auto ret = cgcontext.builder->CreateStore(assignData, element_ptr);
         return nullptr;
     }
 
@@ -320,11 +332,63 @@ llvm::Value *FuncParamDecStatementNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
-    return nullptr;
+    auto exprNode = dynamic_cast<ArrayExprNode*>(expr);
+    auto arrExpr = exprNode;
+    auto size = exprNode->size->codegen(cgcontext);
+    auto arraySize = size;
+    if (arrExpr->type == "array")
+    {
+        for (auto &slice : *arrExpr->values)
+        {
+            auto castedSlice = dynamic_cast<ArrayExprNode*>(slice);
+            auto sliceSize = castedSlice->size->codegen(cgcontext);
+            auto newArraySize = BinaryOperator::Create(Instruction::Mul, sliceSize, arraySize, "", cgcontext.currentBlock());
+            arraySize = newArraySize;
+            arrExpr = castedSlice;
+        }
+    }
+    auto type = typeOf(cgcontext, arrExpr->type);
+    llvm::Type* int64type = llvm::Type::getInt64Ty(*cgcontext.context);
+
+    auto elementSize = ConstantInt::get(int64type, cgcontext.dataLayout->getTypeAllocSize(type));
+    auto allocSize = BinaryOperator::Create(Instruction::Mul, elementSize, arraySize, "", cgcontext.currentBlock());
+    // GC_malloc
+    //auto arr = cgcontext.builder->CreateCall(cgcontext.mModule->getFunction("GC_malloc"), {allocSize});
+    // malloc
+    auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, nullptr, "");
+    cgcontext.builder->Insert(arr);
+
+    cgcontext.locals()[name->value] = arr;
+    //ArrayType *arrayType = ArrayType::get(type, reinterpret_cast<ConstantInt*>(arraySize)->getZExtValue());
+    //AllocaInst *alloc = new AllocaInst(arrayType, value->value, cgcontext.currentBlock());
+    // auto var = new AllocaInst(arrayType, 0, value->value, cgcontext.currentBlock());
+    return arr;
 }
 
 llvm::Value *IndexExprNode::codegen(CodeGenContext &cgcontext) {
-    return nullptr;
+    Value* var;
+    var = cgcontext.localsLookup(value);
+    if (var == nullptr)
+    {
+        if(cgcontext.globals().find(cgcontext.moduleName + "." + value) == cgcontext.globals().end())
+        {
+            if (cgcontext.globals().find(value) == cgcontext.globals().end())
+                llvm::errs() << "[ERROR] Undeclared Variable \"" << value << "\".\n";
+            else
+                var = cgcontext.globals()[value];
+        }
+        else
+        {
+            var = cgcontext.globals()[cgcontext.moduleName + "." + value];
+        }
+    }
+    if (var == nullptr)
+    {
+        llvm::errs() << "[ERROR] Undeclared Variable \"" << value << "\".\n";
+        return nullptr;
+    }
+    auto elementPtr = cgcontext.builder->CreateInBoundsGEP(var, indexExpr->codegen(cgcontext));
+    return cgcontext.builder->CreateLoad(elementPtr, false);
 }
 
 std::string getParameterTypeName(ParameterType type)

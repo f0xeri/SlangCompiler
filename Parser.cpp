@@ -318,9 +318,9 @@ bool Parser::parseTypeDecl() {
                                 auto field = parseFieldDecl(fields, name, constructorRequired);
                                 if (field != nullptr)
                                 {
-                                    // TODO Check if field name already exists in fields
+                                    // TODO Check if field value already exists in fields
                                     fields->push_back(field);
-                                    //if (DEBUG) llvm::outs() << "parsed field " << field->name->value << " " << field->isPrivate << "\n";
+                                    //if (DEBUG) llvm::outs() << "parsed field " << field->value->value << " " << field->isPrivate << "\n";
                                 }
                                 else
                                 {
@@ -334,7 +334,7 @@ bool Parser::parseTypeDecl() {
                                 auto method = parseMethodDecl(methods, name);
                                 if (method != nullptr)
                                 {
-                                    // TODO Check if method name already exists in methods
+                                    // TODO Check if method value already exists in methods
                                     methods->push_back(method);
                                 }
                             }
@@ -535,26 +535,27 @@ StatementNode* Parser::parseVarOrCall() {
     std::string name = tok.data;
     advance();
     // if we have dot
+    bool dotModule = false;
+    bool dotClass = false;
     if (token.type == TokenType::Dot)
     {
-        // is it module or class name
-        bool moduleOrClass = false;
+        // is it module or class value
         Parser *moduleP = nullptr;
         for (auto &module : *importedModules)
         {
             if (module->mainModuleNode->name->value == name)
             {
-                moduleOrClass = true;
+                dotModule = true;
                 moduleP = module;
                 break;
             }
         }
-        if (!moduleOrClass)
+        if (!dotModule)
         {
             auto type = currentScope->lookup(name);
-            if (dynamic_cast<TypeDecStatementNode*>(type) != nullptr) moduleOrClass = true;
+            if (dynamic_cast<TypeDecStatementNode*>(type) != nullptr) dotClass = true;
         }
-        if (!moduleOrClass)
+        if (!dotModule && !dotClass)
         {
             llvm::errs() << "[ERROR] " + name + " is not declared.\n";
         }
@@ -566,7 +567,19 @@ StatementNode* Parser::parseVarOrCall() {
             llvm::errs() << "[ERROR] " + name + "." + token.data + " is not declared.\n";
         advance();
     }
+    // if we have an array
+    if (token.type == TokenType::LBracket)
+    {
+        advance();
+        auto index = parseExpression();
+        consume(TokenType::RBracket);
+        return new IndexExprNode(name, index);
+    }
     if (token.type != TokenType::LParen) return new VariableExprNode(name);
+    if (!dotModule && currentScope->lookup(mainModuleNode->name->value + "." + name) != nullptr)
+        name = mainModuleNode->name->value + "." + name;
+    //else
+    //llvm::errs() << "[ERROR] " + mainModuleNode->value->value + "." + value + " is not declared.\n";
     consume(TokenType::LParen);
     auto *params = new std::vector<ExprNode*>();
     if (token.type != TokenType::RParen)
@@ -584,13 +597,14 @@ StatementNode* Parser::parseVarOrCall() {
     return new CallExprNode(new VariableExprNode(name), params);
 }
 
-VarDecStatementNode* Parser::parseVariableDecl(bool isGlobal) {
+DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
     std::string type;
     std::string name;
     advance();
     consume(TokenType::Minus);
     ExprNode *expr = nullptr;
     type = consume(TokenType::Identifier).data;
+    bool isArray = false;
     if (oneOfDefaultTypes(type))
     {
         name = consume(TokenType::Identifier).data;
@@ -600,6 +614,43 @@ VarDecStatementNode* Parser::parseVariableDecl(bool isGlobal) {
             expr = parseExpression();
         }
         expect(TokenType::Semicolon);
+    }
+    else if (type == "array")
+    {
+        isArray = true;
+        tokensIterator--;
+        token = *tokensIterator;
+        std::string typeOfArray;
+        ExprNode* size;
+        advance();
+        consume(TokenType::LBracket);
+        size = parseExpression();
+        consume(TokenType::RBracket);
+        std::string arrType = token.data;
+        ArrayExprNode* arrExpr = new ArrayExprNode(arrType, size, new std::vector<ExprNode*>());
+        while (token.data == "array")
+        {
+            advance();
+            consume(TokenType::LBracket);
+            size = parseExpression();
+            consume(TokenType::RBracket);
+            if (token.type == TokenType::Identifier)
+            {
+                arrType = token.data;
+                if (!oneOfDefaultTypes(arrType) && arrType != "array")
+                {
+                    auto typeStatement = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(type));
+                    if (typeStatement == nullptr)
+                    {
+                        llvm::errs() << "[ERROR] Unknown type \"" << type << "\".\n";
+                    }
+                }
+            }
+            arrExpr->values->push_back(new ArrayExprNode(arrType, size, nullptr));
+        }
+        expr = arrExpr;
+        advance();
+        name = consume(TokenType::Identifier).data;
     }
     else
     {
@@ -616,7 +667,15 @@ VarDecStatementNode* Parser::parseVariableDecl(bool isGlobal) {
         llvm::errs() << "[ERROR] Name conflict - \"" << name << "\".\n";
     }
     if (isGlobal) name = mainModuleNode->name->value + "." + name;
-    auto result = new VarDecStatementNode(type, new VariableExprNode(name), expr, isGlobal);
+    DeclarationNode* result;
+    if (isArray)
+    {
+        result = new ArrayDecStatementNode(new VariableExprNode(name), expr);
+    }
+    else
+    {
+        result = new VarDecStatementNode(type, new VariableExprNode(name), expr, isGlobal);
+    }
     if (isGlobal) currentScope->insert(result);
     return result;
 }
@@ -642,7 +701,8 @@ FuncDecStatementNode *Parser::parseFunctionDecl() {
         expect(TokenType::Identifier);
         type = token.data;
     }
-
+    auto function = new FuncDecStatementNode(type, new VariableExprNode(mainModuleNode->name->value + "." + name), isPrivate, isFunction, params, nullptr);
+    currentScope->insert(function);
     auto block = parseBlock(new VariableExprNode(name));
 
     if (token.type != TokenType::Semicolon)
@@ -650,8 +710,7 @@ FuncDecStatementNode *Parser::parseFunctionDecl() {
         llvm::errs() << "[ERROR] Unexpected token \"" << token.data + "\", expected \"" + Lexer::getTokenName(TokenType::Semicolon) + "\".\n";
         hasError = true;
     }
-    auto function = new FuncDecStatementNode(type, new VariableExprNode(mainModuleNode->name->value + "." + name), isPrivate, isFunction, params, block);
-    currentScope->insert(function);
+    function->block = block;
     return function;
 }
 
@@ -757,16 +816,21 @@ OutputStatementNode *Parser::parseOutputStatement() {
 AssignExprNode *Parser::parseAssignStatement() {
     consume(TokenType::Let);
     advance();
-    auto varName = dynamic_cast<VariableExprNode *>(parseVarOrCall());
-    if (varName == nullptr)
-    {
-        llvm::errs() << "[ERROR] " + varName->value + " is not a variable.\n";
-    }
-    tokensIterator--;
+    auto varName = parseVarOrCall();
+    // TODO: ???
+    //tokensIterator--;
+    //token = *tokensIterator;
     consume(TokenType::Assign);
-    advance();
     auto expr = parseExpression();
-    return new AssignExprNode(varName, expr);
+    if (dynamic_cast<VariableExprNode *>(varName) != nullptr)
+    {
+        return new AssignExprNode(dynamic_cast<VariableExprNode *>(varName), expr);
+    }
+    else if (dynamic_cast<IndexExprNode *>(varName) != nullptr)
+    {
+        return new AssignExprNode(dynamic_cast<IndexExprNode *>(varName), expr);
+    }
+    return nullptr;
 }
 
 ReturnStatementNode *Parser::parseReturnStatement() {
@@ -787,22 +851,11 @@ WhileStatementNode *Parser::parseWhileStatement() {
 
 CallExprNode *Parser::parseCall() {
     consume(TokenType::Call);
-    Token tok = token;
-    std::string name = tok.data;
     advance();
-    consume(TokenType::LParen);
-    auto *params = new std::vector<ExprNode*>();
-    if (token.type != TokenType::RParen)
+    auto callExpr = parseVarOrCall();
+    if (dynamic_cast<CallExprNode *>(callExpr) == nullptr)
     {
-        while (1)
-        {
-            if (auto arg = parseExpression())
-                params->push_back(arg);
-            else return nullptr;
-            if (token.type == TokenType::RParen) break;
-            consume(TokenType::Comma);
-        }
+        llvm::errs() << "[ERROR] " << dynamic_cast<VariableExprNode *>(callExpr)->value << " is not a function.\n";
     }
-    advance();
-    return new CallExprNode(new VariableExprNode(name), params);
+    return dynamic_cast<CallExprNode *>(callExpr);
 }

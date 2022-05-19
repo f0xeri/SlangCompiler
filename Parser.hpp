@@ -165,7 +165,7 @@ public:
     bool parseModuleDecl();
     BlockExprNode* parseBlock(VariableExprNode *name);
     bool parseVisibilityOperator();
-    VarDecStatementNode* parseVariableDecl(bool isGlobal = false);
+    DeclarationNode* parseVariableDecl(bool isGlobal = false);
     bool parseStatement();
     FieldVarDecNode* parseFieldDecl(std::vector<FieldVarDecNode *> *fields, std::string &thisClassName, bool &constructorRequired);
     MethodDecNode* parseMethodDecl(std::vector<MethodDecNode*> *methods, std::string &thisClassName);

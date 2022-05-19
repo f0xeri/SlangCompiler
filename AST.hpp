@@ -133,8 +133,10 @@ public:
 class ArrayExprNode : public ExprNode
 {
 public:
-    std::vector<ArrayExprNode*> *values;
-    explicit ArrayExprNode(std::vector<ArrayExprNode*> *values): values(values) {
+    std::vector<ExprNode*> *values;
+    std::string type;
+    ExprNode* size;
+    explicit ArrayExprNode(const std::string &type, ExprNode* size, std::vector<ExprNode*> *values): type(type), size(size), values(values) {
         _type = E_ARRAY;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
@@ -157,6 +159,16 @@ public:
     explicit VariableExprNode(std::string name, E_TYPE type = E_UNKNOWN): value(std::move(name)) {
         _type = type;
     }
+    virtual llvm::Value *codegen(CodeGenContext &cgcontext);
+};
+
+class IndexExprNode : public VariableExprNode  {
+public:
+    ExprNode *indexExpr;
+    ExprNode *assign;
+public:
+    IndexExprNode(const std::string &name, ExprNode *expr): VariableExprNode(name), indexExpr(expr), assign(nullptr) {}
+    IndexExprNode(const std::string &name, ExprNode *expr, ExprNode *assign): VariableExprNode(name), indexExpr(expr), assign(assign) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -291,30 +303,22 @@ public:
 
 class ArrayDecStatementNode : public DeclarationNode {
 public:
-    std::string type;
+    /*std::string type;
     std::vector<ExprNode*> *init;
-    long long size;
-    bool isString;
+    ExprNode *size;
+    bool isString;*/
 
-    ArrayDecStatementNode(std::string type, VariableExprNode *name, long long size): type(std::move(type)), DeclarationNode(name), init(new std::vector<ExprNode*>()), size(size), isString(false) {}
-    ArrayDecStatementNode(std::string type, VariableExprNode *name, std::vector<ExprNode*> *init): type(std::move(type)), DeclarationNode(name), init(init), size(init->size()), isString(false) {}
-    ArrayDecStatementNode(std::string type, VariableExprNode *name, const std::string &str): type(std::move(type)), DeclarationNode(name), init(new std::vector<ExprNode*>()), isString(true) {
+    ExprNode* expr;
+    ArrayDecStatementNode(VariableExprNode *name, ExprNode *expr) : DeclarationNode(name), expr(expr) {}
+
+    /*ArrayDecStatementNode(std::string type, VariableExprNode *value, ExprNode *size): type(std::move(type)), DeclarationNode(value), init(new std::vector<ExprNode*>()), size(size), isString(false) {}
+    ArrayDecStatementNode(std::string type, VariableExprNode *value, std::vector<ExprNode*> *init): type(std::move(type)), DeclarationNode(value), init(init), size(new IntExprNode(init->size())), isString(false) {}
+    ArrayDecStatementNode(std::string type, VariableExprNode *value, const std::string &str): type(std::move(type)), DeclarationNode(value), init(new std::vector<ExprNode*>()), isString(true) {
         for(auto it = str.begin(); it != str.end(); it++)
             init->push_back((ExprNode*)(new CharExprNode(*it)));
         init->push_back((ExprNode*)(new CharExprNode(0)));
         size = init->size() + 1;
-    }
-    virtual llvm::Value *codegen(CodeGenContext &cgcontext);
-};
-
-class IndexExprNode : public ExprNode {
-public:
-    VariableExprNode *name;
-    ExprNode *expr;
-    ExprNode *assign;
-public:
-    IndexExprNode(VariableExprNode *name, ExprNode *expr): name(name), expr(expr), assign(nullptr) {}
-    IndexExprNode(VariableExprNode *name, ExprNode *expr, ExprNode *assign): name(name), expr(expr), assign(assign) {}
+    }*/
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -473,6 +477,7 @@ class CodeGenContext {
 public:
     std::unique_ptr<llvm::LLVMContext> context;
     std::unique_ptr<llvm::IRBuilder<>> builder;
+    std::unique_ptr<llvm::DataLayout> dataLayout;
 
     llvm::Module* mModule;
     std::vector<CodeGenBlock*> blocks;
@@ -483,10 +488,11 @@ public:
 
     CodeGenContext(ModuleStatementNode *moduleStatement, bool isMainModule)
     {
-        context = make_unique<llvm::LLVMContext>();
+        context = std::make_unique<llvm::LLVMContext>();
         builder = std::make_unique<llvm::IRBuilder<>>(*context);
         mModule = new Module(moduleStatement->name->value, *context);
         mModule->setTargetTriple("x86_64-w64-windows-gnu");
+        dataLayout = std::make_unique<llvm::DataLayout>(mModule);
         this->isMainModule = isMainModule;
         moduleName = moduleStatement->name->value;
     }
@@ -502,6 +508,23 @@ public:
         return printfFunc;
     }
 
+    Function* GC_InitFunction() {
+        vector<Type*> args;
+        FunctionType* type = FunctionType::get(Type::getVoidTy(*context), args, false);
+        Function *GC_InitFunc = Function::Create(type, Function::ExternalLinkage, Twine("GC_init"), mModule);
+        GC_InitFunc->setCallingConv(CallingConv::C);
+        return GC_InitFunc;
+    }
+
+    Function* GC_MallocFunction() {
+        vector<Type*> args;
+        args.push_back(Type::getInt64Ty(*context));
+        FunctionType* type = FunctionType::get(Type::getInt8PtrTy(*context), args, false);
+        Function *GC_MallocFunc = Function::Create(type, Function::ExternalLinkage, Twine("GC_malloc"), mModule);
+        GC_MallocFunc->setCallingConv(CallingConv::C);
+        return GC_MallocFunc;
+    }
+
     Function* llvmTrap() {
         vector<Type*> agrs;
         FunctionType* type = FunctionType::get(Type::getVoidTy(*context), agrs, false);
@@ -514,6 +537,8 @@ public:
     {
         printfFunction();
         llvmTrap();
+        GC_InitFunction();
+        GC_MallocFunction();
         for (auto g : symbols)
         {
             g.second->codegen(*this);
@@ -528,6 +553,7 @@ public:
             builder->SetInsertPoint(entry);
 
             pushBlock(entry);
+            builder->CreateCall(mModule->getFunction("GC_init"), {});
             for (auto decl : *mainModule->block->statements)
             {
                 decl->codegen(*this);

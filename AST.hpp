@@ -99,7 +99,6 @@ public:
     int value;
     explicit IntExprNode(int value): ExprNode(true), value(value) {
         _type = E_INT;
-        isConst = true;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
@@ -110,7 +109,6 @@ public:
     double value;
     explicit RealExprNode(double value): ExprNode(true), value(value) {
         _type = E_REAL;
-        isConst = true;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
@@ -121,7 +119,6 @@ public:
     char value;
     explicit CharExprNode(char value): ExprNode(true), value(value) {
         _type = E_CHAR;
-        isConst = true;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
@@ -132,7 +129,6 @@ public:
     std::string value;
     explicit StringExprNode(std::string value): ExprNode(true), value(std::move(value)) {
         _type = E_STRING;
-        isConst = true;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
@@ -145,7 +141,6 @@ public:
     ExprNode* size;
     explicit ArrayExprNode(const std::string &type, ExprNode* size, std::vector<ExprNode*> *values): type(type), size(size), values(values), ExprNode(false) {
         _type = E_ARRAY;
-        isConst = false;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
@@ -156,7 +151,6 @@ public:
     bool value;
     explicit BooleanExprNode(bool value): ExprNode(true), value(value) {
         _type = E_BOOLEAN;
-        isConst = true;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };

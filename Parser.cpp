@@ -670,7 +670,7 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
     DeclarationNode* result;
     if (isArray)
     {
-        result = new ArrayDecStatementNode(new VariableExprNode(name), expr);
+        result = new ArrayDecStatementNode(new VariableExprNode(name), expr, isGlobal);
     }
     else
     {

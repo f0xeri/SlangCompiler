@@ -217,8 +217,9 @@ llvm::Value *AssignExprNode::codegen(CodeGenContext &cgcontext) {
 
     if (dynamic_cast<IndexExprNode*>(left) != nullptr)
     {
-        auto element_ptr = cgcontext.builder->CreateInBoundsGEP(var, dynamic_cast<IndexExprNode*>(left)->indexExpr->codegen(cgcontext));
-        auto ret = cgcontext.builder->CreateStore(assignData, element_ptr);
+        auto loadArr = cgcontext.builder->CreateLoad(var);
+        auto elementPtr = cgcontext.builder->CreateInBoundsGEP(loadArr, dynamic_cast<IndexExprNode*>(left)->indexExpr->codegen(cgcontext));
+        auto ret = cgcontext.builder->CreateStore(assignData, elementPtr);
         return nullptr;
     }
 
@@ -334,6 +335,13 @@ llvm::Value *FuncParamDecStatementNode::codegen(CodeGenContext &cgcontext) {
 llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
     auto exprNode = dynamic_cast<ArrayExprNode*>(expr);
     auto arrExpr = exprNode;
+    if (isGlobal)
+    {
+        if (!exprNode->size->isConst) {
+            llvm::errs() << "[ERROR] Codegen - global array " << name->value << " size should be constant.\n";
+            exit(-1);
+        }
+    }
     auto size = exprNode->size->codegen(cgcontext);
     auto arraySize = size;
     if (arrExpr->type == "array")
@@ -350,6 +358,34 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
     auto type = typeOf(cgcontext, arrExpr->type);
     llvm::Type* int64type = llvm::Type::getInt64Ty(*cgcontext.context);
 
+    if (isGlobal)
+    {
+        cgcontext.mModule->getOrInsertGlobal(name->value, type->getPointerTo());
+        auto gVar = cgcontext.mModule->getNamedGlobal(name->value);
+        gVar->setLinkage(GlobalValue::ExternalLinkage);
+        gVar->setInitializer(ConstantPointerNull::get(PointerType::get(type, 0)));
+        gVar->setAlignment(Align(8));
+        gVar->setDSOLocal(true);
+        cgcontext.globals()[name->value] = gVar;
+
+        FunctionType* type = FunctionType::get(Type::getVoidTy(*cgcontext.context), {}, false);
+        Function *constructorFunc = Function::Create(type, Function::ExternalLinkage, Twine(name->value + "_constructor"), cgcontext.mModule);
+        BasicBlock *bb = BasicBlock::Create(*cgcontext.context, name->value + "_constructorEntry", constructorFunc, nullptr);
+        cgcontext.pushBlock(bb);
+        cgcontext.builder->SetInsertPoint(bb);
+
+        getOrCreateSanitizerCtorAndInitFunctions(
+                *cgcontext.mModule, cgcontext.moduleName + "_GLOBAL_", name->value + "_constructor", {}, {},
+                // This callback is invoked when the functions are created the first
+                // time. Hook them into the global ctors list in that case:
+                [&](Function *Ctor, FunctionCallee) { appendToGlobalCtors(*cgcontext.mModule, Ctor, 65535); });
+    }
+    else
+    {
+        auto lVar = cgcontext.builder->CreateAlloca(type->getPointerTo(), 0, nullptr, name->value);
+        cgcontext.locals()[name->value] = lVar;
+    }
+
     auto elementSize = ConstantInt::get(int64type, cgcontext.dataLayout->getTypeAllocSize(type));
     auto allocSize = BinaryOperator::Create(Instruction::Mul, elementSize, arraySize, "", cgcontext.currentBlock());
     // GC_malloc
@@ -357,12 +393,24 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
     // malloc
     auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, nullptr, "");
     cgcontext.builder->Insert(arr);
-
-    cgcontext.locals()[name->value] = arr;
+    if (isGlobal)
+    {
+        auto gVar = cgcontext.mModule->getNamedGlobal(name->value);
+        cgcontext.builder->CreateStore(arr, gVar);
+        cgcontext.builder->CreateRetVoid();
+        cgcontext.popBlock();
+        return gVar;
+    }
+    else
+    {
+        auto lVar = cgcontext.locals()[name->value];
+        cgcontext.builder->CreateStore(arr, lVar);
+        return lVar;
+    }
     //ArrayType *arrayType = ArrayType::get(type, reinterpret_cast<ConstantInt*>(arraySize)->getZExtValue());
     //AllocaInst *alloc = new AllocaInst(arrayType, value->value, cgcontext.currentBlock());
     // auto var = new AllocaInst(arrayType, 0, value->value, cgcontext.currentBlock());
-    return arr;
+    return nullptr;
 }
 
 llvm::Value *IndexExprNode::codegen(CodeGenContext &cgcontext) {
@@ -387,7 +435,8 @@ llvm::Value *IndexExprNode::codegen(CodeGenContext &cgcontext) {
         llvm::errs() << "[ERROR] Undeclared Variable \"" << value << "\".\n";
         return nullptr;
     }
-    auto elementPtr = cgcontext.builder->CreateInBoundsGEP(var, indexExpr->codegen(cgcontext));
+    auto loadArr = cgcontext.builder->CreateLoad(var);
+    auto elementPtr = cgcontext.builder->CreateInBoundsGEP(loadArr, indexExpr->codegen(cgcontext));
     return cgcontext.builder->CreateLoad(elementPtr, false);
 }
 

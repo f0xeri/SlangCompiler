@@ -17,6 +17,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Transforms/Utils/ModuleUtils.h"
 
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Module.h>
@@ -78,6 +79,8 @@ public:
 class ExprNode : public Node
 {
 public:
+    bool isConst = false;
+    ExprNode(bool isConst): isConst(isConst) {}
     virtual ~ExprNode() = default;
     E_TYPE _type = E_UNKNOWN;
     virtual llvm::Value *codegen(CodeGenContext &cgcontext) = 0;
@@ -94,8 +97,9 @@ class IntExprNode : public ExprNode
 {
 public:
     int value;
-    explicit IntExprNode(int value): ExprNode(), value(value) {
+    explicit IntExprNode(int value): ExprNode(true), value(value) {
         _type = E_INT;
+        isConst = true;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
@@ -104,8 +108,9 @@ class RealExprNode : public ExprNode
 {
 public:
     double value;
-    explicit RealExprNode(double value): ExprNode(), value(value) {
+    explicit RealExprNode(double value): ExprNode(true), value(value) {
         _type = E_REAL;
+        isConst = true;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
@@ -114,8 +119,9 @@ class CharExprNode : public ExprNode
 {
 public:
     char value;
-    explicit CharExprNode(char value): ExprNode(), value(value) {
+    explicit CharExprNode(char value): ExprNode(true), value(value) {
         _type = E_CHAR;
+        isConst = true;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
@@ -124,8 +130,9 @@ class StringExprNode : public ExprNode
 {
 public:
     std::string value;
-    explicit StringExprNode(std::string value): ExprNode(), value(std::move(value)) {
+    explicit StringExprNode(std::string value): ExprNode(true), value(std::move(value)) {
         _type = E_STRING;
+        isConst = true;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
@@ -136,8 +143,9 @@ public:
     std::vector<ExprNode*> *values;
     std::string type;
     ExprNode* size;
-    explicit ArrayExprNode(const std::string &type, ExprNode* size, std::vector<ExprNode*> *values): type(type), size(size), values(values) {
+    explicit ArrayExprNode(const std::string &type, ExprNode* size, std::vector<ExprNode*> *values): type(type), size(size), values(values), ExprNode(false) {
         _type = E_ARRAY;
+        isConst = false;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
@@ -146,8 +154,9 @@ class BooleanExprNode : public ExprNode
 {
 public:
     bool value;
-    explicit BooleanExprNode(bool value): ExprNode(), value(value) {
+    explicit BooleanExprNode(bool value): ExprNode(true), value(value) {
         _type = E_BOOLEAN;
+        isConst = true;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
@@ -155,8 +164,7 @@ public:
 class VariableExprNode: public ExprNode, public StatementNode {
 public:
     std::string value;
-
-    explicit VariableExprNode(std::string name, E_TYPE type = E_UNKNOWN): value(std::move(name)) {
+    VariableExprNode(std::string name, E_TYPE type = E_UNKNOWN): value(std::move(name)), ExprNode(false) {
         _type = type;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
@@ -177,7 +185,7 @@ public:
     TokenType op;
     ExprNode *right;
 
-    UnaryOperatorExprNode(TokenType op, ExprNode *right): right(right), ExprNode(), op(op) {}
+    UnaryOperatorExprNode(TokenType op, ExprNode *right): right(right), ExprNode(false), op(op) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -186,7 +194,7 @@ public:
     TokenType op;
     ExprNode *left, *right;
 
-    OperatorExprNode(ExprNode *left, TokenType op, ExprNode *right): left(left), right(right), op(op) {}
+    OperatorExprNode(ExprNode *left, TokenType op, ExprNode *right): ExprNode(false), left(left), right(right), op(op) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -195,7 +203,7 @@ public:
     TokenType op;
     ExprNode *left, *right;
 
-    ConditionalExprNode(ExprNode *left, TokenType op, ExprNode *right): left(left), right(right), op(op) {}
+    ConditionalExprNode(ExprNode *left, TokenType op, ExprNode *right): ExprNode(false), left(left), right(right), op(op) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -204,7 +212,7 @@ public:
     VariableExprNode *name;
     std::vector<ExprNode*> *args;
 
-    CallExprNode(VariableExprNode *name, std::vector<ExprNode*> *args) : name(name), args(args) {}
+    CallExprNode(VariableExprNode *name, std::vector<ExprNode*> *args) : ExprNode(false), name(name), args(args) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -212,8 +220,8 @@ class BlockExprNode: public ExprNode {
 public:
     std::vector<StatementNode*> *statements;
 
-    BlockExprNode(): statements(new std::vector<StatementNode*>()) {}
-    BlockExprNode(std::vector<StatementNode*> *statements): statements(statements) {}
+    BlockExprNode(): ExprNode(false), statements(new std::vector<StatementNode*>()) {}
+    BlockExprNode(std::vector<StatementNode*> *statements): ExprNode(false), statements(statements) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -231,8 +239,8 @@ public:
     VariableExprNode *functor;
     std::vector<ExprNode*> *args;
 
-    explicit FuncExprNode(VariableExprNode *functor): functor(functor), args(new std::vector<ExprNode*>()) {}
-    FuncExprNode(VariableExprNode *functor, std::vector<ExprNode*> *args): functor(functor), args(args) {}
+    explicit FuncExprNode(VariableExprNode *functor): ExprNode(false), functor(functor), args(new std::vector<ExprNode*>()) {}
+    FuncExprNode(VariableExprNode *functor, std::vector<ExprNode*> *args): ExprNode(false), functor(functor), args(args) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -241,7 +249,7 @@ public:
     VariableExprNode *type;
     ExprNode *expr;
 
-    CastExprNode(VariableExprNode *type, ExprNode *expr): type(type), expr(expr) {}
+    CastExprNode(VariableExprNode *type, ExprNode *expr): ExprNode(false), type(type), expr(expr) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -308,8 +316,9 @@ public:
     ExprNode *size;
     bool isString;*/
 
+    bool isGlobal = false;
     ExprNode* expr;
-    ArrayDecStatementNode(VariableExprNode *name, ExprNode *expr) : DeclarationNode(name), expr(expr) {}
+    ArrayDecStatementNode(VariableExprNode *name, ExprNode *expr, bool isGlobal) : DeclarationNode(name), expr(expr), isGlobal(isGlobal) {}
 
     /*ArrayDecStatementNode(std::string type, VariableExprNode *value, ExprNode *size): type(std::move(type)), DeclarationNode(value), init(new std::vector<ExprNode*>()), size(size), isString(false) {}
     ArrayDecStatementNode(std::string type, VariableExprNode *value, std::vector<ExprNode*> *init): type(std::move(type)), DeclarationNode(value), init(init), size(new IntExprNode(init->size())), isString(false) {}
@@ -544,6 +553,20 @@ public:
             g.second->codegen(*this);
         }
 
+        /*FunctionType* type = FunctionType::get(Type::getVoidTy(*context), {}, false);
+        Function *kTsanInitNameFunc = Function::Create(type, Function::ExternalLinkage, Twine("kTsanInitName"), mModule);
+        BasicBlock *bb = BasicBlock::Create(*context, "kTsanInitNameFuncEntry", kTsanInitNameFunc, 0);
+        pushBlock(bb);
+        builder->SetInsertPoint(bb);
+        builder->CreateRetVoid();
+        popBlock();
+
+        getOrCreateSanitizerCtorAndInitFunctions(
+                *mModule, "kTsanModuleCtorName", "kTsanInitName", {}, {},
+                // This callback is invoked when the functions are created the first
+                // time. Hook them into the global ctors list in that case:
+                [&](Function *Ctor, FunctionCallee) { appendToGlobalCtors(*mModule, Ctor, 0); });
+        */
         if (isMainModule)
         {
             FunctionType *mainType = FunctionType::get(builder->getInt32Ty(), false);

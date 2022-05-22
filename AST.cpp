@@ -556,7 +556,7 @@ llvm::Value *TypeDecStatementNode::codegen(CodeGenContext &cgcontext) {
     for (auto field : *fields)
     {
         Type* type;
-        if (field->name->value == "array")
+        if (dynamic_cast<FieldArrayVarDecNode*>(field))
         {
             auto exprNode = dynamic_cast<FieldArrayVarDecNode*>(field)->var;
             auto arrExpr = dynamic_cast<ArrayExprNode*>(exprNode->expr);
@@ -573,7 +573,7 @@ llvm::Value *TypeDecStatementNode::codegen(CodeGenContext &cgcontext) {
                     arrExpr = castedSlice;
                 }
             }
-            type = typeOf(cgcontext, arrExpr->type);
+            type = ptrToTypeOf(cgcontext, arrExpr->type);
         }
         else
             type = typeOf(cgcontext, field->name->value);

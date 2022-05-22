@@ -22,7 +22,12 @@ void Parser::parse()
             }
             else if (dynamic_cast<TypeDecStatementNode*>(decl.second) != nullptr)
             {
-
+                auto var = dynamic_cast<TypeDecStatementNode*>(decl.second);
+                for (auto &method : *var->methods)
+                {
+                    method->block = nullptr;
+                }
+                currentScope->insert(var);
             }
             else if (dynamic_cast<VarDecStatementNode*>(decl.second) != nullptr)
             {
@@ -406,7 +411,7 @@ bool Parser::parseTypeDecl() {
                     if (token.type == TokenType::Identifier && token.data == name && advance().type == TokenType::Semicolon)
                     {
                         currentScope = scope->parent;
-                        typeNode = new TypeDecStatementNode(new VariableExprNode(name), isPrivate, fields, methods, parent);
+                        typeNode = new TypeDecStatementNode(new VariableExprNode(mainModuleNode->name->value + "." + name), isPrivate, fields, methods, parent);
                         currentScope->insert(typeNode);
                     }
                 }
@@ -699,8 +704,43 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
     }
     else
     {
-        auto typeStatement = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(type));
-        if (typeStatement == nullptr)
+        if (dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(type)) == nullptr)
+        {
+            // if we have dot
+            bool dotModule = false;
+            bool dotClass = false;
+            if (token.type == TokenType::Dot)
+            {
+                // is it module or class value
+                Parser *moduleP = nullptr;
+                for (auto &module : *importedModules)
+                {
+                    if (module->mainModuleNode->name->value == type)
+                    {
+                        dotModule = true;
+                        moduleP = module;
+                        break;
+                    }
+                }
+                if (!dotModule)
+                {
+                    auto t = currentScope->lookup(type);
+                    if (dynamic_cast<TypeDecStatementNode*>(t) != nullptr) dotClass = true;
+                }
+                if (!dotModule && !dotClass)
+                {
+                    llvm::errs() << "[ERROR] " + type + " is not declared.\n";
+                }
+                advance();
+                expect(TokenType::Identifier);
+                if (moduleP->currentScope->lookup(type + "." + token.data) != nullptr)
+                    type += "." + token.data;
+                else
+                    llvm::errs() << "[ERROR] " + type + "." + token.data + " is not declared.\n";
+                advance();
+            }
+        }
+        else
         {
             llvm::errs() << "[ERROR] Unknown type \"" << type << "\".\n";
         }

@@ -27,7 +27,9 @@ public:
         auto objectType = new TypeDecStatementNode(new VariableExprNode("Object"), false, nullptr, nullptr);
         objectType->methods = new std::vector<MethodDecNode*>();
         auto toStringType = new ArrayExprNode("character", nullptr, new std::vector<ExprNode*>());
-        objectType->methods->push_back(new MethodDecNode(toStringType, new VariableExprNode("toString"), false, new VariableExprNode("this"), {}, nullptr));
+        auto args = new std::vector<FuncParamDecStatementNode *>();
+        args->push_back(new FuncParamDecStatementNode("Object", new VariableExprNode("this"), ParameterType::Var));
+        objectType->methods->push_back(new MethodDecNode(toStringType, new VariableExprNode("Object.toString"), false, true, new VariableExprNode("this"), args, nullptr));
         currentScope->insert(objectType);
         importedModules = new std::vector<Parser*>();
         this->tokens = tokens;
@@ -106,29 +108,29 @@ public:
 
     std::vector<FuncParamDecStatementNode *>* parseFuncParameters();
 
-    FieldVarDecNode* initDefaultType(bool isPrivate, const std::string &name, const std::string &type, TokenType dataType, const std::string &data)
+    FieldVarDecNode* initDefaultType(const std::string &typeName, bool isPrivate, const std::string &name, const std::string &type, TokenType dataType, const std::string &data, int index)
     {
         FieldVarDecNode *field = nullptr;
         if (type == "integer")
         {
             if (dataType == TokenType::Integer)
             {
-                field = new FieldVarDecNode(new VariableExprNode(name), isPrivate, type,new IntExprNode(std::stoi(token.data)));
+                field = new FieldVarDecNode(typeName, new VariableExprNode(name), isPrivate, type,new IntExprNode(std::stoi(token.data)), index);
             }
             else
             {
-                field = new FieldVarDecNode(new VariableExprNode(name), isPrivate, type,new IntExprNode(0));
+                field = new FieldVarDecNode(typeName, new VariableExprNode(name), isPrivate, type,new IntExprNode(0), index);
             }
         }
         else if (type == "real")
         {
             if (dataType == TokenType::Real)
             {
-                field = new FieldVarDecNode(new VariableExprNode(name), isPrivate, type, new RealExprNode(std::stod(data)));
+                field = new FieldVarDecNode(typeName, new VariableExprNode(name), isPrivate, type, new RealExprNode(std::stod(data)), index);
             }
             else
             {
-                field = new FieldVarDecNode(new VariableExprNode(name), isPrivate, type, new RealExprNode(0.0));
+                field = new FieldVarDecNode(typeName, new VariableExprNode(name), isPrivate, type, new RealExprNode(0.0), index);
             }
         }
         else if (type == "boolean")
@@ -136,11 +138,11 @@ public:
             if (dataType == TokenType::Boolean)
             {
                 bool bdata = data == "true";
-                field = new FieldVarDecNode(new VariableExprNode(name), isPrivate, type,new BooleanExprNode(bdata));
+                field = new FieldVarDecNode(typeName, new VariableExprNode(name), isPrivate, type, new BooleanExprNode(bdata), index);
             }
             else
             {
-                field = new FieldVarDecNode(new VariableExprNode(name), isPrivate, type,new BooleanExprNode(false));
+                field = new FieldVarDecNode(typeName, new VariableExprNode(name), isPrivate, type, new BooleanExprNode(false), index);
             }
         }
         else if (type == "character")
@@ -148,17 +150,17 @@ public:
             if (data.length() == 1)
             {
                 char chdata = data[0];
-                field = new FieldVarDecNode(new VariableExprNode(name), isPrivate, type, new CharExprNode(chdata));
+                field = new FieldVarDecNode(typeName, new VariableExprNode(name), isPrivate, type, new CharExprNode(chdata), index);
             }
             else if (data.length() == 0)
             {
-                field = new FieldVarDecNode(new VariableExprNode(name), isPrivate, type, new CharExprNode(NULL));
+                field = new FieldVarDecNode(typeName, new VariableExprNode(name), isPrivate, type, new CharExprNode(NULL), index);
             }
 
         }
         else if (type == "string")
         {
-            field = new FieldVarDecNode(new VariableExprNode(name), isPrivate, type, new StringExprNode(data));
+            field = new FieldVarDecNode(typeName, new VariableExprNode(name), isPrivate, type, new StringExprNode(data), index);
         }
         return field;
     }
@@ -230,7 +232,7 @@ public:
     bool parseVisibilityOperator();
     DeclarationNode* parseVariableDecl(bool isGlobal = false);
     bool parseStatement();
-    DeclarationNode* parseFieldDecl(std::vector<DeclarationNode *> *fields, std::string &thisClassName, bool &constructorRequired);
+    DeclarationNode* parseFieldDecl(std::vector<DeclarationNode *> *fields, std::string &thisClassName, bool &constructorRequired, int index);
     MethodDecNode* parseMethodDecl(std::vector<MethodDecNode*> *methods, std::string &thisClassName);
     FuncDecStatementNode* parseFunctionDecl();
     IfStatementNode* parseIfStatement();

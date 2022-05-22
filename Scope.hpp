@@ -24,14 +24,14 @@ public:
         symbols.emplace_back(declarationNode->name->value, declarationNode);
     }
 
-    bool contains(const std::string &name)
+    bool contains(Scope *s, const std::string &name)
     {
-        return std::ranges::find(symbols, name, &std::pair<std::string, DeclarationNode*>::first) != symbols.end();
+        return std::ranges::find(s->symbols, name, &std::pair<std::string, DeclarationNode*>::first) != s->symbols.end();
     }
 
-    DeclarationNode* get(const std::string &name)
+    DeclarationNode* get(Scope *s, const std::string &name)
     {
-        return (*(std::ranges::find(symbols, name, &std::pair<std::string, DeclarationNode*>::first))).second;
+        return (*(std::ranges::find(s->symbols, name, &std::pair<std::string, DeclarationNode*>::first))).second;
     }
 
     DeclarationNode* lookup(const std::string &name)
@@ -41,7 +41,7 @@ public:
         {
             /*llvm::StringMap<DeclarationNode*>::iterator i = s->symbols.find(value->value);
             if (i != s->symbols.end()) return i->second;*/
-            if (contains(name)) return get(name);
+            if (contains(s, name)) return get(s, name);
             s = s->parent;
         }
         return nullptr;

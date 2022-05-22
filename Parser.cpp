@@ -88,6 +88,8 @@ bool Parser::parseModuleDecl()
 }
 
 BlockExprNode* Parser::parseBlock(VariableExprNode *name) {
+    Scope *scope = new Scope(currentScope);
+    currentScope = scope;
     bool blockEnd = false;
     auto *statements = new std::vector<StatementNode*>();
     auto *block = new BlockExprNode(statements);
@@ -115,6 +117,7 @@ BlockExprNode* Parser::parseBlock(VariableExprNode *name) {
             }
         }
     }
+    currentScope = scope->parent;
     return block;
 }
 
@@ -131,7 +134,7 @@ bool Parser::parseStatement() {
     return false;
 }
 
-DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, std::string &thisClassName, bool &constructorRequired) {
+DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, std::string &thisClassName, bool &constructorRequired, int index) {
     DeclarationNode *field = nullptr;
     std::string name;
     std::string type;
@@ -175,7 +178,8 @@ DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, 
         expr = arrExpr;
         advance();
         name = consume(TokenType::Identifier).data;
-        field = new FieldArrayVarDecNode(new VariableExprNode(name), isPrivate, new ArrayDecStatementNode(nullptr, expr, isPrivate));
+        constructorRequired = true;
+        field = new FieldArrayVarDecNode(thisClassName, new VariableExprNode(name), isPrivate, new ArrayDecStatementNode(nullptr, expr, isPrivate), index);
     }
     else
     {
@@ -196,7 +200,7 @@ DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, 
                 if (init) {
                     advance();
                     expr = parseExpression();
-                    field = new FieldVarDecNode(new VariableExprNode(name), isPrivate, type, expr);
+                    field = new FieldVarDecNode(thisClassName, new VariableExprNode(name), isPrivate, type, expr, index);
                     constructorRequired = true;
                     if (DEBUG) llvm::outs() << "parsed field " << type << " " << name << "\n";
                 }
@@ -206,7 +210,7 @@ DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, 
                     std::string data = init ? token.data : "";
                     if (oneOfDefaultTypes(type))
                     {
-                        field = initDefaultType(isPrivate, name, type, dataType, data);
+                        field = initDefaultType(thisClassName, isPrivate, name, type, dataType, data, index);
                         if (DEBUG) llvm::outs() << "parsed field " << type << " " << name << " - " << data << "\n";
                     }
                     else
@@ -252,7 +256,10 @@ std::vector<FuncParamDecStatementNode*> *Parser::parseFuncParameters()
 }
 
 MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std::string &thisClassName) {
+    auto scope = new Scope(currentScope);
+
     MethodDecNode *method = nullptr;
+    bool isFunction = false;
     std::string name;
     ExprNode* type;
     std::string thisName;
@@ -262,7 +269,8 @@ MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std
     if (token.data == "private") isPrivate = true;
     consume(TokenType::Method);
     tok = consume(TokenType::Identifier);
-    name = tok.data;
+    auto shortName = tok.data;
+    name = mainModuleNode->name->value + "." + thisClassName + "." + tok.data;
     consume(TokenType::LParen);
     tok = consume(TokenType::Identifier);
     if (tok.data != thisClassName)
@@ -272,17 +280,23 @@ MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std
     }
     tok = consume(TokenType::Identifier);
     thisName = tok.data;
+    scope->insert(new VarDecStatementNode(mainModuleNode->name->value + "." + thisClassName, new VariableExprNode(thisName)));
+    currentScope = scope;
     consume(TokenType::RParen);
-    auto params = parseFuncParameters();
+    auto params = new std::vector<FuncParamDecStatementNode *>();
+    params = parseFuncParameters();
+    params->insert(params->begin(), new FuncParamDecStatementNode(mainModuleNode->name->value + "." + thisClassName, new VariableExprNode(thisName), ParameterType::Var));
     advance();
     if (token.type == TokenType::Colon)
     {
         advance();
         type = lookupTypes(token.data);
+        isFunction = true;
     }
     else
     {
         type = new VariableExprNode("");
+        isFunction = false;
     }
 
     // override
@@ -297,26 +311,17 @@ MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std
     }
 
     // parse statements
-
-    while (token.type != TokenType::End)
-    {
-        advance();
-    }
-    advance();
-    tok = consume(TokenType::Identifier);
-    if (tok.data != name)
-    {
-        llvm::errs() << "[ERROR] Expected end of block \"" << name + "\", not \"" << tok.data << "\".\n";
-        hasError = true;
-    }
+    tokensIterator--;
+    token = *tokensIterator;
+    block = parseBlock(new VariableExprNode(shortName));
 
     if (token.type != TokenType::Semicolon)
     {
         llvm::errs() << "[ERROR] Unexpected token \"" << token.data + "\", expected \"" + Lexer::getTokenName(TokenType::Semicolon) + "\".\n";
         hasError = true;
     }
-
-    method = new MethodDecNode(type, new VariableExprNode(name), isPrivate, new VariableExprNode(thisName), params, block);
+    currentScope = scope->parent;
+    method = new MethodDecNode(type, new VariableExprNode(name), isPrivate, isFunction, new VariableExprNode(thisName), params, block);
     if (DEBUG) llvm::outs() << "parsed method of class " << thisClassName << " " << type << " " << name << "\n";
     return method;
 }
@@ -340,18 +345,63 @@ bool Parser::parseTypeDecl() {
             if (token.type == TokenType::Identifier)
             {
                 DeclarationNode *decl = currentScope->lookup(token.data);
+                if (decl == nullptr) decl = currentScope->lookup(mainModuleNode->name->value + "." + token.data);
                 if (decl != nullptr)
                 {
                     parent = dynamic_cast<TypeDecStatementNode*>(decl);
                     if (parent != nullptr)
                     {
-                        if (parent->fields != nullptr) fields->assign(parent->fields->begin(), parent->fields->end());
-                        if (parent->methods != nullptr) methods->assign(parent->methods->begin(), parent->methods->end());
+                        if (parent->fields != nullptr)
+                        {
+                            fields->assign(parent->fields->begin(), parent->fields->end());
+                        }
+                        if (parent->methods != nullptr)
+                        {
+                            for (auto &method : *parent->methods)
+                            {
+                                auto newName = new VariableExprNode(mainModuleNode->name->value + "." + name + method->name->value.substr(method->name->value.rfind('.')));
+                                auto args = new std::vector<FuncParamDecStatementNode*>();
+                                if (method->args != nullptr)
+                                {
+                                    if (method->args != nullptr && !method->args->empty())
+                                    {
+                                        args->push_back(new FuncParamDecStatementNode(mainModuleNode->name->value + "." + name,
+                                                                                      new VariableExprNode(method->args->at(0)->name->value),
+                                                                                      method->args->at(0)->parameterType,
+                                                                                      method->args->at(0)->expr));
+                                    }
+                                }
+                                auto newStatements = new std::vector<StatementNode*>();
+                                if (method->name->value == method->name->value + "._DefaultConstructor_")
+                                {
+                                    for (auto &statement : *method->block->statements)
+                                    {
+                                        if (dynamic_cast<FieldVarDecNode*>(statement) != nullptr)
+                                        {
+                                            auto pFieldVar = dynamic_cast<FieldVarDecNode*>(statement);
+                                            auto fieldVarDec = new FieldVarDecNode(name, new VariableExprNode(pFieldVar->name->value), pFieldVar->isPrivate, pFieldVar->type, pFieldVar->expr, pFieldVar->index);
+                                            newStatements->push_back(fieldVarDec);
+                                        }
+                                        else if (dynamic_cast<FieldArrayVarDecNode*>(statement) != nullptr)
+                                        {
+                                            auto pFieldArrVar = dynamic_cast<FieldArrayVarDecNode*>(statement);
+                                            auto fieldArrVarDec = new FieldArrayVarDecNode(name, new VariableExprNode(pFieldArrVar->name->value), pFieldArrVar->isPrivate, pFieldArrVar->var, pFieldArrVar->index);
+                                            newStatements->push_back(fieldArrVarDec);
+                                        }
+                                    }
+                                }
+                                auto methodDecNode = new MethodDecNode(method->type, newName, method->isPrivate, method->isFunction, new VariableExprNode(method->thisName->value), args, new BlockExprNode(newStatements));
+                                methods->push_back(methodDecNode);
+                            }
+                        }
                     }
+                    // insert before methods parsing
+                    typeNode = new TypeDecStatementNode(new VariableExprNode(mainModuleNode->name->value + "." + name), isPrivate, fields, methods, parent);
+                    currentScope->insert(typeNode);
 
                     Scope *scope = new Scope(currentScope);
                     currentScope = scope;
-
+                    int fieldIndex = 0;
                     while (token.type != TokenType::End)
                     {
                         advance();
@@ -362,11 +412,12 @@ bool Parser::parseTypeDecl() {
                             {
                                 tokensIterator--;
                                 token = *tokensIterator;
-                                auto field = parseFieldDecl(fields, name, constructorRequired);
+                                auto field = parseFieldDecl(fields, name, constructorRequired, fieldIndex);
                                 if (field != nullptr)
                                 {
                                     // TODO Check if field value already exists in fields
                                     fields->push_back(field);
+                                    fieldIndex++;
                                     //if (DEBUG) llvm::outs() << "parsed field " << field->value->value << " " << field->isPrivate << "\n";
                                 }
                                 else
@@ -390,8 +441,8 @@ bool Parser::parseTypeDecl() {
 
                     if (constructorRequired)
                     {
-                        std::string constructorName = name + "DefaultConstructor";
-                        std::string constructorType = "";
+                        std::string constructorName = name + "._DefaultConstructor_";
+                        std::string constructorType;
                         bool constructorIsPrivate = false;
                         auto *constructorStatements = new std::vector<StatementNode*>();
                         //constructorStatements->push_back(new AssignExprNode());
@@ -399,10 +450,14 @@ bool Parser::parseTypeDecl() {
                         {
                             if (dynamic_cast<FieldVarDecNode*>(field) != nullptr)
                             {
-                                constructorStatements->push_back(new AssignExprNode(field->name, dynamic_cast<FieldVarDecNode*>(field)->expr));
+                                constructorStatements->push_back(field);
+                            }
+                            else if (dynamic_cast<FieldArrayVarDecNode*>(field) != nullptr)
+                            {
+                                constructorStatements->push_back(field);
                             }
                         }
-                        auto constructor = new MethodDecNode(new VariableExprNode(constructorType), new VariableExprNode(constructorName), constructorIsPrivate, new VariableExprNode(name),
+                        auto constructor = new MethodDecNode(new VariableExprNode(constructorType), new VariableExprNode(mainModuleNode->name->value + "." + constructorName), constructorIsPrivate, false, new VariableExprNode(name),
                                                    nullptr, new BlockExprNode(constructorStatements));
                         methods->push_back(constructor);
                     }
@@ -412,8 +467,14 @@ bool Parser::parseTypeDecl() {
                     {
                         currentScope = scope->parent;
                         typeNode = new TypeDecStatementNode(new VariableExprNode(mainModuleNode->name->value + "." + name), isPrivate, fields, methods, parent);
-                        currentScope->insert(typeNode);
+                        // already inserted
+                        //currentScope->insert(typeNode);
                     }
+                }
+                else
+                {
+                    llvm::errs() << "[ERROR] Type " + token.data + " is not declared.\n";
+                    exit(-1);
                 }
             }
         }
@@ -584,9 +645,17 @@ StatementNode* Parser::parseVarOrCall() {
     Token tok = token;
     std::string name = tok.data;
     advance();
-    // if we have dot
+
+    TypeDecStatementNode* type;
     bool dotModule = false;
     bool dotClass = false;
+
+    bool fieldExists = false;
+    bool methodExists = false;
+
+    int fieldIndex = -1;
+    std::string methodName;
+    // if we have dot
     if (token.type == TokenType::Dot)
     {
         // is it module or class value
@@ -602,36 +671,73 @@ StatementNode* Parser::parseVarOrCall() {
         }
         if (!dotModule)
         {
-            auto type = currentScope->lookup(name);
-            if (dynamic_cast<TypeDecStatementNode*>(type) != nullptr) dotClass = true;
+            type = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(name));
+            if (type != nullptr) dotClass = true;
         }
         if (!dotModule && !dotClass)
         {
-            llvm::errs() << "[ERROR] " + name + " is not declared.\n";
+            auto var = currentScope->lookup(name);
+            if (var == nullptr)
+            {
+                llvm::errs() << "[ERROR] " + name + " is not declared.\n";
+            }
+            type = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(dynamic_cast<VarDecStatementNode*>(var)->type));
+            if (type != nullptr) dotClass = true;
         }
         advance();
         expect(TokenType::Identifier);
-        if (moduleP->currentScope->lookup(name + "." + token.data) != nullptr)
-            name += "." + token.data;
-        else
-            llvm::errs() << "[ERROR] " + name + "." + token.data + " is not declared.\n";
+        if (dotModule)
+        {
+            if (moduleP->currentScope->lookup(name + "." + token.data) != nullptr)
+                name += "." + token.data;
+            else
+                llvm::errs() << "[ERROR] " + name + "." + token.data + " is not declared.\n";
+        }
+        if (dotClass)
+        {
+
+            for (auto &field : *type->fields)
+            {
+                if (field->name->value == token.data)
+                {
+                    name += "." + token.data;
+                    fieldExists = true;
+                    if (dynamic_cast<FieldVarDecNode*>(field) != nullptr) fieldIndex = dynamic_cast<FieldVarDecNode*>(field)->index;
+                    else if (dynamic_cast<FieldArrayVarDecNode*>(field)) fieldIndex = dynamic_cast<FieldArrayVarDecNode*>(field)->index;
+                    break;
+                }
+            }
+
+            for (auto &method : *type->methods)
+            {
+                if (method->name->value == type->name->value + "." + token.data)
+                {
+                    //name = type->name->value + "." + token.data;
+                    methodName = type->name->value + "." + token.data;
+                    methodExists = true;
+                    break;
+                }
+            }
+        }
         advance();
     }
     // if we have an array
     if (token.type == TokenType::LBracket)
     {
+        if (dotClass && !fieldExists) llvm::errs() << "[ERROR] Field " + name + "." + token.data + " is not declared in " + type->name->value + " type.\n";
         advance();
         auto index = parseExpression();
         consume(TokenType::RBracket);
-        return new IndexExprNode(name, index);
+        return new IndexExprNode(name, index, dotModule, dotClass, fieldIndex);
     }
-    if (token.type != TokenType::LParen) return new VariableExprNode(name);
+    if (token.type != TokenType::LParen) return new VariableExprNode(name, E_UNKNOWN, dotModule, dotClass, fieldIndex);
     if (!dotModule && currentScope->lookup(mainModuleNode->name->value + "." + name) != nullptr)
         name = mainModuleNode->name->value + "." + name;
     //else
     //llvm::errs() << "[ERROR] " + mainModuleNode->value->value + "." + value + " is not declared.\n";
+    if (dotClass && !methodExists) llvm::errs() << "[ERROR] Method " + name + "." + token.data + " is not declared in " + type->name->value + " type.\n";
     consume(TokenType::LParen);
-    auto *params = new std::vector<ExprNode*>();
+    auto params = new std::vector<ExprNode*>();
     if (token.type != TokenType::RParen)
     {
         while (1)
@@ -644,7 +750,14 @@ StatementNode* Parser::parseVarOrCall() {
         }
     }
     advance();
-    return new CallExprNode(new VariableExprNode(name), params);
+    if (dotClass)
+    {
+        params->insert(params->begin(), new VariableExprNode(name, E_UNKNOWN, dotModule, dotClass));
+        return new CallExprNode(new VariableExprNode(methodName), params);
+    }
+    else
+        return new CallExprNode(new VariableExprNode(name, E_UNKNOWN, dotModule, dotClass), params);
+    return nullptr;
 }
 
 DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
@@ -704,7 +817,7 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
     }
     else
     {
-        if (dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(type)) == nullptr)
+        if (dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(mainModuleNode->name->value + "." + type)) == nullptr)
         {
             // if we have dot
             bool dotModule = false;
@@ -742,7 +855,7 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
         }
         else
         {
-            llvm::errs() << "[ERROR] Unknown type \"" << type << "\".\n";
+            type = mainModuleNode->name->value + "." + type;
         }
         name = consume(TokenType::Identifier).data;
         // arrays and objects
@@ -762,6 +875,7 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
         result = new VarDecStatementNode(type, new VariableExprNode(name), expr, isGlobal);
     }
     if (isGlobal) currentScope->insert(result);
+    currentScope->insert(result);
     return result;
 }
 
@@ -777,15 +891,22 @@ FuncDecStatementNode *Parser::parseFunctionDecl() {
         consume(TokenType::Procedure);
     }
     std::string name = consume(TokenType::Identifier).data;
-    std::string type;
+    ExprNode* type;
     auto params = parseFuncParameters();
     if (isFunction)
     {
         advance();
-        consume(TokenType::Colon);
-        expect(TokenType::Identifier);
-        type = token.data;
+        if (token.type == TokenType::Colon)
+        {
+            advance();
+            type = lookupTypes(token.data);
+        }
+        else
+        {
+            type = new VariableExprNode("");
+        }
     }
+    else type = new VariableExprNode("");
     auto function = new FuncDecStatementNode(type, new VariableExprNode(mainModuleNode->name->value + "." + name), isPrivate, isFunction, params, nullptr);
     currentScope->insert(function);
     auto block = parseBlock(new VariableExprNode(name));

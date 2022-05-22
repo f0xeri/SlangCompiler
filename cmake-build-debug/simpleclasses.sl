@@ -1,8 +1,7 @@
 module main
     variable-integer globalint := 15;
     public class Time inherits Object
-
-        public field-integer int := 2 + (1 + 4) * 2;
+        public field-integer int := 2;
         public field-real r := 15.25;
 
         public field-character ch := "!";
@@ -15,17 +14,15 @@ module main
         public method p1(Time time)()
             output "parent method";
         end p1;
-
-        public method p2(Time this)():string
-            return this.s;
-        end p2;
     end Time;
+
     variable-real globalreal := 100.1;
+
     public class ABC inherits Time
 
     end ABC;
 
-    public function first(in integer a, in integer ra):integer
+    public function first(in integer a, in integer ra): integer
         let ra := (globalint + (ra - a) + (1 + 4) * 2) * -10;
         return ra;
     end first;
@@ -78,4 +75,8 @@ start
     output globalint + globalreal;
     variable-real aaa := globalint / 2.0;
     output aaa;
+    output "~~~~~~~~~~~~~";
+    variable-Time time;
+    output time.int;
+    output time.r;
 end main.

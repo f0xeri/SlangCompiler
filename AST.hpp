@@ -158,7 +158,10 @@ public:
 class VariableExprNode: public ExprNode, public StatementNode {
 public:
     std::string value;
-    VariableExprNode(std::string name, E_TYPE type = E_UNKNOWN): value(std::move(name)), ExprNode(false) {
+    bool dotClass = false;
+    bool dotModule = false;
+    int index = -1;
+    VariableExprNode(std::string name, E_TYPE type = E_UNKNOWN, bool dotModule = false, bool dotClass = false, int index = -1): value(std::move(name)), ExprNode(false), dotModule(dotModule), dotClass(dotClass), index(index) {
         _type = type;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
@@ -169,8 +172,8 @@ public:
     ExprNode *indexExpr;
     ExprNode *assign;
 public:
-    IndexExprNode(const std::string &name, ExprNode *expr): VariableExprNode(name), indexExpr(expr), assign(nullptr) {}
-    IndexExprNode(const std::string &name, ExprNode *expr, ExprNode *assign): VariableExprNode(name), indexExpr(expr), assign(assign) {}
+    IndexExprNode(const std::string &name, ExprNode *expr, bool dotModule = false, bool dotClass = false, int index = -1): VariableExprNode(name, E_UNKNOWN, dotModule, dotClass, index), indexExpr(expr), assign(nullptr) {}
+    IndexExprNode(const std::string &name, ExprNode *expr, ExprNode *assign, bool dotModule = false, bool dotClass = false, int index = -1): VariableExprNode(name, E_UNKNOWN, dotModule, dotClass, index), indexExpr(expr), assign(assign) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -327,33 +330,37 @@ public:
 
 class FuncDecStatementNode : public DeclarationNode {
 public:
-    std::string type;
+    ExprNode* type;
     std::vector<FuncParamDecStatementNode*> *args = nullptr;
     BlockExprNode *block = nullptr;
     bool isPrivate = false;
     bool isFunction = false;
 
-    FuncDecStatementNode(std::string type, VariableExprNode *name, bool isPrivate, bool isFunction, std::vector<FuncParamDecStatementNode*> *args, BlockExprNode *block): type(std::move(type)), DeclarationNode(name), isPrivate(isPrivate), isFunction(isFunction), args(args), block(block) {}
+    FuncDecStatementNode(ExprNode*  type, VariableExprNode *name, bool isPrivate, bool isFunction, std::vector<FuncParamDecStatementNode*> *args, BlockExprNode *block): type(type), DeclarationNode(name), isPrivate(isPrivate), isFunction(isFunction), args(args), block(block) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
 class FieldVarDecNode : public DeclarationNode
 {
 public:
+    std::string typeName;
     std::string type;
     ExprNode *expr;
     bool isPrivate;
-    FieldVarDecNode(VariableExprNode *name, bool isPrivate, std::string type): DeclarationNode(name), type(std::move(type)), expr(nullptr), isPrivate(isPrivate) {};
-    FieldVarDecNode(VariableExprNode *name, bool isPrivate, std::string type, ExprNode *expr): DeclarationNode(name), type(std::move(type)), isPrivate(isPrivate), expr(expr) {};
+    int index;
+    FieldVarDecNode(const std::string &typeName, VariableExprNode *name, bool isPrivate, std::string type, int index): typeName(typeName), DeclarationNode(name), type(std::move(type)), expr(nullptr), isPrivate(isPrivate), index(index) {};
+    FieldVarDecNode(const std::string &typeName, VariableExprNode *name, bool isPrivate, std::string type, ExprNode *expr, int index): typeName(typeName),  DeclarationNode(name), type(std::move(type)), isPrivate(isPrivate), expr(expr), index(index) {};
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
 class FieldArrayVarDecNode : public DeclarationNode
 {
 public:
+    std::string typeName;
     bool isPrivate;
     ArrayDecStatementNode *var;
-    FieldArrayVarDecNode(VariableExprNode *name, bool isPrivate, ArrayDecStatementNode *var) : DeclarationNode(name), isPrivate(isPrivate), var(var) {};
+    int index;
+    FieldArrayVarDecNode(const std::string &typeName, VariableExprNode *name, bool isPrivate, ArrayDecStatementNode *var, int index): typeName(typeName),  DeclarationNode(name), isPrivate(isPrivate), var(var), index(index) {};
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -365,9 +372,9 @@ public:
     std::vector<FuncParamDecStatementNode*> *args = nullptr;
     BlockExprNode *block = nullptr;
     bool isPrivate = false;
-
-    MethodDecNode(ExprNode*  type, VariableExprNode *name, bool isPrivate, VariableExprNode *thisName, std::vector<FuncParamDecStatementNode*> *args, BlockExprNode *block):
-            type(type), DeclarationNode(name), isPrivate(isPrivate), thisName(thisName), args(args), block(block) {};
+    bool isFunction = false;
+    MethodDecNode(ExprNode* type, VariableExprNode *name, bool isPrivate, bool isFunction, VariableExprNode *thisName, std::vector<FuncParamDecStatementNode*> *args, BlockExprNode *block):
+            type(type), DeclarationNode(name), isPrivate(isPrivate), isFunction(isFunction), thisName(thisName), args(args), block(block) {};
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -482,6 +489,8 @@ public:
     bool isMainModule = false;
     std::string moduleName;
 
+    LoadInst* currentTypeLoad;
+
     CodeGenContext(ModuleStatementNode *moduleStatement, bool isMainModule)
     {
         context = std::make_unique<llvm::LLVMContext>();
@@ -540,20 +549,6 @@ public:
             g.second->codegen(*this);
         }
 
-        /*FunctionType* type = FunctionType::get(Type::getVoidTy(*context), {}, false);
-        Function *kTsanInitNameFunc = Function::Create(type, Function::ExternalLinkage, Twine("kTsanInitName"), mModule);
-        BasicBlock *bb = BasicBlock::Create(*context, "kTsanInitNameFuncEntry", kTsanInitNameFunc, 0);
-        pushBlock(bb);
-        builder->SetInsertPoint(bb);
-        builder->CreateRetVoid();
-        popBlock();
-
-        getOrCreateSanitizerCtorAndInitFunctions(
-                *mModule, "kTsanModuleCtorName", "kTsanInitName", {}, {},
-                // This callback is invoked when the functions are created the first
-                // time. Hook them into the global ctors list in that case:
-                [&](Function *Ctor, FunctionCallee) { appendToGlobalCtors(*mModule, Ctor, 0); });
-        */
         if (isMainModule)
         {
             FunctionType *mainType = FunctionType::get(builder->getInt32Ty(), false);

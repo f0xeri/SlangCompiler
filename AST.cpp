@@ -53,7 +53,7 @@ llvm::Value *CharExprNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *StringExprNode::codegen(CodeGenContext &cgcontext) {
-    return nullptr;
+    return cgcontext.builder->CreateGlobalStringPtr(value);
 }
 
 llvm::Value *ArrayExprNode::codegen(CodeGenContext &cgcontext) {
@@ -246,11 +246,21 @@ llvm::Value *OutputStatementNode::codegen(CodeGenContext &cgcontext) {
     Value *value = expr->codegen(cgcontext);
     std::vector<Value *> printArgs;
     Value *formatStr;
-    if (value->getType()->isIntegerTy()) {
+    if (value->getType()->isIntegerTy() && value->getType()->getIntegerBitWidth() == 64) {
+        formatStr = cgcontext.builder->CreateGlobalStringPtr("%d\n");
+    }
+    else if (value->getType()->isIntegerTy() && value->getType()->getIntegerBitWidth() == 8) {
+        formatStr = cgcontext.builder->CreateGlobalStringPtr("%c\n");
+    }
+    else if (value->getType()->isIntegerTy() && value->getType()->getIntegerBitWidth() == 1) {
+        value = cgcontext.builder->CreateIntCast(value, Type::getInt64Ty(*cgcontext.context), false);
         formatStr = cgcontext.builder->CreateGlobalStringPtr("%d\n");
     }
     else if (value->getType()->isDoubleTy()) {
         formatStr = cgcontext.builder->CreateGlobalStringPtr("%f\n");
+    }
+    else if (value->getType()->isPointerTy()) {
+        formatStr = cgcontext.builder->CreateGlobalStringPtr("%s\n");
     }
     printArgs.push_back(formatStr);
     printArgs.push_back(value);
@@ -270,6 +280,8 @@ static Type *typeOf(CodeGenContext &cgcontext, const std::string &var) {
         type = Type::getInt8Ty(*cgcontext.context);
     else if (var == "real")
         type = Type::getDoubleTy(*cgcontext.context);
+    else if (var == "boolean")
+        type = Type::getInt1Ty(*cgcontext.context);
     else if (var.empty())
         type = Type::getVoidTy(*cgcontext.context);
     else
@@ -524,10 +536,6 @@ llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
     return nullptr;
 }
 
-llvm::Value *FieldDecNode::codegen(CodeGenContext &cgcontext) {
-    return nullptr;
-}
-
 llvm::Value *FieldVarDecNode::codegen(CodeGenContext &cgcontext) {
     return nullptr;
 }
@@ -547,16 +555,29 @@ llvm::Value *TypeDecStatementNode::codegen(CodeGenContext &cgcontext) {
     std::vector<Type*> dataTypes;
     for (auto field : *fields)
     {
-        if (field->type == "integer") {
-            dataTypes.push_back(Type::getInt64Ty(*cgcontext.context));
-        }
-        else if (field->type == "real") {
-            dataTypes.push_back(Type::getDoubleTy(*cgcontext.context));
-        }
-        else if (field->type == "character")
+        Type* type;
+        if (field->name->value == "array")
         {
-            dataTypes.push_back(Type::getInt8Ty(*cgcontext.context));
+            auto exprNode = dynamic_cast<FieldArrayVarDecNode*>(field)->var;
+            auto arrExpr = dynamic_cast<ArrayExprNode*>(exprNode->expr);
+            auto size = arrExpr->size->codegen(cgcontext);
+            auto arraySize = size;
+            if (arrExpr->type == "array")
+            {
+                for (auto &slice : *arrExpr->values)
+                {
+                    auto castedSlice = dynamic_cast<ArrayExprNode*>(slice);
+                    auto sliceSize = castedSlice->size->codegen(cgcontext);
+                    auto newArraySize = BinaryOperator::Create(Instruction::Mul, sliceSize, arraySize, "", cgcontext.currentBlock());
+                    arraySize = newArraySize;
+                    arrExpr = castedSlice;
+                }
+            }
+            type = typeOf(cgcontext, arrExpr->type);
         }
+        else
+            type = typeOf(cgcontext, field->name->value);
+        dataTypes.push_back(type);
         // ... array, class, string
     }
     cgcontext.allocatedClasses[name->value]->setBody(dataTypes);

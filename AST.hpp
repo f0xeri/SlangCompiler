@@ -337,55 +337,48 @@ public:
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
-class FieldDecNode : public DeclarationNode
-{
-public:
-    bool isPrivate;
-    FieldDecNode(VariableExprNode *name, bool isPrivate) : DeclarationNode(name), isPrivate(isPrivate) {};
-    virtual llvm::Value *codegen(CodeGenContext &cgcontext);
-};
-
-class FieldVarDecNode : public FieldDecNode
+class FieldVarDecNode : public DeclarationNode
 {
 public:
     std::string type;
     ExprNode *expr;
-
-    FieldVarDecNode(VariableExprNode *name, bool isPrivate, std::string type): type(std::move(type)), FieldDecNode(name, isPrivate), expr(nullptr) {};
-    FieldVarDecNode(VariableExprNode *name, bool isPrivate, std::string type, ExprNode *expr): type(std::move(type)), FieldDecNode(name, isPrivate), expr(expr) {};
+    bool isPrivate;
+    FieldVarDecNode(VariableExprNode *name, bool isPrivate, std::string type): DeclarationNode(name), type(std::move(type)), expr(nullptr), isPrivate(isPrivate) {};
+    FieldVarDecNode(VariableExprNode *name, bool isPrivate, std::string type, ExprNode *expr): DeclarationNode(name), type(std::move(type)), isPrivate(isPrivate), expr(expr) {};
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
-class FieldArrayVarDecNode : public FieldDecNode
+class FieldArrayVarDecNode : public DeclarationNode
 {
 public:
+    bool isPrivate;
     ArrayDecStatementNode *var;
-    FieldArrayVarDecNode(VariableExprNode *name, bool isPrivate, ArrayDecStatementNode *var) : FieldDecNode(name, isPrivate), var(var) {};
+    FieldArrayVarDecNode(VariableExprNode *name, bool isPrivate, ArrayDecStatementNode *var) : DeclarationNode(name), isPrivate(isPrivate), var(var) {};
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
 class MethodDecNode : public DeclarationNode
 {
 public:
-    std::string type;
+    ExprNode* type;
     VariableExprNode *thisName;
     std::vector<FuncParamDecStatementNode*> *args = nullptr;
     BlockExprNode *block = nullptr;
     bool isPrivate = false;
 
-    MethodDecNode(std::string type, VariableExprNode *name, bool isPrivate, VariableExprNode *thisName, std::vector<FuncParamDecStatementNode*> *args, BlockExprNode *block):
-            type(std::move(type)), DeclarationNode(name), isPrivate(isPrivate), thisName(thisName), args(args), block(block) {};
+    MethodDecNode(ExprNode*  type, VariableExprNode *name, bool isPrivate, VariableExprNode *thisName, std::vector<FuncParamDecStatementNode*> *args, BlockExprNode *block):
+            type(type), DeclarationNode(name), isPrivate(isPrivate), thisName(thisName), args(args), block(block) {};
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
 class TypeDecStatementNode : public DeclarationNode
 {
 public:
-    std::vector<FieldVarDecNode*> *fields = nullptr;
+    std::vector<DeclarationNode*> *fields = nullptr;
     std::vector<MethodDecNode*> *methods = nullptr;
     TypeDecStatementNode *parentType = nullptr;
     bool isPrivate = false;
-    TypeDecStatementNode(VariableExprNode *name, bool isPrivate, std::vector<FieldVarDecNode*> *fields, std::vector<MethodDecNode*> *methods, TypeDecStatementNode *parentType = nullptr):
+    TypeDecStatementNode(VariableExprNode *name, bool isPrivate, std::vector<DeclarationNode*> *fields, std::vector<MethodDecNode*> *methods, TypeDecStatementNode *parentType = nullptr):
                          DeclarationNode(name), isPrivate(isPrivate), fields(fields), methods(methods), parentType(parentType) {};
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };

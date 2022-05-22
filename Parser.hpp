@@ -24,7 +24,11 @@ public:
         tokensIterator = tokens.begin();
         token = *tokensIterator;
         currentScope = new Scope();
-        currentScope->insert(new TypeDecStatementNode(new VariableExprNode("Object"), {}, {}, nullptr));
+        auto objectType = new TypeDecStatementNode(new VariableExprNode("Object"), false, nullptr, nullptr);
+        objectType->methods = new std::vector<MethodDecNode*>();
+        auto toStringType = new ArrayExprNode("character", nullptr, new std::vector<ExprNode*>());
+        objectType->methods->push_back(new MethodDecNode(toStringType, new VariableExprNode("toString"), false, new VariableExprNode("this"), {}, nullptr));
+        currentScope->insert(objectType);
         importedModules = new std::vector<Parser*>();
         this->tokens = tokens;
     }
@@ -91,9 +95,9 @@ public:
         return false;
     }
 
-    bool isFieldNameCorrect(std::vector<FieldVarDecNode *> *fields, const std::string &name)
+    bool isFieldNameCorrect(std::vector<DeclarationNode *> *fields, const std::string &name)
     {
-        if (std::find_if(fields->begin(), fields->end(), [&name](FieldVarDecNode *field){ return field->name->value == name; }) != fields->end())
+        if (std::find_if(fields->begin(), fields->end(), [&name](DeclarationNode *field){ return field->name->value == name; }) != fields->end())
         {
             return false;
         }
@@ -159,6 +163,65 @@ public:
         return field;
     }
 
+    ExprNode* lookupTypes(const std::string &type)
+    {
+        ExprNode *expr = nullptr;
+        bool isArray = false;
+        if (oneOfDefaultTypes(type))
+        {
+            return new VariableExprNode(type);
+        }
+        else if (type == "array")
+        {
+            isArray = true;
+            std::string typeOfArray;
+            ExprNode* size;
+            advance();
+            consume(TokenType::LBracket);
+            if (token.type != TokenType::RBracket)
+                size = parseExpression();
+            else
+                size = nullptr;
+            consume(TokenType::RBracket);
+            std::string arrType = token.data;
+            ArrayExprNode* arrExpr = new ArrayExprNode(arrType, size, new std::vector<ExprNode*>());
+            while (token.data == "array")
+            {
+                advance();
+                consume(TokenType::LBracket);
+                if (token.type != TokenType::RBracket)
+                    size = parseExpression();
+                else
+                    size = nullptr;
+                consume(TokenType::RBracket);
+                if (token.type == TokenType::Identifier)
+                {
+                    arrType = token.data;
+                    if (!oneOfDefaultTypes(arrType) && arrType != "array")
+                    {
+                        auto typeStatement = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(type));
+                        if (typeStatement == nullptr)
+                        {
+                            llvm::errs() << "[ERROR] Unknown type \"" << type << "\".\n";
+                        }
+                    }
+                }
+                arrExpr->values->push_back(new ArrayExprNode(arrType, size, nullptr));
+            }
+            expr = arrExpr;
+        }
+        else
+        {
+            auto typeStatement = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(type));
+            if (typeStatement == nullptr)
+            {
+                llvm::errs() << "[ERROR] Unknown type \"" << type << "\".\n";
+            }
+            // arrays and objects
+        }
+        return expr;
+    }
+
     void parse();
     ModuleStatementNode *mainModuleNode;
     bool parseImports();
@@ -167,7 +230,7 @@ public:
     bool parseVisibilityOperator();
     DeclarationNode* parseVariableDecl(bool isGlobal = false);
     bool parseStatement();
-    FieldVarDecNode* parseFieldDecl(std::vector<FieldVarDecNode *> *fields, std::string &thisClassName, bool &constructorRequired);
+    DeclarationNode* parseFieldDecl(std::vector<DeclarationNode *> *fields, std::string &thisClassName, bool &constructorRequired);
     MethodDecNode* parseMethodDecl(std::vector<MethodDecNode*> *methods, std::string &thisClassName);
     FuncDecStatementNode* parseFunctionDecl();
     IfStatementNode* parseIfStatement();

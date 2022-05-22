@@ -126,20 +126,51 @@ bool Parser::parseStatement() {
     return false;
 }
 
-FieldVarDecNode* Parser::parseFieldDecl(std::vector<FieldVarDecNode *> *fields, std::string &thisClassName, bool &constructorRequired) {
-    FieldVarDecNode *field = nullptr;
+DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, std::string &thisClassName, bool &constructorRequired) {
+    DeclarationNode *field = nullptr;
     std::string name;
     std::string type;
     bool isPrivate = false;
+    bool isArray = false;
     Token tok = consume(TokenType::VisibilityType);
     if (token.data == "private") isPrivate = true;
     consume(TokenType::Field);
     consume(TokenType::Minus);
     tok = consume(TokenType::Identifier);
     type = tok.data;
-    if (type == "array")
-    {
-        // parse array
+    if (type == "array") {
+        ExprNode* expr;
+        isArray = true;
+        tokensIterator--;
+        token = *tokensIterator;
+        std::string typeOfArray;
+        ExprNode *size;
+        advance();
+        consume(TokenType::LBracket);
+        size = parseExpression();
+        consume(TokenType::RBracket);
+        std::string arrType = token.data;
+        ArrayExprNode *arrExpr = new ArrayExprNode(arrType, size, new std::vector<ExprNode *>());
+        while (token.data == "array") {
+            advance();
+            consume(TokenType::LBracket);
+            size = parseExpression();
+            consume(TokenType::RBracket);
+            if (token.type == TokenType::Identifier) {
+                arrType = token.data;
+                if (!oneOfDefaultTypes(arrType) && arrType != "array") {
+                    auto typeStatement = dynamic_cast<TypeDecStatementNode *>(currentScope->lookup(type));
+                    if (typeStatement == nullptr) {
+                        llvm::errs() << "[ERROR] Unknown type \"" << type << "\".\n";
+                    }
+                }
+            }
+            arrExpr->values->push_back(new ArrayExprNode(arrType, size, nullptr));
+        }
+        expr = arrExpr;
+        advance();
+        name = consume(TokenType::Identifier).data;
+        field = new FieldArrayVarDecNode(new VariableExprNode(name), isPrivate, new ArrayDecStatementNode(nullptr, expr, isPrivate));
     }
     else
     {
@@ -218,7 +249,7 @@ std::vector<FuncParamDecStatementNode*> *Parser::parseFuncParameters()
 MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std::string &thisClassName) {
     MethodDecNode *method = nullptr;
     std::string name;
-    std::string type;
+    ExprNode* type;
     std::string thisName;
     bool isPrivate = false;
     BlockExprNode *block = nullptr;
@@ -242,11 +273,22 @@ MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std
     if (token.type == TokenType::Colon)
     {
         advance();
-        type = consume(TokenType::Identifier).data;
+        type = lookupTypes(token.data);
     }
     else
     {
-        type = "";
+        type = new VariableExprNode("");
+    }
+
+    // override
+    for (auto it = methods->begin(); it != methods->end(); it++)
+    {
+        if ((*it)->name->value == name)
+        {
+            delete *it;
+            methods->erase(it);
+            break;
+        }
     }
 
     // parse statements
@@ -276,7 +318,7 @@ MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std
 
 bool Parser::parseTypeDecl() {
     TypeDecStatementNode *typeNode;
-    auto *fields = new std::vector<FieldVarDecNode*>();
+    auto *fields = new std::vector<DeclarationNode*>();
     auto *methods = new std::vector<MethodDecNode*>();
     std::string name;
     TypeDecStatementNode *parent;
@@ -350,9 +392,12 @@ bool Parser::parseTypeDecl() {
                         //constructorStatements->push_back(new AssignExprNode());
                         for (auto field : *fields)
                         {
-                            constructorStatements->push_back(new AssignExprNode(field->name, field->expr));
+                            if (dynamic_cast<FieldVarDecNode*>(field) != nullptr)
+                            {
+                                constructorStatements->push_back(new AssignExprNode(field->name, dynamic_cast<FieldVarDecNode*>(field)->expr));
+                            }
                         }
-                        auto constructor = new MethodDecNode(constructorType, new VariableExprNode(constructorName), constructorIsPrivate, new VariableExprNode(name),
+                        auto constructor = new MethodDecNode(new VariableExprNode(constructorType), new VariableExprNode(constructorName), constructorIsPrivate, new VariableExprNode(name),
                                                    nullptr, new BlockExprNode(constructorStatements));
                         methods->push_back(constructor);
                     }

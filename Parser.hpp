@@ -217,8 +217,13 @@ public:
             auto typeStatement = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(type));
             if (typeStatement == nullptr)
             {
-                llvm::errs() << "[ERROR] Unknown type \"" << type << "\".\n";
+                typeStatement = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(mainModuleNode->name->value + "." + type));
+                if (typeStatement == nullptr)
+                {
+                    llvm::errs() << "[ERROR] Unknown type \"" << type << "\".\n";
+                }
             }
+            expr = new VariableExprNode(typeStatement->name->value);
             // arrays and objects
         }
         return expr;

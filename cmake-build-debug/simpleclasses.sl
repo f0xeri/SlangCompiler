@@ -79,4 +79,5 @@ start
     variable-Time time;
     output time.int;
     output time.r;
+    variable-ABC abc;
 end main.

@@ -92,7 +92,6 @@ llvm::Value *VariableExprNode::codegen(CodeGenContext &cgcontext) {
                             typeOfTypeVar = typeVar->getType()->getPointerElementType();
                             auto elementPtr = cgcontext.builder->CreateStructGEP(typeOfTypeVar, typeVar, index);
                             val = cgcontext.builder->CreateLoad(elementPtr);
-                            return val;
                         }
                         else if (typeVar->getType()->getPointerElementType()->getPointerElementType()->isStructTy()) {
                             typeOfTypeVar = typeVar->getType()->getPointerElementType()->getPointerElementType();
@@ -100,10 +99,17 @@ llvm::Value *VariableExprNode::codegen(CodeGenContext &cgcontext) {
                             cgcontext.currentTypeLoad = loadThis;
                             auto elementPtr = cgcontext.builder->CreateStructGEP(typeOfTypeVar, loadThis, index);
                             val = cgcontext.builder->CreateLoad(elementPtr);
-                            return val;
                         }
+                        if (dynamic_cast<IndexExprNode*>(this) != nullptr)
+                        {
+                            auto elementPtr = cgcontext.builder->CreateInBoundsGEP(val, dynamic_cast<IndexExprNode*>(this)->indexExpr->codegen(cgcontext));
+                            return cgcontext.builder->CreateLoad(elementPtr);
+                        }
+                        else
+                            return val;
                     }
                     else llvm::errs() << "[ERROR] Variable \"" << typeVarName << "\" is not a custom type.\n";
+                    type = typeOfTypeVar;
                 }
                 else llvm::errs() << "[ERROR] Undeclared Variable \"" << value << "\".\n";
             }
@@ -115,7 +121,16 @@ llvm::Value *VariableExprNode::codegen(CodeGenContext &cgcontext) {
             val = cgcontext.globals()[cgcontext.moduleName + "." + value];
         }
     }
-    type = val->getType()->getPointerElementType();
+
+    if (dynamic_cast<IndexExprNode*>(this) != nullptr)
+    {
+        auto loadArr = cgcontext.builder->CreateLoad(val);
+        auto elementPtr = cgcontext.builder->CreateInBoundsGEP(loadArr, dynamic_cast<IndexExprNode*>(this)->indexExpr->codegen(cgcontext));
+        return cgcontext.builder->CreateLoad(elementPtr);
+    }
+
+    if (type == nullptr)
+        type = val->getType()->getPointerElementType();
     if (dotClass) return val;
     return new LoadInst(type, val, "", false, cgcontext.currentBlock());
 }
@@ -207,12 +222,18 @@ llvm::Value *ConditionalExprNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
-    Function *function = cgcontext.mModule->getFunction(name->value);
+    std::vector<Value*> argsRef;
+    std::string nameAddition;
+    llvm::raw_string_ostream nameAdditionStream(nameAddition);
+    for (auto it = args->begin(); it != args->end(); it++)
+    {
+        auto var = (*it)->codegen(cgcontext);
+        var->getType()->print(nameAdditionStream);
+        argsRef.push_back(var);
+    }
+    Function *function = cgcontext.mModule->getFunction(name->value + nameAddition);
     if (function == nullptr)
         llvm::errs() << "[ERROR] Codegen - no such function \"" << name->value << "\".\n";
-    std::vector<Value*> argsRef;
-    for (auto it = args->begin(); it != args->end(); it++)
-        argsRef.push_back((*it)->codegen(cgcontext));
     CallInst *call = CallInst::Create(function, makeArrayRef(argsRef), "", cgcontext.currentBlock());
     return call;
 }
@@ -466,9 +487,9 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
     auto elementSize = ConstantInt::get(int64type, cgcontext.dataLayout->getTypeAllocSize(type));
     auto allocSize = BinaryOperator::Create(Instruction::Mul, elementSize, arraySize, "", cgcontext.currentBlock());
     // GC_malloc
-    //auto arr = cgcontext.builder->CreateCall(cgcontext.mModule->getFunction("GC_malloc"), {allocSize});
+    auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, cgcontext.mModule->getFunction("GC_malloc"), "");
     // malloc
-    auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, nullptr, "");
+    //auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, nullptr, "");
     cgcontext.builder->Insert(arr);
     if (isGlobal)
     {
@@ -492,13 +513,45 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
 
 llvm::Value *IndexExprNode::codegen(CodeGenContext &cgcontext) {
     Value* var;
+    Type *type = nullptr;
+    // check local variables
     var = cgcontext.localsLookup(value);
+    // check global variables if there is no local
     if (var == nullptr)
     {
-        if(cgcontext.globals().find(cgcontext.moduleName + "." + value) == cgcontext.globals().end())
+        // check global variable declared in current module
+        if (cgcontext.globals().find(cgcontext.moduleName + "." + value) == cgcontext.globals().end())
         {
+            // check other global variables
             if (cgcontext.globals().find(value) == cgcontext.globals().end())
-                llvm::errs() << "[ERROR] Undeclared Variable \"" << value << "\".\n";
+            {
+                // check type fields
+                auto typeVarName = value.substr(0, value.rfind('.'));
+                auto typeVar = cgcontext.localsLookup(typeVarName);
+                if (typeVar != nullptr)
+                {
+                    Type* typeOfTypeVar = nullptr;
+                    // type variable exists, get type
+                    // we should check is it pointer to pointer to struct or just pointer to struct
+                    if (dotClass)
+                    {
+                        if (typeVar->getType()->getPointerElementType()->isStructTy()) {
+                            typeOfTypeVar = typeVar->getType()->getPointerElementType();
+                            auto elementPtr = cgcontext.builder->CreateStructGEP(typeOfTypeVar, typeVar, index);
+                            var = elementPtr;
+                        }
+                        else if (typeVar->getType()->getPointerElementType()->getPointerElementType()->isStructTy()) {
+                            typeOfTypeVar = typeVar->getType()->getPointerElementType()->getPointerElementType();
+                            auto loadThis = cgcontext.builder->CreateLoad(typeVar);
+                            cgcontext.currentTypeLoad = loadThis;
+                            auto elementPtr = cgcontext.builder->CreateStructGEP(typeOfTypeVar, loadThis, index);
+                            var = elementPtr;
+                        }
+                    }
+                    else llvm::errs() << "[ERROR] Variable \"" << typeVarName << "\" is not a custom type.\n";
+                }
+                else llvm::errs() << "[ERROR] Undeclared Variable \"" << value << "\".\n";
+            }
             else
                 var = cgcontext.globals()[value];
         }
@@ -507,11 +560,7 @@ llvm::Value *IndexExprNode::codegen(CodeGenContext &cgcontext) {
             var = cgcontext.globals()[cgcontext.moduleName + "." + value];
         }
     }
-    if (var == nullptr)
-    {
-        llvm::errs() << "[ERROR] Undeclared Variable \"" << value << "\".\n";
-        return nullptr;
-    }
+
     auto loadArr = cgcontext.builder->CreateLoad(var);
     auto elementPtr = cgcontext.builder->CreateInBoundsGEP(loadArr, indexExpr->codegen(cgcontext));
     return cgcontext.builder->CreateLoad(elementPtr, false);
@@ -529,18 +578,23 @@ llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
     std::vector<llvm::Type*> argTypes;
     std::vector<int> refParams;
     int i = 1;
+    std::string nameAddition;
+    llvm::raw_string_ostream nameAdditionStream(nameAddition);
     for (auto arg : *args)
     {
-        Type* argType = typeOf(cgcontext, arg->type);
+        Type* argType;
         if (arg->parameterType == ParameterType::Out || arg->parameterType == ParameterType::Var)
         {
-            argTypes.push_back(ptrToTypeOf(cgcontext, arg->type));
+            argType = ptrToTypeOf(cgcontext, arg->type);
+            argTypes.push_back(argType);
             refParams.push_back(i);
         }
         else
         {
-            argTypes.push_back(typeOf(cgcontext, arg->type));
+            argType = typeOf(cgcontext, arg->type);
+            argTypes.push_back(argType);
         }
+        argType->print(nameAdditionStream);
         i++;
     }
     Type *retType = nullptr;
@@ -572,7 +626,7 @@ llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
         retTypeName = arrExpr->type + "Array";
     }
     FunctionType* funcType = FunctionType::get(retType, argTypes, false);
-    auto function = Function::Create(funcType, GlobalValue::ExternalLinkage, name->value, cgcontext.mModule);
+    auto function = Function::Create(funcType, GlobalValue::ExternalLinkage, name->value + nameAddition, cgcontext.mModule);
     for (auto paramID : refParams)
     {
         // TODO Set Dereferenceable attribute for ref params
@@ -664,9 +718,9 @@ llvm::Value *FieldArrayVarDecNode::codegen(CodeGenContext &cgcontext) {
     auto elementSize = ConstantInt::get(int64type, cgcontext.dataLayout->getTypeAllocSize(type));
     auto allocSize = BinaryOperator::Create(Instruction::Mul, elementSize, arraySize, "", cgcontext.currentBlock());
     // GC_malloc
-    //auto arr = cgcontext.builder->CreateCall(cgcontext.mModule->getFunction("GC_malloc"), {allocSize});
+    auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, cgcontext.mModule->getFunction("GC_malloc"), "");
     // malloc
-    auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, nullptr, "");
+    //auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, nullptr, "");
     cgcontext.builder->Insert(arr);
 
     cgcontext.builder->CreateStore(arr, elementPtr);
@@ -716,51 +770,50 @@ llvm::Value *TypeDecStatementNode::codegen(CodeGenContext &cgcontext) {
     // create default constructor
     if (!fields->empty())
     {
-        MethodDecNode* constructorMethod = nullptr;
         for (auto &method : *methods)
         {
             if (method->name->value == name->value + "._DefaultConstructor_")
             {
-                constructorMethod = method;
-                break;
-            }
-            else
-            {
-                method->codegen(cgcontext);
-            }
-        }
-
-        if (constructorMethod != nullptr)
-        {
-            std::vector<llvm::Type*> argTypes;
-            auto thisArg = ptrToTypeOf(cgcontext, name->value);
-            argTypes.push_back(thisArg);
-            FunctionType* type = FunctionType::get(Type::getVoidTy(*cgcontext.context), argTypes, false);
-            if (constructorMethod->block != nullptr)
-            {
-                Function *constructorFunc = Function::Create(type, Function::ExternalLinkage, Twine(name->value + "._DefaultConstructor_"), cgcontext.mModule);
-                BasicBlock *bb = BasicBlock::Create(*cgcontext.context, name->value + "_DefaultConstructor_Entry", constructorFunc, nullptr);
-                cgcontext.pushBlock(bb);
-                cgcontext.builder->SetInsertPoint(bb);
-
-                auto ptrToType = ptrToTypeOf(cgcontext, name->value);
-                auto typeAlloc = cgcontext.builder->CreateAlloca(ptrToType);
-                auto storeThis = cgcontext.builder->CreateStore(constructorFunc->getArg(0), typeAlloc);
-                auto loadThis = cgcontext.builder->CreateLoad(ptrToType, typeAlloc);
-                cgcontext.currentTypeLoad = loadThis;
-                for (auto &statement : *constructorMethod->block->statements)
+                if (method != nullptr)
                 {
-                    statement->codegen(cgcontext);
+                    std::vector<llvm::Type*> argTypes;
+                    auto thisArg = ptrToTypeOf(cgcontext, name->value);
+                    argTypes.push_back(thisArg);
+                    FunctionType* type = FunctionType::get(Type::getVoidTy(*cgcontext.context), argTypes, false);
+                    if (method->block != nullptr)
+                    {
+                        Function *constructorFunc = Function::Create(type, Function::ExternalLinkage, Twine(name->value + "._DefaultConstructor_"), cgcontext.mModule);
+                        BasicBlock *bb = BasicBlock::Create(*cgcontext.context, name->value + "_DefaultConstructor_Entry", constructorFunc, nullptr);
+                        cgcontext.pushBlock(bb);
+                        cgcontext.builder->SetInsertPoint(bb);
+
+                        auto ptrToType = ptrToTypeOf(cgcontext, name->value);
+                        auto typeAlloc = cgcontext.builder->CreateAlloca(ptrToType);
+                        auto storeThis = cgcontext.builder->CreateStore(constructorFunc->getArg(0), typeAlloc);
+                        auto loadThis = cgcontext.builder->CreateLoad(ptrToType, typeAlloc);
+                        cgcontext.currentTypeLoad = loadThis;
+                        for (auto &statement : *method->block->statements)
+                        {
+                            statement->codegen(cgcontext);
+                        }
+                        cgcontext.builder->CreateRetVoid();
+                        cgcontext.popBlock();
+                    }
+                    else
+                    {
+                        Function *constructorFunc = Function::Create(type, Function::ExternalLinkage, Twine(name->value + "._DefaultConstructor_"), cgcontext.mModule);
+                    }
                 }
-                cgcontext.builder->CreateRetVoid();
-                cgcontext.popBlock();
-            }
-            else
-            {
-                Function *constructorFunc = Function::Create(type, Function::ExternalLinkage, Twine(name->value + "._DefaultConstructor_"), cgcontext.mModule);
             }
         }
-
+    }
+    // codegen other methods
+    for (auto &method : *methods)
+    {
+        if (method->name->value != name->value + "._DefaultConstructor_")
+        {
+            method->codegen(cgcontext);
+        }
     }
     return nullptr;
 }

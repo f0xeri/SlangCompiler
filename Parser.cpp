@@ -304,9 +304,29 @@ MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std
     {
         if ((*it)->name->value == name)
         {
-            delete *it;
-            methods->erase(it);
-            break;
+            auto margs = (*it)->args;
+            bool argsEqual = true;
+            if (margs->size() == params->size())
+            {
+                int i = 0;
+                for (auto argIt = margs->begin(); argIt != margs->end(); argIt++, i++)
+                {
+                    if ((*argIt)->type != params->at(i)->type)
+                    {
+                        argsEqual = false;
+                    }
+                }
+            }
+            else
+            {
+                argsEqual = false;
+            }
+            if (argsEqual)
+            {
+                delete *it;
+                methods->erase(it);
+                break;
+            }
         }
     }
 
@@ -1016,6 +1036,14 @@ BlockExprNode *Parser::parseElseBlock() {
 OutputStatementNode *Parser::parseOutputStatement() {
     consume(TokenType::Output);
     auto expr = parseExpression();
+    /*if (dynamic_cast<VariableExprNode *>(expr) != nullptr)
+    {
+        return new OutputStatementNode(dynamic_cast<VariableExprNode *>(expr));
+    }
+    else if (dynamic_cast<IndexExprNode *>(expr) != nullptr)
+    {
+        return new OutputStatementNode(dynamic_cast<IndexExprNode *>(expr));
+    }*/
     return new OutputStatementNode(expr);
 }
 

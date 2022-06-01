@@ -28,7 +28,7 @@ public:
         objectType->methods = new std::vector<MethodDecNode*>();
         auto toStringType = new ArrayExprNode("character", nullptr, new std::vector<ExprNode*>());
         auto args = new std::vector<FuncParamDecStatementNode *>();
-        args->push_back(new FuncParamDecStatementNode("Object", new VariableExprNode("this"), ParameterType::Var));
+        args->push_back(new FuncParamDecStatementNode(new VariableExprNode("Object"), new VariableExprNode("this"), ParameterType::Var));
         objectType->methods->push_back(new MethodDecNode(toStringType, new VariableExprNode("Object.toString"), false, true, new VariableExprNode("this"), args, nullptr));
         currentScope->insert(objectType);
         importedModules = new std::vector<Parser*>();
@@ -227,6 +227,24 @@ public:
             // arrays and objects
         }
         return expr;
+    }
+
+    std::string getArrayFinalType(ArrayExprNode* exprNode)
+    {
+        std::string type;
+        if (exprNode->type == "array")
+        {
+            for (auto &slice : *exprNode->values)
+            {
+                auto castedSlice = dynamic_cast<ArrayExprNode*>(slice);
+                //auto sliceSize = castedSlice->size->codegen(cgcontext);
+                //auto newArraySize = BinaryOperator::Create(Instruction::Mul, sliceSize, arraySize, "", cgcontext.currentBlock());
+                //arraySize = newArraySize;
+                exprNode = castedSlice;
+            }
+        }
+        type = exprNode->type;
+        return type;
     }
 
     void parse();

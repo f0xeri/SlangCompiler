@@ -69,6 +69,7 @@ enum class TokenType
     Nil,
 
     EndOfFile,
+    Delete,
 };
 
 struct Token

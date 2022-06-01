@@ -574,6 +574,40 @@ std::string getParameterTypeName(ParameterType type)
     return "";
 }
 
+// array size is not calculating here!!!
+Type* getTypeFromExprNode(CodeGenContext &cgcontext, ExprNode* node)
+{
+    Type *retType = nullptr;
+    std::string retTypeName;
+    if (dynamic_cast<VariableExprNode*>(node) != nullptr)
+    {
+        retType = typeOf(cgcontext, dynamic_cast<VariableExprNode*>(node)->value);
+        retTypeName = dynamic_cast<VariableExprNode*>(node)->value;
+    }
+    else if (dynamic_cast<ArrayExprNode*>(node) != nullptr)
+    {
+        auto exprNode = dynamic_cast<ArrayExprNode*>(node);
+        auto arrExpr = exprNode;
+
+        //auto size = exprNode->size->codegen(cgcontext);
+        //auto arraySize = size;
+        if (arrExpr->type == "array")
+        {
+            for (auto &slice : *arrExpr->values)
+            {
+                auto castedSlice = dynamic_cast<ArrayExprNode*>(slice);
+                //auto sliceSize = castedSlice->size->codegen(cgcontext);
+                //auto newArraySize = BinaryOperator::Create(Instruction::Mul, sliceSize, arraySize, "", cgcontext.currentBlock());
+                //arraySize = newArraySize;
+                arrExpr = castedSlice;
+            }
+        }
+        retType = ptrToTypeOf(cgcontext, arrExpr->type);
+        retTypeName = arrExpr->type + "Array";
+    }
+    return retType;
+}
+
 llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
     std::vector<llvm::Type*> argTypes;
     std::vector<int> refParams;
@@ -585,13 +619,14 @@ llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
         Type* argType;
         if (arg->parameterType == ParameterType::Out || arg->parameterType == ParameterType::Var)
         {
-            argType = ptrToTypeOf(cgcontext, arg->type);
+            // not tested
+            argType = getTypeFromExprNode(cgcontext, arg->type)->getPointerTo();
             argTypes.push_back(argType);
             refParams.push_back(i);
         }
         else
         {
-            argType = typeOf(cgcontext, arg->type);
+            argType = getTypeFromExprNode(cgcontext, arg->type);
             argTypes.push_back(argType);
         }
         argType->print(nameAdditionStream);
@@ -640,13 +675,13 @@ llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
         Function::arg_iterator argsValues = function->arg_begin();
         for (auto it = args->begin(); it != args->end(); it++, argsValues++) {
             if ((*it)->parameterType == ParameterType::Out || (*it)->parameterType == ParameterType::Var) {
-                auto var = new AllocaInst(ptrToTypeOf(cgcontext, (*it)->type), 0, nullptr, (*it)->name->value, bb);
+                auto var = new AllocaInst(getTypeFromExprNode(cgcontext, (*it)->type)->getPointerTo(), 0, nullptr, (*it)->name->value, bb);
                 cgcontext.locals()[(*it)->name->value] = var;
                 Value *argumentValue = &(*argsValues);
                 argumentValue->setName(getParameterTypeName((*it)->parameterType) + (*it)->name->value);
                 StoreInst *inst = new StoreInst(argumentValue, cgcontext.locals()[(*it)->name->value], false, bb);
             } else {
-                auto var = new AllocaInst(typeOf(cgcontext, (*it)->type), 0, nullptr, (*it)->name->value, bb);
+                auto var = new AllocaInst(getTypeFromExprNode(cgcontext, (*it)->type), 0, nullptr, (*it)->name->value, bb);
                 cgcontext.locals()[(*it)->name->value] = var;
                 Value *argumentValue = &(*argsValues);
                 argumentValue->setName(getParameterTypeName((*it)->parameterType) + (*it)->name->value);

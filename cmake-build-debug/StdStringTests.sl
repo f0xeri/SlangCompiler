@@ -13,4 +13,9 @@ start
     let str.arrayOfChars[5] := "g";
     call str.setSymbol(0, "a");
     output str.toString();
+
+    variable-StdString.String str2;
+    call str2.init("govno", 228);
+    output str2.toString();
+    output str2.capacity;
 end StdStringTests.

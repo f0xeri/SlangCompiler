@@ -22,6 +22,7 @@ std::map<std::string, TokenType> Lexer::tokensMap = {{"import",    TokenType::Im
                                                      {"procedure", TokenType::Procedure},
                                                      {"call",      TokenType::Call},
                                                      {"return",    TokenType::Return},
+                                                     {"delete",    TokenType::Delete},
 
                                                      {"while",     TokenType::While},
                                                      {"repeat",    TokenType::Repeat},
@@ -143,6 +144,7 @@ void Lexer::tokenizeString() {
         str += symbol;
         symbol = sourceCode[++pos];
     }
+
     if (DEBUG) std::cout << "STRING(" << str << ") ";
     tokens.push_back({TokenType::String, str});
 }

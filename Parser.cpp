@@ -236,15 +236,17 @@ std::vector<FuncParamDecStatementNode*> *Parser::parseFuncParameters()
     consume(TokenType::LParen);
     while (token.type != TokenType::RParen)
     {
-        std::string type, name;
+        std::string name;
+        ExprNode* typeNode;
         ParameterType parameterType{};
         std::string ptype = consume(TokenType::Identifier).data;
         if (ptype == "in") parameterType = ParameterType::In;
         else if (ptype == "var") parameterType = ParameterType::Var;
         else if (ptype == "out") parameterType = ParameterType::Out;        // probably we dont need "out" type
-        type = consume(TokenType::Identifier).data;
+        typeNode = lookupTypes(token.data);
+        advance();
         name = consume(TokenType::Identifier).data;
-        params->push_back(new FuncParamDecStatementNode(type, new VariableExprNode(name), parameterType));
+        params->push_back(new FuncParamDecStatementNode(typeNode, new VariableExprNode(name), parameterType));
         //advance();
         if (token.type != TokenType::Comma)
         {
@@ -285,7 +287,7 @@ MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std
     consume(TokenType::RParen);
     auto params = new std::vector<FuncParamDecStatementNode *>();
     params = parseFuncParameters();
-    params->insert(params->begin(), new FuncParamDecStatementNode(mainModuleNode->name->value + "." + thisClassName, new VariableExprNode(thisName), ParameterType::Var));
+    params->insert(params->begin(), new FuncParamDecStatementNode(new VariableExprNode(mainModuleNode->name->value + "." + thisClassName), new VariableExprNode(thisName), ParameterType::Var));
     advance();
     if (token.type == TokenType::Colon)
     {
@@ -311,9 +313,23 @@ MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std
                 int i = 0;
                 for (auto argIt = margs->begin(); argIt != margs->end(); argIt++, i++)
                 {
-                    if ((*argIt)->type != params->at(i)->type)
+                    auto left = (*argIt)->type;
+                    auto right = params->at(i)->type;
+                    if (dynamic_cast<VariableExprNode*>(left) != nullptr && dynamic_cast<VariableExprNode*>(right) != nullptr)
                     {
-                        argsEqual = false;
+                        if (dynamic_cast<VariableExprNode*>(left)->value != dynamic_cast<VariableExprNode*>(right)->value)
+                        {
+                            argsEqual = false;
+                        }
+                    }
+                    else if (dynamic_cast<ArrayExprNode*>(left) != nullptr && dynamic_cast<ArrayExprNode*>(right) != nullptr)
+                    {
+                        auto larr = dynamic_cast<ArrayExprNode*>(left);
+                        auto rarr = dynamic_cast<ArrayExprNode*>(right);
+                        if (getArrayFinalType(larr) != getArrayFinalType(rarr))
+                        {
+                            argsEqual = false;
+                        }
                     }
                 }
             }
@@ -385,7 +401,7 @@ bool Parser::parseTypeDecl() {
                                 {
                                     if (method->args != nullptr && !method->args->empty())
                                     {
-                                        args->push_back(new FuncParamDecStatementNode(mainModuleNode->name->value + "." + name,
+                                        args->push_back(new FuncParamDecStatementNode(new VariableExprNode(mainModuleNode->name->value + "." + name),
                                                                                       new VariableExprNode(method->args->at(0)->name->value),
                                                                                       method->args->at(0)->parameterType,
                                                                                       method->args->at(0)->expr));

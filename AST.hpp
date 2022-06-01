@@ -298,11 +298,11 @@ public:
 class FuncParamDecStatementNode : public DeclarationNode {
 public:
     ParameterType parameterType;
-    std::string type;
+    ExprNode * type;
     ExprNode *expr;
 
-    FuncParamDecStatementNode(std::string type, VariableExprNode *name, ParameterType parameterType): type(std::move(type)), DeclarationNode(name), parameterType(parameterType), expr(nullptr) {}
-    FuncParamDecStatementNode(std::string type, VariableExprNode *name, ParameterType parameterType, ExprNode *expr): type(std::move(type)), DeclarationNode(name), parameterType(parameterType), expr(expr) {}
+    FuncParamDecStatementNode(ExprNode* type, VariableExprNode *name, ParameterType parameterType): type(type), DeclarationNode(name), parameterType(parameterType), expr(nullptr) {}
+    FuncParamDecStatementNode(ExprNode* type, VariableExprNode *name, ParameterType parameterType, ExprNode *expr): type(type), DeclarationNode(name), parameterType(parameterType), expr(expr) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 

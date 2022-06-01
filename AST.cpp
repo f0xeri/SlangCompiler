@@ -632,34 +632,9 @@ llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
         argType->print(nameAdditionStream);
         i++;
     }
-    Type *retType = nullptr;
+    Type *retType = getTypeFromExprNode(cgcontext, type);
     std::string retTypeName;
-    if (dynamic_cast<VariableExprNode*>(type) != nullptr)
-    {
-        retType = typeOf(cgcontext, dynamic_cast<VariableExprNode*>(type)->value);
-        retTypeName = dynamic_cast<VariableExprNode*>(type)->value;
-    }
-    else if (dynamic_cast<ArrayExprNode*>(type) != nullptr)
-    {
-        auto exprNode = dynamic_cast<ArrayExprNode*>(type);
-        auto arrExpr = exprNode;
 
-        //auto size = exprNode->size->codegen(cgcontext);
-        //auto arraySize = size;
-        if (arrExpr->type == "array")
-        {
-            for (auto &slice : *arrExpr->values)
-            {
-                auto castedSlice = dynamic_cast<ArrayExprNode*>(slice);
-                //auto sliceSize = castedSlice->size->codegen(cgcontext);
-                //auto newArraySize = BinaryOperator::Create(Instruction::Mul, sliceSize, arraySize, "", cgcontext.currentBlock());
-                //arraySize = newArraySize;
-                arrExpr = castedSlice;
-            }
-        }
-        retType = ptrToTypeOf(cgcontext, arrExpr->type);
-        retTypeName = arrExpr->type + "Array";
-    }
     FunctionType* funcType = FunctionType::get(retType, argTypes, false);
     auto function = Function::Create(funcType, GlobalValue::ExternalLinkage, name->value + nameAddition, cgcontext.mModule);
     for (auto paramID : refParams)

@@ -1,7 +1,7 @@
 module StdString
     public class String inherits Object
         private field-array[256] character arrayOfChars;
-        private field-integer length := 0;
+        private field-integer length := 256;
         private field-integer capacity := 256;
 
         public method init(String this)(in array[] character str, in integer capacity)

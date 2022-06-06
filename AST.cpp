@@ -56,6 +56,10 @@ llvm::Value *StringExprNode::codegen(CodeGenContext &cgcontext) {
     return cgcontext.builder->CreateGlobalStringPtr(value);
 }
 
+llvm::Value *NilExprNode::codegen(CodeGenContext &cgcontext) {
+    return nullptr;
+}
+
 llvm::Value *ArrayExprNode::codegen(CodeGenContext &cgcontext) {
     return nullptr;
 }
@@ -238,6 +242,15 @@ llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
     return call;
 }
 
+llvm::Value *DeleteExprNode::codegen(CodeGenContext &cgcontext) {
+    auto var = expr->codegen(cgcontext);
+    //auto call = cgcontext.builder->CreateCall(cgcontext.mModule->getFunction("GC_free"), {var});
+    auto call = CallInst::CreateFree(var, cgcontext.currentBlock());
+    cgcontext.builder->Insert(call);
+    return call;
+    //return nullptr;
+}
+
 llvm::Value *BlockExprNode::codegen(CodeGenContext &cgcontext) {
     return nullptr;
 }
@@ -299,6 +312,13 @@ llvm::Value *AssignExprNode::codegen(CodeGenContext &cgcontext) {
         auto elementPtr = cgcontext.builder->CreateInBoundsGEP(loadArr, dynamic_cast<IndexExprNode*>(left)->indexExpr->codegen(cgcontext));
         auto ret = cgcontext.builder->CreateStore(assignData, elementPtr);
         return nullptr;
+    }
+
+    // TODO: at least it works for arrays, check for other types
+    if (dynamic_cast<NilExprNode*>(right) != nullptr)
+    {
+        auto ptype = static_cast<PointerType*>(var->getType()->getPointerElementType());
+        assignData = ConstantPointerNull::get(ptype);
     }
 
     return new StoreInst(assignData, var, false, cgcontext.currentBlock());
@@ -487,7 +507,7 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
     auto elementSize = ConstantInt::get(int64type, cgcontext.dataLayout->getTypeAllocSize(type));
     auto allocSize = BinaryOperator::Create(Instruction::Mul, elementSize, arraySize, "", cgcontext.currentBlock());
     // GC_malloc
-    auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, cgcontext.mModule->getFunction("GC_malloc"), "");
+    auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, cgcontext.mModule->getFunction("malloc"), "");
     // malloc
     //auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, nullptr, "");
     cgcontext.builder->Insert(arr);
@@ -728,7 +748,7 @@ llvm::Value *FieldArrayVarDecNode::codegen(CodeGenContext &cgcontext) {
     auto elementSize = ConstantInt::get(int64type, cgcontext.dataLayout->getTypeAllocSize(type));
     auto allocSize = BinaryOperator::Create(Instruction::Mul, elementSize, arraySize, "", cgcontext.currentBlock());
     // GC_malloc
-    auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, cgcontext.mModule->getFunction("GC_malloc"), "");
+    auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, cgcontext.mModule->getFunction("malloc"), "");
     // malloc
     //auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, nullptr, "");
     cgcontext.builder->Insert(arr);

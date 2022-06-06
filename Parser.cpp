@@ -103,6 +103,7 @@ BlockExprNode* Parser::parseBlock(VariableExprNode *name) {
         else if (token.type == TokenType::Let) statements->push_back(parseAssignStatement());
         else if (token.type == TokenType::While) statements->push_back(parseWhileStatement());
         else if (token.type == TokenType::Call) statements->push_back(parseCall());
+        else if (token.type == TokenType::Delete) statements->push_back(parseDelete());
         if (token.type == TokenType::End)
         {
             advance();
@@ -653,6 +654,7 @@ ExprNode *Parser::parsePrimary() {
     Token tok = token;
     advance();
     if (tok.type == TokenType::Boolean) return new BooleanExprNode(tok.data == "true");
+    if (tok.type == TokenType::Nil) return new NilExprNode();
     else if (tok.type == TokenType::String)
     {
         if (tok.data.size() == 1) return new CharExprNode(tok.data[0]);
@@ -980,6 +982,7 @@ IfStatementNode *Parser::parseIfStatement() {
             else if (token.type == TokenType::Return) statements->push_back(parseReturnStatement());
             else if (token.type == TokenType::Let) statements->push_back(parseAssignStatement());
             else if (token.type == TokenType::Call) statements->push_back(parseCall());
+            else if (token.type == TokenType::Delete) statements->push_back(parseDelete());
             if (token.type == TokenType::End || token.type == TokenType::Else || token.type == TokenType::Elseif)
             {
                 blockEnd = true;
@@ -1016,6 +1019,7 @@ ElseIfStatementNode *Parser::parseElseIfBlock() {
         else if (token.type == TokenType::Return) statements->push_back(parseReturnStatement());
         else if (token.type == TokenType::Let) statements->push_back(parseAssignStatement());
         else if (token.type == TokenType::Call) statements->push_back(parseCall());
+        else if (token.type == TokenType::Delete) statements->push_back(parseDelete());
         if (token.type == TokenType::Else)
         {
             blockEnd = true;
@@ -1040,6 +1044,7 @@ BlockExprNode *Parser::parseElseBlock() {
         else if (token.type == TokenType::Let) statements->push_back(parseAssignStatement());
         else if (token.type == TokenType::While) statements->push_back(parseWhileStatement());
         else if (token.type == TokenType::Call) statements->push_back(parseCall());
+        else if (token.type == TokenType::Delete) statements->push_back(parseDelete());
         if (token.type == TokenType::End)
         {
             blockEnd = true;
@@ -1108,4 +1113,10 @@ CallExprNode *Parser::parseCall() {
         llvm::errs() << "[ERROR] " << dynamic_cast<VariableExprNode *>(callExpr)->value << " is not a function.\n";
     }
     return dynamic_cast<CallExprNode *>(callExpr);
+}
+
+DeleteExprNode *Parser::parseDelete() {
+    consume(TokenType::Delete);
+    auto varExpr = parseExpression();
+    return new DeleteExprNode(varExpr);
 }

@@ -268,6 +268,7 @@ public:
     bool parseTypeDecl();
     StatementNode* parseVarOrCall();
     CallExprNode* parseCall();
+    DeleteExprNode* parseDelete();
     ExprNode* parseExpression();
     ExprNode* parseStrInterpolation();
     ExprNode* parseOr();

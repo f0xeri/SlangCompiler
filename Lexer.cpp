@@ -141,7 +141,34 @@ void Lexer::tokenizeString() {
     char symbol = sourceCode[++pos];
     std::string str;
     while (symbol != '"') {
-        str += symbol;
+        if (symbol == '\\') {
+            symbol = sourceCode[++pos];
+            switch (symbol) {
+                case '\\': {
+                    str += symbol;
+                    break;
+                }
+                case 'n': {
+                    str += '\n';
+                    break;
+                }
+                case 't': {
+                    str += '\t';
+                    break;
+                }
+                case '0': {
+                    str += '\0';
+                    break;
+                }
+                default: {
+                    str += symbol;
+                    break;
+                }
+            }
+        }
+        else {
+            str += symbol;
+        }
         symbol = sourceCode[++pos];
     }
 

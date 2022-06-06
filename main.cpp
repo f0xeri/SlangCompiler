@@ -2,6 +2,7 @@
 #include "Parser.hpp"
 #include <filesystem>
 #include <numeric>
+#include <iostream>
 
 int main(int argc, char **argv) {
     std::string mainFilename;
@@ -16,6 +17,15 @@ int main(int argc, char **argv) {
         mainFilename = argv[1];
         mainFilename = mainFilename.substr(0, mainFilename.find('.', 0));
         filenames.push_back(mainFilename);
+
+        // temporary work around
+        if (mainFilename == "--help")
+        {
+            std::cout << "USAGE: slangc.exe [options] file...\n";
+            std::cout << "OPTIONS:\n   -gc\t\t Enable Boehm garbage collector\n   -debug\t Enable debug output\n";
+            return 0;
+        }
+
         for (int i = 2; i < argc; i++)
         {
             std::string name = argv[i];

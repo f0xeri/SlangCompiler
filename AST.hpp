@@ -133,6 +133,15 @@ public:
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
+class NilExprNode : public ExprNode
+{
+public:
+    explicit NilExprNode(): ExprNode(true) {
+        _type = E_UNKNOWN;
+    }
+    virtual llvm::Value *codegen(CodeGenContext &cgcontext);
+};
+
 class ArrayExprNode : public ExprNode
 {
 public:
@@ -210,6 +219,13 @@ public:
     std::vector<ExprNode*> *args;
 
     CallExprNode(VariableExprNode *name, std::vector<ExprNode*> *args) : ExprNode(false), name(name), args(args) {}
+    virtual llvm::Value *codegen(CodeGenContext &cgcontext);
+};
+
+class DeleteExprNode : public ExprNode, public StatementNode {
+public:
+    ExprNode* expr;
+    DeleteExprNode(ExprNode *expr) : ExprNode(false), expr(expr) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -530,6 +546,15 @@ public:
         return GC_MallocFunc;
     }
 
+    Function* GC_FreeFunction() {
+        vector<Type*> args;
+        args.push_back(Type::getInt8PtrTy(*context));
+        FunctionType* type = FunctionType::get(Type::getVoidTy(*context), args, false);
+        Function *GC_FreeFunc = Function::Create(type, Function::ExternalLinkage, Twine("GC_free"), mModule);
+        GC_FreeFunc->setCallingConv(CallingConv::C);
+        return GC_FreeFunc;
+    }
+
     Function* llvmTrap() {
         vector<Type*> agrs;
         FunctionType* type = FunctionType::get(Type::getVoidTy(*context), agrs, false);
@@ -544,6 +569,8 @@ public:
         llvmTrap();
         GC_InitFunction();
         GC_MallocFunction();
+        GC_FreeFunction();
+
         for (auto g : symbols)
         {
             g.second->codegen(*this);

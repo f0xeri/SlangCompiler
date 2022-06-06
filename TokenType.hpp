@@ -70,6 +70,7 @@ enum class TokenType
 
     EndOfFile,
     Delete,
+    Extern,
 };
 
 struct Token

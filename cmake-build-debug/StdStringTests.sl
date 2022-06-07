@@ -1,7 +1,6 @@
 import StdString;
 module StdStringTests
 start
-    // comment
     variable-integer i := 0;
     variable-StdString.String str;
     call str.init("test1");

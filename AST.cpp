@@ -232,12 +232,16 @@ llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
     for (auto it = args->begin(); it != args->end(); it++)
     {
         auto var = (*it)->codegen(cgcontext);
+        // TODO: CreateLoad if args is out/var (it should fix this.method() calls too
+        //auto arg = dynamic_cast<FuncParamDecStatementNode*>(*it);
+        //if (arg->parameterType == ParameterType::Out || arg->parameterType == ParameterType::Var)
+            //cgcontext.builder->CreateLoad(var);
         var->getType()->print(nameAdditionStream);
         argsRef.push_back(var);
     }
     Function *function = cgcontext.mModule->getFunction(name->value + nameAddition);
     if (function == nullptr)
-        llvm::errs() << "[ERROR] Codegen - no such function \"" << name->value << "\".\n";
+        llvm::errs() << "[ERROR] Codegen - no such function \"" << name->value + nameAddition << "\".\n";
     CallInst *call = CallInst::Create(function, makeArrayRef(argsRef), "", cgcontext.currentBlock());
     return call;
 }

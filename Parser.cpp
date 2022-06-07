@@ -554,7 +554,7 @@ ExprNode *Parser::parseAnd() {
     while (true)
     {
         if (match(TokenType::And)) {
-            result = new ConditionalExprNode(result, TokenType::And, parseEquality());
+            result = new OperatorExprNode(result, TokenType::And, parseEquality());
             continue;
         }
         break;
@@ -981,6 +981,7 @@ IfStatementNode *Parser::parseIfStatement() {
             else if (token.type == TokenType::Output) statements->push_back(parseOutputStatement());
             else if (token.type == TokenType::Return) statements->push_back(parseReturnStatement());
             else if (token.type == TokenType::Let) statements->push_back(parseAssignStatement());
+            else if (token.type == TokenType::While) statements->push_back(parseWhileStatement());
             else if (token.type == TokenType::Call) statements->push_back(parseCall());
             else if (token.type == TokenType::Delete) statements->push_back(parseDelete());
             if (token.type == TokenType::End || token.type == TokenType::Else || token.type == TokenType::Elseif)
@@ -1018,6 +1019,7 @@ ElseIfStatementNode *Parser::parseElseIfBlock() {
         else if (token.type == TokenType::Output) statements->push_back(parseOutputStatement());
         else if (token.type == TokenType::Return) statements->push_back(parseReturnStatement());
         else if (token.type == TokenType::Let) statements->push_back(parseAssignStatement());
+        else if (token.type == TokenType::While) statements->push_back(parseWhileStatement());
         else if (token.type == TokenType::Call) statements->push_back(parseCall());
         else if (token.type == TokenType::Delete) statements->push_back(parseDelete());
         if (token.type == TokenType::Else)

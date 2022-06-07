@@ -208,6 +208,12 @@ void Lexer::tokenizeChar() {
         tokenizeString();
         return;
     }
+    else if (sourceCode[pos] == '/' && sourceCode[pos + 1] == '/') {
+        char symbol = sourceCode[++pos];
+        while (symbol != '\n') symbol = sourceCode[++pos];
+        if (DEBUG) std::cout << "\n";
+        return;
+    }
     else if (sourceCode[pos + 1] == '=' || sourceCode[pos] == '|' && sourceCode[pos + 1] == '|' ||
              sourceCode[pos] == '&' && sourceCode[pos] == '&') {
         word += sourceCode[pos + 1];

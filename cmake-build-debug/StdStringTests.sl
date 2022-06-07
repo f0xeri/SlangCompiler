@@ -1,31 +1,18 @@
 import StdString;
 module StdStringTests
 start
-    variable-array[256] character array;
-    let array := "chararray";
-    output array;
-    output StdString.strlen(array);
+    // comment
+    variable-integer i := 0;
     variable-StdString.String str;
-    let str.arrayOfChars[0] := "s";
-    let str.arrayOfChars[1] := "t";
-    let str.arrayOfChars[2] := "r";
-    let str.arrayOfChars[3] := "i";
-    let str.arrayOfChars[4] := "n";
-    let str.arrayOfChars[5] := "g";
-    call str.setSymbol(0, "a");
+    call str.init("test1");
+    call str.concat("test2");
     output str.toString();
 
-    variable-StdString.String str2;
-    call str2.init(array);
-    output str2.toString();
-    output str2.capacity;
-    call str2.clear();
-
-    variable-StdString.String str3;
-    variable-integer i := 0;
-    while i < 100000 repeat
-        call str3.init("test");
-        let i := i + 1;
-        output i;
-    end while;
+    variable-StdString.String res;
+    let res := str.substr(6, 9);
+    output res.toString();
+    let res := str.substr(6);
+    output res.toString();
+    output str.find("est");
+    output str.find("est2");
 end StdStringTests.

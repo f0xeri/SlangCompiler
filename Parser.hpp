@@ -44,7 +44,8 @@ public:
     {
         if (token.type == TokenType::EndOfFile)
         {
-            llvm::errs() << "[ERROR] Unexpected EOF token.\n";
+            llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Unexpected EOF token.\n";
+            hasError = true;
             return token;
         }
         tokensIterator++;
@@ -56,7 +57,7 @@ public:
 
     void error()
     {
-        llvm::errs() << "[ERROR] Unexpected token \"" << Lexer::getTokenName(token.type) << "\".\n";
+        llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Unexpected token \"" << Lexer::getTokenName(token.type) << "\".\n";
         hasError = true;
     }
 
@@ -64,7 +65,7 @@ public:
     {
         if (token.type != tokenType)
         {
-            llvm::errs() << "[ERROR] Unexpected token \"" << Lexer::getTokenName(token.type) + "\", expected \"" + Lexer::getTokenName(tokenType) + "\".\n";
+            llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Unexpected token \"" << Lexer::getTokenName(token.type) + "\", expected \"" + Lexer::getTokenName(tokenType) + "\".\n";
             hasError = true;
             return false;
         }
@@ -204,7 +205,8 @@ public:
                         auto typeStatement = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(type));
                         if (typeStatement == nullptr)
                         {
-                            llvm::errs() << "[ERROR] Unknown type \"" << type << "\".\n";
+                            llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Unknown type \"" << type << "\".\n";
+                            hasError = true;
                         }
                     }
                 }
@@ -220,7 +222,8 @@ public:
                 typeStatement = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(mainModuleNode->name->value + "." + type));
                 if (typeStatement == nullptr)
                 {
-                    llvm::errs() << "[ERROR] Unknown type \"" << type << "\".\n";
+                    llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Unknown type \"" << type << "\".\n";
+                    hasError = true;
                 }
             }
             expr = new VariableExprNode(typeStatement->name->value);

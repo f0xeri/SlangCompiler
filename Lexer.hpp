@@ -29,7 +29,9 @@ public:
 
     std::vector<Token> tokens;
     std::string sourceCode;
-    unsigned int pos = 0;
+    uint64_t pos = 0;
+    uint64_t currentStringNumber = 1;
+    uint64_t currentSymbolNumber = 1;
     Lexer(const std::string &path);
     ~Lexer();
     void tokenize();

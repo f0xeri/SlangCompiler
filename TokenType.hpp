@@ -77,6 +77,8 @@ struct Token
 {
     TokenType type;
     std::string data{};
+    uint64_t stringNumber;
+    uint64_t symbolNumber;
 };
 
 #endif //SLANGPARSER_TOKENTYPE_HPP

@@ -76,6 +76,8 @@ module StdString
             let this.length := totalLength;
         end concat;
 
+        // leaks when assigning (old String object is not deleted)
+        // workaround - GC can automatically free it
         public method substr(String this)(in integer first, in integer last) : String
             variable-String result;
             if last > this.length then
@@ -153,6 +155,10 @@ module StdString
             end while;
             return -1;
         end find;
+
+        public method replace(String this)(in array[] character oldStr, in array[] character newStr) : String
+
+        end replace;
 
         public method len(String this)(): integer
             return this.length;

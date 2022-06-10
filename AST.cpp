@@ -248,9 +248,9 @@ llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
 
 llvm::Value *DeleteExprNode::codegen(CodeGenContext &cgcontext) {
     auto var = expr->codegen(cgcontext);
-    //auto call = cgcontext.builder->CreateCall(cgcontext.mModule->getFunction("GC_free"), {var});
-    auto call = CallInst::CreateFree(var, cgcontext.currentBlock());
-    cgcontext.builder->Insert(call);
+    auto call = cgcontext.builder->CreateCall(cgcontext.mModule->getFunction("GC_free"), {var});
+    //auto call = CallInst::CreateFree(var, cgcontext.currentBlock());
+    //cgcontext.builder->Insert(call);
     return call;
     //return nullptr;
 }
@@ -511,7 +511,7 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
     auto elementSize = ConstantInt::get(int64type, cgcontext.dataLayout->getTypeAllocSize(type));
     auto allocSize = BinaryOperator::Create(Instruction::Mul, elementSize, arraySize, "", cgcontext.currentBlock());
     // GC_malloc
-    auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, cgcontext.mModule->getFunction("malloc"), "");
+    auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, cgcontext.mModule->getFunction("GC_malloc"), "");
     // malloc
     //auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, nullptr, "");
     cgcontext.builder->Insert(arr);
@@ -752,7 +752,7 @@ llvm::Value *FieldArrayVarDecNode::codegen(CodeGenContext &cgcontext) {
     auto elementSize = ConstantInt::get(int64type, cgcontext.dataLayout->getTypeAllocSize(type));
     auto allocSize = BinaryOperator::Create(Instruction::Mul, elementSize, arraySize, "", cgcontext.currentBlock());
     // GC_malloc
-    auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, cgcontext.mModule->getFunction("malloc"), "");
+    auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, cgcontext.mModule->getFunction("GC_malloc"), "");
     // malloc
     //auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, nullptr, "");
     cgcontext.builder->Insert(arr);

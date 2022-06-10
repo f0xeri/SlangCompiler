@@ -55,6 +55,11 @@ bool Parser::parseImports()
         lexer.tokenize();
         Parser* parser = new Parser(lexer.tokens);
         parser->parse();
+        if (parser->hasError)
+        {
+            llvm::errs() << "[ERROR] Compilation failed.\n";
+            exit(-1);
+        }
         CodeGenContext codeGenContext(parser->mainModuleNode, false);
         codeGenContext.generateCode(parser->mainModuleNode, parser->currentScope->symbols);
         if (DEBUG) codeGenContext.mModule->print(llvm::dbgs(), nullptr);
@@ -113,7 +118,8 @@ BlockExprNode* Parser::parseBlock(VariableExprNode *name) {
                 blockEnd = true;
             else
             {
-                llvm::errs() << "[ERROR] Expected end of block \"" << name->value << "\", not \"" << endName << "\".\n";
+                llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Expected end of block \"" << name->value << "\", not \"" << endName << "\".\n";
+                hasError = true;
                 return block;
             }
         }
@@ -170,7 +176,8 @@ DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, 
                 if (!oneOfDefaultTypes(arrType) && arrType != "array") {
                     auto typeStatement = dynamic_cast<TypeDecStatementNode *>(currentScope->lookup(type));
                     if (typeStatement == nullptr) {
-                        llvm::errs() << "[ERROR] Unknown type \"" << type << "\".\n";
+                        llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Unknown type \"" << type << "\".\n";
+                        hasError = true;
                     }
                 }
             }
@@ -190,7 +197,7 @@ DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, 
             name = tok.data;
             if (!isFieldNameCorrect(fields, name))
             {
-                llvm::errs() << "[ERROR] Field \"" << name << "\" already declared in class \"" << thisClassName << "\".\n";
+                llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber <<  ") Field \"" << name << "\" already declared in class \"" << thisClassName << "\".\n";
                 hasError = true; // error field already exists
             }
 
@@ -278,7 +285,7 @@ MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std
     tok = consume(TokenType::Identifier);
     if (tok.data != thisClassName)
     {
-        llvm::errs() << "[ERROR] \"this\" should be \"" << thisClassName + "\", not \"" << tok.data << "\".\n";
+        llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") \"this\" should be \"" << thisClassName + "\", not \"" << tok.data << "\".\n";
         hasError = true;
     }
     tok = consume(TokenType::Identifier);
@@ -354,7 +361,7 @@ MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std
 
     if (token.type != TokenType::Semicolon)
     {
-        llvm::errs() << "[ERROR] Unexpected token \"" << token.data + "\", expected \"" + Lexer::getTokenName(TokenType::Semicolon) + "\".\n";
+        llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Unexpected token \"" << token.data + "\", expected \"" + Lexer::getTokenName(TokenType::Semicolon) + "\".\n";
         hasError = true;
     }
     currentScope = scope->parent;
@@ -459,7 +466,8 @@ bool Parser::parseTypeDecl() {
                                 }
                                 else
                                 {
-                                    llvm::errs() << "[ERROR] Failed to parse field of class \"" << name << "\".\n";
+                                    llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Failed to parse field of class \"" << name << "\".\n";
+                                    hasError = true;
                                 }
                             }
                             if (token.type == TokenType::Method)
@@ -510,8 +518,8 @@ bool Parser::parseTypeDecl() {
                 }
                 else
                 {
-                    llvm::errs() << "[ERROR] Type " + token.data + " is not declared.\n";
-                    exit(-1);
+                    llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Type " + token.data + " is not declared.\n";
+                    hasError = true;
                 }
             }
         }
@@ -673,7 +681,8 @@ ExprNode *Parser::parsePrimary() {
         consume(TokenType::RParen);
         return result;
     }
-    llvm::errs() << "[ERROR] Failed to parse expression.\n";
+    llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Failed to parse expression.\n";
+    hasError = true;
     return nullptr;
 }
 
@@ -717,7 +726,8 @@ StatementNode* Parser::parseVarOrCall() {
             auto var = currentScope->lookup(name);
             if (var == nullptr)
             {
-                llvm::errs() << "[ERROR] " + name + " is not declared.\n";
+                llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") " + name + " is not declared.\n";
+                hasError = true;
             }
             type = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(dynamic_cast<VarDecStatementNode*>(var)->type));
             if (type != nullptr) dotClass = true;
@@ -729,7 +739,10 @@ StatementNode* Parser::parseVarOrCall() {
             if (moduleP->currentScope->lookup(name + "." + token.data) != nullptr)
                 name += "." + token.data;
             else
-                llvm::errs() << "[ERROR] " + name + "." + token.data + " is not declared.\n";
+            {
+                llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") " + name + "." + token.data + " is not declared.\n";
+                hasError = true;
+            }
         }
         if (dotClass)
         {
@@ -762,7 +775,10 @@ StatementNode* Parser::parseVarOrCall() {
     // if we have an array
     if (token.type == TokenType::LBracket)
     {
-        if (dotClass && !fieldExists) llvm::errs() << "[ERROR] Field " + name + "." + token.data + " is not declared in " + type->name->value + " type.\n";
+        if (dotClass && !fieldExists) {
+            llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Field " + name + "." + token.data + " is not declared in " + type->name->value + " type.\n";
+            hasError = true;
+        }
         advance();
         auto index = parseExpression();
         consume(TokenType::RBracket);
@@ -772,8 +788,11 @@ StatementNode* Parser::parseVarOrCall() {
     if (!dotModule && currentScope->lookup(mainModuleNode->name->value + "." + name) != nullptr)
         name = mainModuleNode->name->value + "." + name;
     //else
-    //llvm::errs() << "[ERROR] " + mainModuleNode->value->value + "." + value + " is not declared.\n";
-    if (dotClass && !methodExists) llvm::errs() << "[ERROR] Method " + name + "." + token.data + " is not declared in " + type->name->value + " type.\n";
+    //llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") " + mainModuleNode->value->value + "." + value + " is not declared.\n";
+    if (dotClass && !methodExists) {
+        llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Method " + name + "." + token.data + " is not declared in " + type->name->value + " type.\n";
+        hasError = true;
+    }
     consume(TokenType::LParen);
     auto params = new std::vector<ExprNode*>();
     if (token.type != TokenType::RParen)
@@ -843,7 +862,8 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
                     auto typeStatement = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(type));
                     if (typeStatement == nullptr)
                     {
-                        llvm::errs() << "[ERROR] Unknown type \"" << type << "\".\n";
+                        llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Unknown type \"" << type << "\".\n";
+                        hasError = true;
                     }
                 }
             }
@@ -880,14 +900,18 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
                 }
                 if (!dotModule && !dotClass)
                 {
-                    llvm::errs() << "[ERROR] " + type + " is not declared.\n";
+                    llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") " + type + " is not declared.\n";
+                    hasError = true;
                 }
                 advance();
                 expect(TokenType::Identifier);
                 if (moduleP->currentScope->lookup(type + "." + token.data) != nullptr)
                     type += "." + token.data;
                 else
-                    llvm::errs() << "[ERROR] " + type + "." + token.data + " is not declared.\n";
+                {
+                    llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") " + type + "." + token.data + " is not declared.\n";
+                    hasError = true;
+                }
                 advance();
             }
         }
@@ -900,7 +924,8 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
     }
     if (currentScope->lookup(name) != nullptr || oneOfDefaultTypes(name))
     {
-        llvm::errs() << "[ERROR] Name conflict - \"" << name << "\".\n";
+        llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Name conflict - \"" << name << "\".\n";
+        hasError = true;
     }
     if (isGlobal) name = mainModuleNode->name->value + "." + name;
     DeclarationNode* result;
@@ -951,7 +976,7 @@ FuncDecStatementNode *Parser::parseFunctionDecl() {
 
     if (token.type != TokenType::Semicolon)
     {
-        llvm::errs() << "[ERROR] Unexpected token \"" << token.data + "\", expected \"" + Lexer::getTokenName(TokenType::Semicolon) + "\".\n";
+        llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Unexpected token \"" << token.data + "\", expected \"" + Lexer::getTokenName(TokenType::Semicolon) + "\".\n";
         hasError = true;
     }
     function->block = block;
@@ -1112,7 +1137,8 @@ CallExprNode *Parser::parseCall() {
     auto callExpr = parseVarOrCall();
     if (dynamic_cast<CallExprNode *>(callExpr) == nullptr)
     {
-        llvm::errs() << "[ERROR] " << dynamic_cast<VariableExprNode *>(callExpr)->value << " is not a function.\n";
+        llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") " << dynamic_cast<VariableExprNode *>(callExpr)->value << " is not a function.\n";
+        hasError = true;
     }
     return dynamic_cast<CallExprNode *>(callExpr);
 }

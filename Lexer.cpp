@@ -100,6 +100,8 @@ void Lexer::tokenize() {
             tokenizeNumber();
         } else if (symbol == '\n') {
             if (DEBUG) std::cout << "\n";
+            currentStringNumber++;
+            currentSymbolNumber = 1;
         } else if (isdigit(symbol)) {
             tokenizeNumber();
         } else if (symbol == ' ') {
@@ -108,8 +110,9 @@ void Lexer::tokenize() {
             tokenizeChar();
         }
         pos++;
+        currentSymbolNumber++;
     }
-    tokens.push_back({TokenType::EndOfFile, ""});
+    tokens.push_back({TokenType::EndOfFile, "", currentStringNumber, currentSymbolNumber});
     if (DEBUG) std::cout << "\n\n";
 }
 
@@ -121,28 +124,31 @@ void Lexer::tokenizeNumber() {
         if (symbol == '.') {
             if (!real) real = true;
             else {
-                //LOG(ERROR) << "Real number can contain only 1 point";
+                std::cout << "[ERROR] Real number can contain only 1 point.\n";
                 exit(1);
             }
         }
         str += symbol;
         symbol = sourceCode[++pos];
+        currentSymbolNumber++;
     }
     if (isalpha(symbol)) {
-        //LOG(ERROR) << "Number can contain only digits";
+        std::cout << "[ERROR] Number can contain only digits.\n";
         exit(1);
     }
     pos--;
     if (DEBUG) std::cout << "NUMBER(" << str << ") ";
-    tokens.push_back({real ? TokenType::Real : TokenType::Integer, str});
+    tokens.push_back({real ? TokenType::Real : TokenType::Integer, str, currentStringNumber, currentSymbolNumber});
 }
 
 void Lexer::tokenizeString() {
     char symbol = sourceCode[++pos];
+    currentSymbolNumber++;
     std::string str;
     while (symbol != '"') {
         if (symbol == '\\') {
             symbol = sourceCode[++pos];
+            currentSymbolNumber++;
             switch (symbol) {
                 case '\\': {
                     str += symbol;
@@ -170,22 +176,26 @@ void Lexer::tokenizeString() {
             str += symbol;
         }
         symbol = sourceCode[++pos];
+        currentSymbolNumber++;
     }
 
     if (DEBUG) std::cout << "STRING(" << str << ") ";
-    tokens.push_back({TokenType::String, str});
+    tokens.push_back({TokenType::String, str, currentStringNumber, currentSymbolNumber});
 }
 
 void Lexer::tokenizeWord() {
     unsigned int tpos = pos + 1;
+    currentSymbolNumber++;
     std::string word;
     word += sourceCode[pos];
     while (isalpha(sourceCode[tpos]) || isdigit(sourceCode[tpos])) {
         word += sourceCode[tpos];
         tpos++;
+        currentSymbolNumber++;
     }
 
     pos = tpos - 1;
+    currentSymbolNumber--;
     if (tokensMap.contains(word)) {
         if (tokensMap.find(word)->second == TokenType::VisibilityType) {
             if (DEBUG) std::cout << "VISIBILITYTYPE(" << word << ") ";
@@ -193,10 +203,10 @@ void Lexer::tokenizeWord() {
             if (DEBUG) std::cout << "WORD(" << word << ") ";
         }
 
-        tokens.push_back({tokensMap.find(word)->second, word});
+        tokens.push_back({tokensMap.find(word)->second, word, currentStringNumber, currentSymbolNumber});
     } else {
         if (DEBUG) std::cout << "ID" << "(" << word << ") ";
-        tokens.push_back({TokenType::Identifier, word});
+        tokens.push_back({TokenType::Identifier, word, currentStringNumber, currentSymbolNumber});
     }
 
 }
@@ -210,7 +220,14 @@ void Lexer::tokenizeChar() {
     }
     else if (sourceCode[pos] == '/' && sourceCode[pos + 1] == '/') {
         char symbol = sourceCode[++pos];
-        while (symbol != '\n') symbol = sourceCode[++pos];
+        currentSymbolNumber++;
+        while (symbol != '\n')
+        {
+            symbol = sourceCode[++pos];
+            currentSymbolNumber++;
+        }
+        currentStringNumber++;
+        currentSymbolNumber = 1;
         if (DEBUG) std::cout << "\n";
         return;
     }
@@ -218,10 +235,11 @@ void Lexer::tokenizeChar() {
              sourceCode[pos] == '&' && sourceCode[pos] == '&') {
         word += sourceCode[pos + 1];
         pos++;
+        currentSymbolNumber++;
     }
 
     if (tokensMap.contains(word)) {
-        tokens.push_back({tokensMap.find(word)->second});
+        tokens.push_back({tokensMap.find(word)->second, "", currentStringNumber, currentSymbolNumber});
         if (DEBUG) std::cout << "(" << word << ") ";
     }
 }

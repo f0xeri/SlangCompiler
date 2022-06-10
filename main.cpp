@@ -1,7 +1,6 @@
 #include "Lexer.hpp"
 #include "Parser.hpp"
 #include <filesystem>
-#include <numeric>
 #include <iostream>
 
 int main(int argc, char **argv) {
@@ -35,6 +34,11 @@ int main(int argc, char **argv) {
         lexer.tokenize();
         Parser parser(lexer.tokens);
         parser.parse();
+        if (parser.hasError)
+        {
+            std::cout << "[ERROR] Compilation failed.\n";
+            exit(-1);
+        }
         CodeGenContext codeGenContext(parser.mainModuleNode, true);
         codeGenContext.generateCode(parser.mainModuleNode, parser.currentScope->symbols);
         if (DEBUG) codeGenContext.mModule->print(llvm::dbgs(), nullptr);

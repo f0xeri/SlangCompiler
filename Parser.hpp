@@ -232,6 +232,55 @@ public:
         return expr;
     }
 
+    std::string parseTypeName(std::string &type)
+    {
+        if (dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(mainModuleNode->name->value + "." + type)) == nullptr)
+        {
+            // if we have dot
+            bool dotModule = false;
+            bool dotClass = false;
+            if (token.type == TokenType::Dot)
+            {
+                // is it module or class value
+                Parser *moduleP = nullptr;
+                for (auto &module : *importedModules)
+                {
+                    if (module->mainModuleNode->name->value == type)
+                    {
+                        dotModule = true;
+                        moduleP = module;
+                        break;
+                    }
+                }
+                if (!dotModule)
+                {
+                    auto t = currentScope->lookup(type);
+                    if (dynamic_cast<TypeDecStatementNode*>(t) != nullptr) dotClass = true;
+                }
+                if (!dotModule && !dotClass)
+                {
+                    llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") " + type + " is not declared.\n";
+                    hasError = true;
+                }
+                advance();
+                expect(TokenType::Identifier);
+                if (moduleP->currentScope->lookup(type + "." + token.data) != nullptr)
+                    type += "." + token.data;
+                else
+                {
+                    llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") " + type + "." + token.data + " is not declared.\n";
+                    hasError = true;
+                }
+                advance();
+            }
+        }
+        else
+        {
+            type = mainModuleNode->name->value + "." + type;
+        }
+        return type;
+    }
+
     std::string getArrayFinalType(ArrayExprNode* exprNode)
     {
         std::string type;

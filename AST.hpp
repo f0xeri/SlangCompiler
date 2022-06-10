@@ -169,8 +169,9 @@ public:
     std::string value;
     bool dotClass = false;
     bool dotModule = false;
+    bool isPointer = false;
     int index = -1;
-    VariableExprNode(std::string name, E_TYPE type = E_UNKNOWN, bool dotModule = false, bool dotClass = false, int index = -1): value(std::move(name)), ExprNode(false), dotModule(dotModule), dotClass(dotClass), index(index) {
+    VariableExprNode(std::string name, E_TYPE type = E_UNKNOWN, bool dotModule = false, bool dotClass = false, int index = -1, bool isPointer = false): value(std::move(name)), ExprNode(false), dotModule(dotModule), dotClass(dotClass), index(index), isPointer(isPointer) {
         _type = type;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
@@ -181,8 +182,8 @@ public:
     ExprNode *indexExpr;
     ExprNode *assign;
 public:
-    IndexExprNode(const std::string &name, ExprNode *expr, bool dotModule = false, bool dotClass = false, int index = -1): VariableExprNode(name, E_UNKNOWN, dotModule, dotClass, index), indexExpr(expr), assign(nullptr) {}
-    IndexExprNode(const std::string &name, ExprNode *expr, ExprNode *assign, bool dotModule = false, bool dotClass = false, int index = -1): VariableExprNode(name, E_UNKNOWN, dotModule, dotClass, index), indexExpr(expr), assign(assign) {}
+    IndexExprNode(const std::string &name, ExprNode *expr, bool dotModule = false, bool dotClass = false, int index = -1, bool isPointer = false): VariableExprNode(name, E_UNKNOWN, dotModule, dotClass, index, isPointer), indexExpr(expr), assign(nullptr) {}
+    IndexExprNode(const std::string &name, ExprNode *expr, ExprNode *assign, bool dotModule = false, bool dotClass = false, int index = -1, bool isPointer = false): VariableExprNode(name, E_UNKNOWN, dotModule, dotClass, index, isPointer), indexExpr(expr), assign(assign) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 

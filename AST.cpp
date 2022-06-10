@@ -587,6 +587,7 @@ llvm::Value *IndexExprNode::codegen(CodeGenContext &cgcontext) {
 
     auto loadArr = cgcontext.builder->CreateLoad(var);
     auto elementPtr = cgcontext.builder->CreateInBoundsGEP(loadArr, indexExpr->codegen(cgcontext));
+    if (isPointer) return elementPtr;
     return cgcontext.builder->CreateLoad(elementPtr, false);
 }
 

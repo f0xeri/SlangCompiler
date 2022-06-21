@@ -39,8 +39,8 @@ int main(int argc, char **argv) {
             std::cout << "[ERROR] Compilation failed.\n";
             exit(-1);
         }
-        CodeGenContext codeGenContext(parser.mainModuleNode, true);
-        codeGenContext.generateCode(parser.mainModuleNode, parser.currentScope->symbols);
+        CodeGenContext codeGenContext(parser.mainModuleNode, true, parser.currentScope->symbols);
+        codeGenContext.generateCode(parser.mainModuleNode);
         if (DEBUG) codeGenContext.mModule->print(llvm::dbgs(), nullptr);
         std::error_code EC;
         auto outFileStream = llvm::raw_fd_ostream(mainFilename + ".ll", EC, sys::fs::OF_None);

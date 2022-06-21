@@ -11,6 +11,7 @@ start
     call strArr[0].concat(strArr[1].toString());
     output strArr[0].toString();
     output strArr[1].toString();
+    output strArr[0].length;
 
     variable-StdString.String str;
     call str.init("test1");

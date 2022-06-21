@@ -60,8 +60,8 @@ bool Parser::parseImports()
             llvm::errs() << "[ERROR] Compilation failed.\n";
             exit(-1);
         }
-        CodeGenContext codeGenContext(parser->mainModuleNode, false);
-        codeGenContext.generateCode(parser->mainModuleNode, parser->currentScope->symbols);
+        CodeGenContext codeGenContext(parser->mainModuleNode, false, parser->currentScope->symbols);
+        codeGenContext.generateCode(parser->mainModuleNode);
         if (DEBUG) codeGenContext.mModule->print(llvm::dbgs(), nullptr);
         std::error_code EC;
         auto outFileStream = llvm::raw_fd_ostream(moduleName + ".ll", EC, sys::fs::OF_None);

@@ -499,6 +499,8 @@ public:
     std::unique_ptr<llvm::IRBuilder<>> builder;
     std::unique_ptr<llvm::DataLayout> dataLayout;
 
+    std::unique_ptr<std::vector<std::pair<std::string, DeclarationNode*>>> symbols;
+
     llvm::Module* mModule;
     std::vector<CodeGenBlock*> blocks;
     std::map<std::string, StructType *> allocatedClasses;
@@ -508,7 +510,7 @@ public:
 
     LoadInst* currentTypeLoad;
 
-    CodeGenContext(ModuleStatementNode *moduleStatement, bool isMainModule)
+    CodeGenContext(ModuleStatementNode *moduleStatement, bool isMainModule, const std::vector<std::pair<std::string, DeclarationNode*>>& symbols)
     {
         context = std::make_unique<llvm::LLVMContext>();
         builder = std::make_unique<llvm::IRBuilder<>>(*context);
@@ -517,6 +519,7 @@ public:
         dataLayout = std::make_unique<llvm::DataLayout>(mModule);
         this->isMainModule = isMainModule;
         moduleName = moduleStatement->name->value;
+        this->symbols = std::make_unique<std::vector<std::pair<std::string, DeclarationNode*>>>(symbols);
     }
     ~CodeGenContext() = default;
 
@@ -564,7 +567,7 @@ public:
         return llvmTrap;
     }
 
-    void generateCode(ModuleStatementNode *mainModule, const std::vector<std::pair<std::string, DeclarationNode*>>& symbols)
+    void generateCode(ModuleStatementNode *mainModule)
     {
         printfFunction();
         llvmTrap();
@@ -572,7 +575,7 @@ public:
         GC_MallocFunction();
         GC_FreeFunction();
 
-        for (auto g : symbols)
+        for (auto g : *symbols)
         {
             g.second->codegen(*this);
         }

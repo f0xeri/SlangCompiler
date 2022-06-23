@@ -118,7 +118,9 @@ llvm::Value *VariableExprNode::codegen(CodeGenContext &cgcontext) {
                 else llvm::errs() << "[ERROR] Undeclared Variable \"" << value << "\".\n";
             }
             else
+            {
                 val = cgcontext.globals()[value];
+            }
         }
         else
         {
@@ -135,7 +137,7 @@ llvm::Value *VariableExprNode::codegen(CodeGenContext &cgcontext) {
 
     if (type == nullptr)
         type = val->getType()->getPointerElementType();
-    if (dotClass) return val;
+    if (dotClass || val->getType()->getPointerElementType()->isStructTy()) return val;
     return new LoadInst(type, val, "", false, cgcontext.currentBlock());
 }
 
@@ -248,9 +250,10 @@ llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
 
 llvm::Value *DeleteExprNode::codegen(CodeGenContext &cgcontext) {
     auto var = expr->codegen(cgcontext);
-    auto call = cgcontext.builder->CreateCall(cgcontext.mModule->getFunction("GC_free"), {var});
-    //auto call = CallInst::CreateFree(var, cgcontext.currentBlock());
-    //cgcontext.builder->Insert(call);
+    //auto call = cgcontext.builder->CreateCall(cgcontext.mModule->getFunction("free"), {var});
+
+    auto call = CallInst::CreateFree(var, cgcontext.currentBlock());
+    cgcontext.builder->Insert(call);
     return call;
     //return nullptr;
 }
@@ -315,7 +318,7 @@ llvm::Value *AssignExprNode::codegen(CodeGenContext &cgcontext) {
         auto loadArr = cgcontext.builder->CreateLoad(var);
         auto elementPtr = cgcontext.builder->CreateInBoundsGEP(loadArr, dynamic_cast<IndexExprNode*>(left)->indexExpr->codegen(cgcontext));
         auto ret = cgcontext.builder->CreateStore(assignData, elementPtr);
-        return nullptr;
+        return ret;
     }
 
     // TODO: at least it works for arrays, check for other types
@@ -323,6 +326,12 @@ llvm::Value *AssignExprNode::codegen(CodeGenContext &cgcontext) {
     {
         auto ptype = static_cast<PointerType*>(var->getType()->getPointerElementType());
         assignData = ConstantPointerNull::get(ptype);
+    }
+
+    if (assignData->getType()->isPointerTy()) {
+        if (assignData->getType()->getPointerElementType()->isStructTy()) {
+            assignData = cgcontext.builder->CreateLoad(assignData);
+        }
     }
 
     return new StoreInst(assignData, var, false, cgcontext.currentBlock());
@@ -511,7 +520,7 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
     auto elementSize = ConstantInt::get(int64type, cgcontext.dataLayout->getTypeAllocSize(type));
     auto allocSize = BinaryOperator::Create(Instruction::Mul, elementSize, arraySize, "", cgcontext.currentBlock());
     // GC_malloc
-    auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, cgcontext.mModule->getFunction("GC_malloc"), "");
+    auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, cgcontext.mModule->getFunction("malloc"), "");
     // malloc
     //auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, nullptr, "");
     cgcontext.builder->Insert(arr);
@@ -658,6 +667,9 @@ llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
         i++;
     }
     Type *retType = getTypeFromExprNode(cgcontext, type);
+    if (retType->isStructTy()) {
+        retType = retType->getPointerTo();
+    }
     std::string retTypeName;
 
     FunctionType* funcType = FunctionType::get(retType, argTypes, false);
@@ -753,7 +765,7 @@ llvm::Value *FieldArrayVarDecNode::codegen(CodeGenContext &cgcontext) {
     auto elementSize = ConstantInt::get(int64type, cgcontext.dataLayout->getTypeAllocSize(type));
     auto allocSize = BinaryOperator::Create(Instruction::Mul, elementSize, arraySize, "", cgcontext.currentBlock());
     // GC_malloc
-    auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, cgcontext.mModule->getFunction("GC_malloc"), "");
+    auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, cgcontext.mModule->getFunction("malloc"), "");
     // malloc
     //auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, nullptr, "");
     cgcontext.builder->Insert(arr);

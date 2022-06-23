@@ -342,7 +342,8 @@ public:
 
     bool isGlobal = false;
     ArrayExprNode* expr;
-    ArrayDecStatementNode(VariableExprNode *name, ArrayExprNode *expr, bool isGlobal) : DeclarationNode(name), expr(expr), isGlobal(isGlobal) {}
+    int indicesCount = 1;
+    ArrayDecStatementNode(VariableExprNode *name, ArrayExprNode *expr, bool isGlobal, int indicesCount = 1) : DeclarationNode(name), expr(expr), isGlobal(isGlobal), indicesCount(indicesCount) {}
 
     /*ArrayDecStatementNode(std::string type, VariableExprNode *value, ExprNode *size): type(std::move(type)), DeclarationNode(value), init(new std::vector<ExprNode*>()), size(size), isString(false) {}
     ArrayDecStatementNode(std::string type, VariableExprNode *value, std::vector<ExprNode*> *init): type(std::move(type)), DeclarationNode(value), init(init), size(new IntExprNode(init->size())), isString(false) {}

@@ -35,16 +35,55 @@ module StdString
         return dest;
     end strcat;
 
+    // create strstr that returns the index of the first occurrence of the substring in the string
+    public function strstr(in array[] character str, in array[] character substr): integer
+        variable-integer i := 0;
+        variable-integer j := 0;
+        variable-character ch := str[i];
+        while (ch != "\0") repeat
+            let ch := str[i];
+            let i := i + 1;
+            if (ch == substr[j]) then
+                let j := j + 1;
+                if (substr[j] == "\0") then
+                    return i - j;
+                end if;
+            else
+                let j := 0;
+            end if;
+        end while;
+        return -1;
+    end strstr;
+
+    // create strstr that returns index and starts from index
+    public function strstr(in array[] character str, in array[] character substr, in integer index): integer
+        variable-integer i := index;
+        variable-integer j := 0;
+        variable-character ch := str[i];
+        while (ch != "\0") repeat
+            let ch := str[i];
+            let i := i + 1;
+            if (ch == substr[j]) then
+                let j := j + 1;
+                if (substr[j] == "\0") then
+                    return i - j;
+                end if;
+            else
+                let j := 0;
+            end if;
+        end while;
+        return -1;
+    end strstr;
+
 
     public class String inherits Object
-        private field-array[256] character arrayOfChars;
-        private field-integer length := 256;
-        private field-integer capacity := 256;
+        private field-array[0] character arrayOfChars;
+        private field-integer length := 0;
 
         public method clear(String this)()
             delete this.arrayOfChars;
             let this.arrayOfChars := "";
-            let this.capacity := 0;
+            //let this.capacity := 0;
             let this.length := 0;
         end clear;
 
@@ -57,7 +96,7 @@ module StdString
             let newCharArray := strcpy(newCharArray, str);
 
             let this.arrayOfChars := newCharArray;
-            let this.capacity := capacity;
+            //let this.capacity := capacity;
             let this.length := capacity;
         end init;
 
@@ -65,14 +104,13 @@ module StdString
         public method concat(String this)(in array[] character str)
             variable-integer strLength := strlen(str);
             variable-integer totalLength := this.length + strLength;
-
             variable-array[totalLength + 1] character newCharArray;
             let newCharArray := strcpy(newCharArray, this.arrayOfChars);
             let newCharArray := strcat(newCharArray, str);
 
             delete this.arrayOfChars;
             let this.arrayOfChars := newCharArray;
-            let this.capacity := totalLength;
+            //let this.capacity := totalLength;
             let this.length := totalLength;
         end concat;
 
@@ -156,9 +194,108 @@ module StdString
             return -1;
         end find;
 
-        public method replace(String this)(in array[] character oldStr, in array[] character newStr) : String
-
+        // create replace method
+        public method replace(String this)(in character ch, in character newCh) : String
+            variable-integer i := 0;
+            while i < this.length repeat
+                if this.arrayOfChars[i] == ch then
+                    this.arrayOfChars[i] := newCh;
+                end if;
+                let i := i + 1;
+            end while;
+            return this;
         end replace;
+
+        // create insert character method with memory realloc
+        public method insert(String this)(in integer index, in character ch) : String
+            variable-integer i := 0;
+            variable-integer j := 0;
+            variable-integer newLength := this.length + 1;
+            variable-array[newLength + 1] character newCharArray;
+            while i < index repeat
+                let newCharArray[j] := this.arrayOfChars[i];
+                let i := i + 1;
+                let j := j + 1;
+            end while;
+            let newCharArray[j] := ch;
+            let j := j + 1;
+            while i < this.length repeat
+                let newCharArray[j] := this.arrayOfChars[i];
+                let i := i + 1;
+                let j := j + 1;
+            end while;
+            let newCharArray[j] := "\0";
+            delete this.arrayOfChars;
+            let this.arrayOfChars := newCharArray;
+            let this.length := newLength;
+            return this;
+        end insert;
+
+        public method replaceAll(String this)(in array[] character str, in array[] character newStr) : String
+            variable-integer i := 0;
+            variable-integer j := 0;
+
+            variable-integer strLength := strlen(str);
+            variable-integer newStrLength := strlen(newStr);
+            variable-integer thisStrLength := this.length;
+            variable-integer count := 0;
+
+            // calculate number of occurrences of str in this.arrayOfChars
+            while i < this.length repeat
+                if this.arrayOfChars[i] == str[0] then
+                    let j := 0;
+                    variable-boolean failed := false;
+                    while j < strLength && failed != true repeat
+                        if this.arrayOfChars[i + j] != str[j] then
+                            let failed := true;
+                        end if;
+                        if j == strLength - 1 && failed != true then
+                            let count := count + 1;
+                        end if;
+                        let j := j + 1;
+                    end while;
+                end if;
+                let i := i + 1;
+            end while;
+
+            variable-integer diff := newStrLength - strLength;
+            variable-integer newLength := thisStrLength + diff * count;
+
+            variable-array[newLength + 2] character newCharArray;
+            let i := 0;
+            let j := 0;
+            variable-integer k := 0;
+            // copy old string to new string and replace str with newStr
+            while i < this.length repeat
+                if this.arrayOfChars[i] == str[0] then
+                    let k := 0;
+                    variable-boolean failed := false;
+                    while k < strLength && failed != true repeat
+                        if this.arrayOfChars[i + k] != str[k] then
+                            let failed := true;
+                        end if;
+                        if k == strLength - 1 && failed != true then
+                            variable-integer c := 0;
+                            while c < newStrLength repeat
+                                let newCharArray[j + c] := newStr[c];
+                                let c := c + 1;
+                            end while;
+                            let i := i + strLength;
+                            let j := j + newStrLength;
+                        end if;
+                        let k := k + 1;
+                    end while;
+                end if;
+                let newCharArray[j] := this.arrayOfChars[i];
+                let i := i + 1;
+                let j := j + 1;
+            end while;
+            let newCharArray[j] := "\0";
+            delete this.arrayOfChars;
+            let this.arrayOfChars := newCharArray;
+            let this.length := newLength;
+            return this;
+        end replaceAll;
 
         public method len(String this)(): integer
             return this.length;

@@ -166,7 +166,9 @@ DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, 
         consume(TokenType::RBracket);
         std::string arrType = token.data;
         ArrayExprNode *arrExpr = new ArrayExprNode(arrType, size, new std::vector<ExprNode *>());
+        int indicesCount = 1;
         while (token.data == "array") {
+            indicesCount++;
             advance();
             consume(TokenType::LBracket);
             size = parseExpression();
@@ -186,7 +188,7 @@ DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, 
         advance();
         name = consume(TokenType::Identifier).data;
         constructorRequired = true;
-        field = new FieldArrayVarDecNode(thisClassName, new VariableExprNode(name), isPrivate, new ArrayDecStatementNode(nullptr, arrExpr, isPrivate), index);
+        field = new FieldArrayVarDecNode(thisClassName, new VariableExprNode(name), isPrivate, new ArrayDecStatementNode(nullptr, arrExpr, isPrivate, indicesCount), index);
     }
     else
     {
@@ -870,63 +872,6 @@ StatementNode* Parser::parseVarOrCall() {
     return nullptr;
 }
 
-/*std::vector<ExprNode*>* Parser::parseFuncCallParams(FuncDecStatementNode* func) {
-    auto params = new std::vector<ExprNode*>();
-    if (token.type != TokenType::RParen)
-    {
-        while (!match(TokenType::RParen))
-        {
-            auto arg = parseExpression();
-            params->push_back(arg);
-            consume(TokenType::Comma);
-        }
-        // TODO: params count check
-    }
-    return params;
-}
-
-StatementNode* Parser::parseIdentifier() {
-    StatementNode* result = nullptr;
-    auto operatorName = token.data;
-    // parse identifier with dot
-    if (next(TokenType::Dot))
-    {
-        Parser *module = getImportedModule(operatorName);
-        std::string moduleName = (module != nullptr ? module->mainModuleNode->name->value : mainModuleNode->name->value);
-        while (match(TokenType::Dot))
-        {
-            expect(TokenType::Identifier);
-            auto name = moduleName + "." + token.data;
-            auto lookupRes = currentScope->lookup(operatorName);
-            auto var = dynamic_cast<VarDecStatementNode*>(lookupRes);
-            auto func = dynamic_cast<FuncDecStatementNode*>(lookupRes);
-            if (var == nullptr && func == nullptr) {
-                llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") " + operatorName + " is not declared.\n";
-                hasError = true;
-            }
-            if (var != nullptr)
-            {
-                auto type = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(var->type));
-                int fieldIndex = -1;
-                for (auto &field : *type->fields)
-                {
-                    if (field->name->value == token.data)
-                    {
-                        if (dynamic_cast<FieldVarDecNode*>(field) != nullptr) fieldIndex = dynamic_cast<FieldVarDecNode*>(field)->index;
-                        else if (dynamic_cast<FieldArrayVarDecNode*>(field)) fieldIndex = dynamic_cast<FieldArrayVarDecNode*>(field)->index;
-                        break;
-                    }
-                }
-            }
-        }
-    }
-    return result;
-}
-
-StatementNode* Parser::parsePostfixExprSuffix() {
-    return nullptr;
-}*/
-
 DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
     std::string type;
     std::string name;
@@ -935,6 +880,7 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
     ExprNode *expr = nullptr;
     type = consume(TokenType::Identifier).data;
     bool isArray = false;
+    int indicesCount = 0;
     if (oneOfDefaultTypes(type))
     {
         name = consume(TokenType::Identifier).data;
@@ -947,6 +893,7 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
     }
     else if (type == "array")
     {
+        indicesCount++;
         isArray = true;
         tokensIterator--;
         token = *tokensIterator;
@@ -967,6 +914,7 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
         ArrayExprNode* arrExpr = new ArrayExprNode(arrType, size, new std::vector<ExprNode*>());
         while (token.data == "array")
         {
+            indicesCount++;
             advance();
             consume(TokenType::LBracket);
             size = parseExpression();
@@ -1005,7 +953,7 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
     DeclarationNode* result;
     if (isArray)
     {
-        result = new ArrayDecStatementNode(new VariableExprNode(name), dynamic_cast<ArrayExprNode*>(expr), isGlobal);
+        result = new ArrayDecStatementNode(new VariableExprNode(name), dynamic_cast<ArrayExprNode*>(expr), isGlobal, indicesCount);
     }
     else
     {
@@ -1221,27 +1169,4 @@ DeleteExprNode *Parser::parseDelete() {
     consume(TokenType::Delete);
     auto varExpr = parseExpression();
     return new DeleteExprNode(varExpr);
-}
-
-ExprNode *Parser::parseFunctionChain(const string &name) {
-    auto expr = parseFunc(name);
-    if (match(TokenType::Dot)) {
-        consume(TokenType::Identifier);
-        if (match(TokenType::LParen))
-        {
-            tokensIterator--;
-            token = *tokensIterator;
-        }
-    }
-    return expr;
-}
-
-ExprNode *Parser::parseFunc(const std::string &name) {
-    consume(TokenType::LParen);
-    auto funcDecl = lookupFunctions(name);
-    if (funcDecl == nullptr) {
-        llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Function \"" + name + "\" is not declared in this scope.\n";
-    }
-    auto params = parseFuncCallParams(funcDecl);
-    return new CallExprNode(new VariableExprNode(name), params);
 }

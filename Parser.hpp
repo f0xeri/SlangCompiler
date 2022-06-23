@@ -92,6 +92,21 @@ public:
         return true;
     }
 
+    bool next(TokenType tokenType)
+    {
+        tokensIterator++;
+        token = *tokensIterator;
+        if (token.type != tokenType) {
+
+            tokensIterator--;
+            token = *tokensIterator;
+            return false;
+        }
+        tokensIterator--;
+        token = *tokensIterator;
+        return true;
+    }
+
     bool oneOfDefaultTypes(const std::string &name)
     {
         if (name == "integer" || name == "real" || name == "boolean" || name == "string" || name == "character") return true;
@@ -107,7 +122,6 @@ public:
         return true;
     }
 
-    std::vector<FuncParamDecStatementNode *>* parseFuncParameters();
 
     FieldVarDecNode* initDefaultType(const std::string &typeName, bool isPrivate, const std::string &name, const std::string &type, TokenType dataType, const std::string &data, int index)
     {
@@ -232,6 +246,25 @@ public:
         return expr;
     }
 
+    Parser* getImportedModule(const std::string &name) const
+    {
+        for (auto &module : *importedModules)
+        {
+            if (module->mainModuleNode->name->value == name)
+            {
+                return module;
+            }
+        }
+        return nullptr;
+    }
+
+    FuncDecStatementNode* lookupFunctions(const std::string &name)
+    {
+        auto res = currentScope->lookup(name);
+        auto func = dynamic_cast<FuncDecStatementNode*>(res);
+        return nullptr;
+    }
+
     std::string parseTypeName(std::string &type)
     {
         if (dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(mainModuleNode->name->value + "." + type)) == nullptr)
@@ -307,6 +340,7 @@ public:
     bool parseVisibilityOperator();
     DeclarationNode* parseVariableDecl(bool isGlobal = false);
     bool parseStatement();
+    std::vector<FuncParamDecStatementNode *>* parseFuncParameters();
     DeclarationNode* parseFieldDecl(std::vector<DeclarationNode *> *fields, std::string &thisClassName, bool &constructorRequired, int index);
     MethodDecNode* parseMethodDecl(std::vector<MethodDecNode*> *methods, std::string &thisClassName);
     FuncDecStatementNode* parseFunctionDecl();
@@ -319,6 +353,11 @@ public:
     WhileStatementNode* parseWhileStatement();
     bool parseTypeDecl();
     StatementNode* parseVarOrCall();
+    ExprNode* parseFunc(const std::string &name);
+    ExprNode* parseFunctionChain(const std::string &name);
+    std::vector<ExprNode*>* parseFuncCallParams(FuncDecStatementNode* func);
+    StatementNode* parseIdentifier();
+    StatementNode* parsePostfixExprSuffix();
     CallExprNode* parseCall();
     DeleteExprNode* parseDelete();
     ExprNode* parseExpression();

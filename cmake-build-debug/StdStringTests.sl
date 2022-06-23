@@ -1,5 +1,8 @@
 import StdString;
 module StdStringTests
+    public class ABC inherits Object
+
+    end ABC;
 start
     variable-integer i := 0;
 

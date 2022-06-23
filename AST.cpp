@@ -977,3 +977,7 @@ llvm::Value *ModuleStatementNode::codegen(CodeGenContext &cgcontext) {
 llvm::Value *ImportStatementNode::codegen(CodeGenContext &cgcontext) {
     return nullptr;
 }
+
+llvm::Value *IndexesExprNode::codegen(CodeGenContext &cgcontext) {
+    return nullptr;
+}

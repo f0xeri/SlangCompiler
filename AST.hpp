@@ -187,6 +187,16 @@ public:
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
+class IndexesExprNode : public VariableExprNode  {
+public:
+    std::vector<ExprNode*> *indexes;
+    ExprNode *assign;
+public:
+    IndexesExprNode(const std::string &name, std::vector<ExprNode*> *indexes, bool dotModule = false, bool dotClass = false, int index = -1, bool isPointer = false): VariableExprNode(name, E_UNKNOWN, dotModule, dotClass, index, isPointer), indexes(indexes), assign(nullptr) {}
+    IndexesExprNode(const std::string &name, std::vector<ExprNode*> *indexes, ExprNode *assign, bool dotModule = false, bool dotClass = false, int index = -1, bool isPointer = false): VariableExprNode(name, E_UNKNOWN, dotModule, dotClass, index, isPointer), indexes(indexes), assign(assign) {}
+    virtual llvm::Value *codegen(CodeGenContext &cgcontext);
+};
+
 class UnaryOperatorExprNode: public ExprNode {
 public:
     TokenType op;
@@ -331,8 +341,8 @@ public:
     bool isString;*/
 
     bool isGlobal = false;
-    ExprNode* expr;
-    ArrayDecStatementNode(VariableExprNode *name, ExprNode *expr, bool isGlobal) : DeclarationNode(name), expr(expr), isGlobal(isGlobal) {}
+    ArrayExprNode* expr;
+    ArrayDecStatementNode(VariableExprNode *name, ArrayExprNode *expr, bool isGlobal) : DeclarationNode(name), expr(expr), isGlobal(isGlobal) {}
 
     /*ArrayDecStatementNode(std::string type, VariableExprNode *value, ExprNode *size): type(std::move(type)), DeclarationNode(value), init(new std::vector<ExprNode*>()), size(size), isString(false) {}
     ArrayDecStatementNode(std::string type, VariableExprNode *value, std::vector<ExprNode*> *init): type(std::move(type)), DeclarationNode(value), init(init), size(new IntExprNode(init->size())), isString(false) {}

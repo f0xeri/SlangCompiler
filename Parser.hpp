@@ -24,7 +24,7 @@ public:
         tokensIterator = tokens.begin();
         token = *tokensIterator;
         currentScope = new Scope();
-        auto objectType = new TypeDecStatementNode(new VariableExprNode("Object"), false, nullptr, nullptr);
+        auto objectType = new TypeDecStatementNode(new VariableExprNode("Object"), false, nullptr, nullptr, false, nullptr);
         objectType->methods = new std::vector<MethodDecNode*>();
         auto toStringType = new ArrayExprNode("character", nullptr, new std::vector<ExprNode*>());
         auto args = new std::vector<FuncParamDecStatementNode *>();
@@ -343,7 +343,7 @@ public:
     std::vector<FuncParamDecStatementNode *>* parseFuncParameters();
     DeclarationNode* parseFieldDecl(std::vector<DeclarationNode *> *fields, std::string &thisClassName, bool &constructorRequired, int index);
     MethodDecNode* parseMethodDecl(std::vector<MethodDecNode*> *methods, std::string &thisClassName);
-    FuncDecStatementNode* parseFunctionDecl();
+    DeclarationNode * parseFunctionDecl();
     IfStatementNode* parseIfStatement();
     ElseIfStatementNode* parseElseIfBlock();
     BlockExprNode* parseElseBlock();
@@ -351,6 +351,7 @@ public:
     OutputStatementNode* parseOutputStatement();
     ReturnStatementNode* parseReturnStatement();
     WhileStatementNode* parseWhileStatement();
+    ExternFuncDecStatementNode* parseExternFuncDecl();
     bool parseTypeDecl();
     StatementNode* parseVarOrCall();
     ExprNode* parseFunc(const std::string &name);

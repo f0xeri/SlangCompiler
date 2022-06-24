@@ -133,6 +133,8 @@ bool Parser::parseVisibilityOperator() {
     //bool ret = false;
     if (token.type == TokenType::Function) parseFunctionDecl();
     else if (token.type == TokenType::Procedure) parseFunctionDecl();
+    else if (token.type == TokenType::Extern && (tokensIterator + 1)->type == TokenType::Class) {tokensIterator = tokensIterator - 1; parseTypeDecl();}
+    else if (token.type == TokenType::Extern) parseFunctionDecl();
     else if (token.type == TokenType::Class) parseTypeDecl();
     return true;
 }
@@ -296,7 +298,7 @@ MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std
     consume(TokenType::RParen);
     auto params = new std::vector<FuncParamDecStatementNode *>();
     params = parseFuncParameters();
-    params->insert(params->begin(), new FuncParamDecStatementNode(new VariableExprNode(mainModuleNode->name->value + "." + thisClassName), new VariableExprNode(thisName), ParameterType::Var));
+    params->insert(params->begin(), new FuncParamDecStatementNode(new VariableExprNode(mainModuleNode->name->value + "." + thisClassName), new VariableExprNode(thisName), ParameterType::Out));
     advance();
     if (token.type == TokenType::Colon)
     {
@@ -378,7 +380,14 @@ bool Parser::parseTypeDecl() {
     std::string name;
     TypeDecStatementNode *parent;
     bool isPrivate = token.data == "private";
+    bool isExtern = false;
     advance();
+    if (token.type == TokenType::Extern)
+    {
+        advance();
+        advance();
+        isExtern = true;
+    }
     bool constructorRequired = false;
     if (token.type == TokenType::Identifier)
     {
@@ -441,7 +450,7 @@ bool Parser::parseTypeDecl() {
                         }
                     }
                     // insert before methods parsing
-                    typeNode = new TypeDecStatementNode(new VariableExprNode(mainModuleNode->name->value + "." + name), isPrivate, fields, methods, parent);
+                    typeNode = new TypeDecStatementNode(new VariableExprNode(mainModuleNode->name->value + "." + name), isPrivate, fields, methods, isExtern, parent);
                     currentScope->insert(typeNode);
 
                     Scope *scope = new Scope(currentScope);
@@ -512,7 +521,7 @@ bool Parser::parseTypeDecl() {
                     if (token.type == TokenType::Identifier && token.data == name && advance().type == TokenType::Semicolon)
                     {
                         currentScope = scope->parent;
-                        typeNode = new TypeDecStatementNode(new VariableExprNode(mainModuleNode->name->value + "." + name), isPrivate, fields, methods, parent);
+                        typeNode = new TypeDecStatementNode(new VariableExprNode(mainModuleNode->name->value + "." + name), isPrivate, fields, methods, isExtern, parent);
                         // already inserted
                         //currentScope->insert(typeNode);
                     }
@@ -528,6 +537,11 @@ bool Parser::parseTypeDecl() {
     else
     {
         return false;
+    }
+    if (isExtern) {
+        typeNode->name->value = name;
+        typeNode->methods->clear();
+        typeNode->fields->clear();
     }
     return true;
 }
@@ -854,6 +868,38 @@ StatementNode* Parser::parseVarOrCall() {
             consume(TokenType::Comma);
         }
     }
+    auto funcDecl = currentScope->lookup(name);
+
+    if (dynamic_cast<FuncDecStatementNode*>(funcDecl) != nullptr) {
+        funcDecl = dynamic_cast<FuncDecStatementNode*>(funcDecl);
+    }
+    else if (dynamic_cast<ExternFuncDecStatementNode*>(funcDecl) != nullptr) {
+        funcDecl = dynamic_cast<ExternFuncDecStatementNode*>(funcDecl);
+    }
+    if (dynamic_cast<FuncDecStatementNode*>(funcDecl) != nullptr)
+    {
+        if (params->size() == dynamic_cast<FuncDecStatementNode*>(funcDecl)->args->size()) {
+            int i = 0;
+            while (i < params->size()) {
+                if (dynamic_cast<NilExprNode*>(params->at(i)) != nullptr) {
+                    dynamic_cast<NilExprNode*>(params->at(i))->type = dynamic_cast<ExternFuncDecStatementNode*>(funcDecl)->args->at(i)->type;
+                }
+                i++;
+            }
+        }
+    }
+    else if (dynamic_cast<ExternFuncDecStatementNode*>(funcDecl) != nullptr)
+    {
+        if (params->size() == dynamic_cast<ExternFuncDecStatementNode*>(funcDecl)->args->size()) {
+            int i = 0;
+            while (i < params->size()) {
+                if (dynamic_cast<NilExprNode*>(params->at(i)) != nullptr) {
+                    dynamic_cast<NilExprNode*>(params->at(i))->type = dynamic_cast<ExternFuncDecStatementNode*>(funcDecl)->args->at(i)->type;
+                }
+                i++;
+            }
+        }
+    }
     advance();
     if (dotClass)
     {
@@ -964,12 +1010,17 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
     return result;
 }
 
-FuncDecStatementNode *Parser::parseFunctionDecl() {
+DeclarationNode *Parser::parseFunctionDecl() {
     tokensIterator--;
     token = *tokensIterator;
     bool isPrivate = false;
     if (token.data == "private") isPrivate = true;
+    bool isExtern = false;
     advance();
+    if (token.type == TokenType::Extern) {
+        isExtern = true;
+        advance();
+    }
     bool isFunction = false;
     if (match(TokenType::Function)) isFunction = true;
     else {
@@ -992,16 +1043,31 @@ FuncDecStatementNode *Parser::parseFunctionDecl() {
         }
     }
     else type = new VariableExprNode("");
-    auto function = new FuncDecStatementNode(type, new VariableExprNode(mainModuleNode->name->value + "." + name), isPrivate, isFunction, params, nullptr);
-    currentScope->insert(function);
-    auto block = parseBlock(new VariableExprNode(name));
+    VariableExprNode *funcName = nullptr;
+    if (isExtern) {
+        funcName = new VariableExprNode(name);
+    } else {
+        funcName = new VariableExprNode(mainModuleNode->name->value + "." + name);
+    }
+    DeclarationNode* function = nullptr;
+    BlockExprNode* block = nullptr;
+    if (isExtern)
+    {
+        function = new ExternFuncDecStatementNode(type, funcName, isPrivate, isFunction, params, block);
+    } else {
+        function = new FuncDecStatementNode(type, funcName, isPrivate, isFunction, params, block);
+    }
 
+    block = parseBlock(new VariableExprNode(name));
+    if (dynamic_cast<ExternFuncDecStatementNode*>(function)) dynamic_cast<ExternFuncDecStatementNode*>(function)->block = block;
+    else if (dynamic_cast<FuncDecStatementNode*>(function)) dynamic_cast<FuncDecStatementNode*>(function)->block = block;
+    currentScope->insert(function);
     if (token.type != TokenType::Semicolon)
     {
         llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Unexpected token \"" << token.data + "\", expected \"" + Lexer::getTokenName(TokenType::Semicolon) + "\".\n";
         hasError = true;
     }
-    function->block = block;
+
     return function;
 }
 
@@ -1169,4 +1235,8 @@ DeleteExprNode *Parser::parseDelete() {
     consume(TokenType::Delete);
     auto varExpr = parseExpression();
     return new DeleteExprNode(varExpr);
+}
+
+ExternFuncDecStatementNode *Parser::parseExternFuncDecl() {
+    return nullptr;
 }

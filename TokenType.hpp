@@ -36,6 +36,7 @@ enum class TokenType
     Assign,
     Let,
 
+    Neg,
     Plus,
     Minus,
     Division,

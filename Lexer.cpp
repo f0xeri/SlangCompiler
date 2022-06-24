@@ -23,6 +23,7 @@ std::map<std::string, TokenType> Lexer::tokensMap = {{"import",    TokenType::Im
                                                      {"call",      TokenType::Call},
                                                      {"return",    TokenType::Return},
                                                      {"delete",    TokenType::Delete},
+                                                     {"extern",    TokenType::Extern},
 
                                                      {"while",     TokenType::While},
                                                      {"repeat",    TokenType::Repeat},
@@ -60,6 +61,7 @@ std::map<std::string, TokenType> Lexer::tokensMap = {{"import",    TokenType::Im
                                                      {"<",         TokenType::Less},
                                                      {">=",        TokenType::GreaterOrEqual},
                                                      {"<=",        TokenType::LessOrEqual},
+                                                     {"!",        TokenType::Neg},
 
                                                     /*{"integer", TokenType::Integer},
                                                     {"real", TokenType::Real},

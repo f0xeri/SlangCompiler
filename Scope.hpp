@@ -11,6 +11,8 @@
 #include "llvm/ADT/StringRef.h"
 #include "AST.hpp"
 
+class CodeGenContext;
+
 class Scope
 {
 public:

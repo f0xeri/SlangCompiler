@@ -136,7 +136,8 @@ public:
 class NilExprNode : public ExprNode
 {
 public:
-    explicit NilExprNode(): ExprNode(true) {
+    ExprNode* type;
+    explicit NilExprNode(ExprNode* type = nullptr): ExprNode(true), type(type) {
         _type = E_UNKNOWN;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
@@ -412,19 +413,21 @@ public:
     std::vector<DeclarationNode*> *fields = nullptr;
     std::vector<MethodDecNode*> *methods = nullptr;
     TypeDecStatementNode *parentType = nullptr;
+    bool isExtern;
     bool isPrivate = false;
-    TypeDecStatementNode(VariableExprNode *name, bool isPrivate, std::vector<DeclarationNode*> *fields, std::vector<MethodDecNode*> *methods, TypeDecStatementNode *parentType = nullptr):
-                         DeclarationNode(name), isPrivate(isPrivate), fields(fields), methods(methods), parentType(parentType) {};
+    TypeDecStatementNode(VariableExprNode *name, bool isPrivate, std::vector<DeclarationNode*> *fields, std::vector<MethodDecNode*> *methods, bool isExtern, TypeDecStatementNode *parentType = nullptr):
+                         DeclarationNode(name), isPrivate(isPrivate), fields(fields), methods(methods), isExtern(isExtern), parentType(parentType) {};
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
 class ExternFuncDecStatementNode : public DeclarationNode {
 public:
-    VariableExprNode *type;
-    std::vector<VarDecStatementNode*> *args;
-
-    ExternFuncDecStatementNode(VariableExprNode *type, VariableExprNode *name, std::vector<VarDecStatementNode*> *_args): type(type), DeclarationNode(name), args(_args) {
-        std::vector<VarDecStatementNode*>::const_iterator it;
+    ExprNode* type;
+    std::vector<FuncParamDecStatementNode*> *args = nullptr;
+    BlockExprNode *block = nullptr;
+    bool isPrivate = false;
+    bool isFunction = false;
+    ExternFuncDecStatementNode(ExprNode*  type, VariableExprNode *name, bool isPrivate, bool isFunction, std::vector<FuncParamDecStatementNode*> *args, BlockExprNode *block): type(type), DeclarationNode(name), isPrivate(isPrivate), isFunction(isFunction), args(args), block(block) {
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
@@ -646,6 +649,35 @@ public:
         CodeGenBlock* top = blocks.back();
         blocks.pop_back();
         delete top;
+    }
+    bool contains(const std::string &name)
+    {
+        return std::ranges::find(*symbols, name, &std::pair<std::string, DeclarationNode*>::first) != symbols->end();
+    }
+
+    DeclarationNode* get(const std::string &name)
+    {
+        return (*(std::ranges::find(*symbols, name, &std::pair<std::string, DeclarationNode*>::first))).second;
+    }
+
+    DeclarationNode* lookupFuncs(const std::string &name)
+    {
+        if (contains(name)) return get(name);
+        for (auto &g : *symbols)
+        {
+            if (dynamic_cast<TypeDecStatementNode*>(g.second) != nullptr)
+            {
+                auto typeDec = dynamic_cast<TypeDecStatementNode*>(g.second);
+                for (auto &method : *typeDec->methods)
+                {
+                    if (method->name->value == name)
+                    {
+                        return method;
+                    }
+                }
+            }
+        }
+        return nullptr;
     }
 };
 

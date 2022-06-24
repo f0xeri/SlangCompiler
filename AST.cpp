@@ -6,6 +6,79 @@
 
 using namespace llvm;
 
+
+static Type *typeOf(CodeGenContext &cgcontext, const std::string &var) {
+    Type *type = nullptr;
+    if (var == "integer")
+        type = Type::getInt64Ty(*cgcontext.context);
+    else if (var == "character")
+        type = Type::getInt8Ty(*cgcontext.context);
+    else if (var == "real")
+        type = Type::getDoubleTy(*cgcontext.context);
+    else if (var == "boolean")
+        type = Type::getInt1Ty(*cgcontext.context);
+    else if (var.empty())
+        type = Type::getVoidTy(*cgcontext.context);
+    else
+    {
+        if (cgcontext.allocatedClasses.contains(var))
+            type = cgcontext.allocatedClasses[var];
+    }
+    return type;
+}
+
+static Type *ptrToTypeOf(CodeGenContext &cgcontext, const std::string &var) {
+    Type *type = nullptr;
+    if (var == "integer")
+        type = Type::getInt64PtrTy(*cgcontext.context);
+    else if (var == "character")
+        type = Type::getInt8PtrTy(*cgcontext.context);
+    else if (var == "real")
+        type = Type::getDoublePtrTy(*cgcontext.context);
+    else if (var.empty())
+        type = Type::getVoidTy(*cgcontext.context);
+    else
+    {
+        if (cgcontext.allocatedClasses.contains(var))
+            type = cgcontext.allocatedClasses[var]->getPointerTo();
+    }
+    return type;
+}
+
+// array size is not calculating here!!!
+Type* getTypeFromExprNode(CodeGenContext &cgcontext, ExprNode* node)
+{
+    Type *retType = nullptr;
+    std::string retTypeName;
+    if (dynamic_cast<VariableExprNode*>(node) != nullptr)
+    {
+        retType = typeOf(cgcontext, dynamic_cast<VariableExprNode*>(node)->value);
+        retTypeName = dynamic_cast<VariableExprNode*>(node)->value;
+    }
+    else if (dynamic_cast<ArrayExprNode*>(node) != nullptr)
+    {
+        auto exprNode = dynamic_cast<ArrayExprNode*>(node);
+        auto arrExpr = exprNode;
+
+        //auto size = exprNode->size->codegen(cgcontext);
+        //auto arraySize = size;
+        if (arrExpr->type == "array")
+        {
+            for (auto &slice : *arrExpr->values)
+            {
+                auto castedSlice = dynamic_cast<ArrayExprNode*>(slice);
+                //auto sliceSize = castedSlice->size->codegen(cgcontext);
+                //auto newArraySize = BinaryOperator::Create(Instruction::Mul, sliceSize, arraySize, "", cgcontext.currentBlock());
+                //arraySize = newArraySize;
+                arrExpr = castedSlice;
+            }
+        }
+        retType = ptrToTypeOf(cgcontext, arrExpr->type);
+        retTypeName = arrExpr->type + "Array";
+    }
+    return retType;
+}
+
 static Value* mycast(Value* value, Type* type, CodeGenContext& cgcontext) {
     if (type == value->getType())
         return value;
@@ -57,7 +130,9 @@ llvm::Value *StringExprNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *NilExprNode::codegen(CodeGenContext &cgcontext) {
-    return nullptr;
+    Type *retType = getTypeFromExprNode(cgcontext, type);
+    auto nil = ConstantPointerNull::get(retType->getPointerTo());
+    return nil;
 }
 
 llvm::Value *ArrayExprNode::codegen(CodeGenContext &cgcontext) {
@@ -137,7 +212,7 @@ llvm::Value *VariableExprNode::codegen(CodeGenContext &cgcontext) {
 
     if (type == nullptr)
         type = val->getType()->getPointerElementType();
-    if (dotClass || val->getType()->getPointerElementType()->isStructTy()) return val;
+    if (val->getType()->getPointerElementType()->isStructTy()) return val;
     return new LoadInst(type, val, "", false, cgcontext.currentBlock());
 }
 
@@ -148,21 +223,45 @@ llvm::Value *UnaryOperatorExprNode::codegen(CodeGenContext &cgcontext) {
 llvm::Value *OperatorExprNode::codegen(CodeGenContext &cgcontext) {
     Value* leftVal = left->codegen(cgcontext);
     Value* rightVal = right->codegen(cgcontext);
+    bool castNeeded = true;
+    /*
+    if (dynamic_cast<NilExprNode*>(left) != nullptr && rightVal != nullptr)
+    {
+        if (rightVal->getType()->isStructTy())
+            rightVal = cgcontext.builder->CreateLoad(rightVal);
+        auto ptype = static_cast<PointerType*>(rightVal->getType()->getPointerElementType());
+        leftVal = ConstantPointerNull::get(ptype);
+        castNeeded = false;
+    }
+    if (dynamic_cast<NilExprNode*>(right) != nullptr && leftVal != nullptr)
+    {
+        if (leftVal->getType()->isStructTy())
+            leftVal = cgcontext.builder->CreateLoad(leftVal);
+        auto ptype = static_cast<PointerType*>(leftVal->getType()->getPointerElementType());
+        rightVal = ConstantPointerNull::get(ptype);
+        castNeeded = false;
+    }
+    leftVal->print(llvm::errs() << "\n");
+    rightVal->print(llvm::errs() << "\n\n");*/
     bool floatOp = false;
-    if (leftVal->getType()->isDoubleTy() || rightVal->getType()->isDoubleTy())
+    if (castNeeded)
     {
-        leftVal = mycast(leftVal, Type::getDoubleTy(*cgcontext.context), cgcontext);
-        rightVal = mycast(rightVal, Type::getDoubleTy(*cgcontext.context), cgcontext);
-        floatOp = true;
-    }
-    else if (leftVal->getType() == rightVal->getType())
-    {
+        if (leftVal->getType()->isDoubleTy() || rightVal->getType()->isDoubleTy())
+        {
+            leftVal = mycast(leftVal, Type::getDoubleTy(*cgcontext.context), cgcontext);
+            rightVal = mycast(rightVal, Type::getDoubleTy(*cgcontext.context), cgcontext);
+            floatOp = true;
+        }
+        else if (leftVal->getType() == rightVal->getType())
+        {
 
+        }
+        else {
+            leftVal = mycast(leftVal, Type::getInt64Ty(*cgcontext.context), cgcontext);
+            rightVal = mycast(rightVal, Type::getInt64Ty(*cgcontext.context), cgcontext);
+        }
     }
-    else {
-        leftVal = mycast(leftVal, Type::getInt64Ty(*cgcontext.context), cgcontext);
-        rightVal = mycast(rightVal, Type::getInt64Ty(*cgcontext.context), cgcontext);
-    }
+
     if (!leftVal || !rightVal)
         return nullptr;
     if (!floatOp)
@@ -231,17 +330,50 @@ llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
     std::vector<Value*> argsRef;
     std::string nameAddition;
     llvm::raw_string_ostream nameAdditionStream(nameAddition);
-    for (auto it = args->begin(); it != args->end(); it++)
+    auto foundFunc = cgcontext.lookupFuncs(name->value);
+    auto funcDecl = dynamic_cast<FuncDecStatementNode*>(foundFunc);
+    auto externFuncDecl = dynamic_cast<ExternFuncDecStatementNode*>(foundFunc);
+    auto methodDecl = dynamic_cast<MethodDecNode*>(foundFunc);
+    int i = 0;
+    for (auto it = args->begin(); it != args->end(); it++, i++)
     {
-        auto var = (*it)->codegen(cgcontext);
         // TODO: CreateLoad if args is out/var (it should fix this.method() calls too
+        auto var = (*it)->codegen(cgcontext);
+        auto loadValue = var;
+        /*if (dynamic_cast<NilExprNode*>(*it) == nullptr)
+        {
+            if (funcDecl != nullptr) {
+                if (i < funcDecl->args->size()) {
+                    if (funcDecl->args->at(i)->parameterType == ParameterType::Out || funcDecl->args->at(i)->parameterType == ParameterType::Var) {
+                        loadValue = cgcontext.builder->CreateLoad(var);
+                    }
+                }
+            }
+            if (externFuncDecl != nullptr) {
+                if (i < externFuncDecl->args->size()) {
+                    if (externFuncDecl->args->at(i)->parameterType == ParameterType::Out || externFuncDecl->args->at(i)->parameterType == ParameterType::Var) {
+                        loadValue = cgcontext.builder->CreateLoad(var);
+                    }
+                }
+            }
+            if (methodDecl != nullptr) {
+                if (i < methodDecl->args->size()) {
+                    if (methodDecl->args->at(i)->parameterType == ParameterType::Out || methodDecl->args->at(i)->parameterType == ParameterType::Var) {
+                        loadValue = cgcontext.builder->CreateLoad(var);
+                    }
+                }
+            }
+        }*/
         //auto arg = dynamic_cast<FuncParamDecStatementNode*>(*it);
         //if (arg->parameterType == ParameterType::Out || arg->parameterType == ParameterType::Var)
             //cgcontext.builder->CreateLoad(var);
-        var->getType()->print(nameAdditionStream);
-        argsRef.push_back(var);
+        loadValue->getType()->print(nameAdditionStream);
+        argsRef.push_back(loadValue);
     }
-    Function *function = cgcontext.mModule->getFunction(name->value + nameAddition);
+    Function *function = cgcontext.mModule->getFunction(name->value);
+    if (function == nullptr) {
+        function = cgcontext.mModule->getFunction(name->value + nameAddition);
+    }
     if (function == nullptr)
         llvm::errs() << "[ERROR] Codegen - no such function \"" << name->value + nameAddition << "\".\n";
     CallInst *call = CallInst::Create(function, makeArrayRef(argsRef), "", cgcontext.currentBlock());
@@ -324,13 +456,15 @@ llvm::Value *AssignExprNode::codegen(CodeGenContext &cgcontext) {
     // TODO: at least it works for arrays, check for other types
     if (dynamic_cast<NilExprNode*>(right) != nullptr)
     {
-        auto ptype = static_cast<PointerType*>(var->getType()->getPointerElementType());
+        auto ptype = static_cast<PointerType*>(var->getType());
+        if (!ptype->isPointerTy()) ptype = static_cast<PointerType*>(var->getType()->getPointerElementType());
         assignData = ConstantPointerNull::get(ptype);
     }
 
     if (assignData->getType()->isPointerTy()) {
         if (assignData->getType()->getPointerElementType()->isStructTy()) {
-            assignData = cgcontext.builder->CreateLoad(assignData);
+            //assignData = cgcontext.builder->CreateLoad(assignData);
+            //var = cgcontext.builder->CreateLoad(var);
         }
     }
 
@@ -383,44 +517,6 @@ llvm::Value *DeclarationNode::codegen(CodeGenContext &cgcontext) {
     return nullptr;
 }
 
-static Type *typeOf(CodeGenContext &cgcontext, const std::string &var) {
-    Type *type = nullptr;
-    if (var == "integer")
-        type = Type::getInt64Ty(*cgcontext.context);
-    else if (var == "character")
-        type = Type::getInt8Ty(*cgcontext.context);
-    else if (var == "real")
-        type = Type::getDoubleTy(*cgcontext.context);
-    else if (var == "boolean")
-        type = Type::getInt1Ty(*cgcontext.context);
-    else if (var.empty())
-        type = Type::getVoidTy(*cgcontext.context);
-    else
-    {
-        if (cgcontext.allocatedClasses.contains(var))
-            type = cgcontext.allocatedClasses[var];
-    }
-    return type;
-}
-
-static Type *ptrToTypeOf(CodeGenContext &cgcontext, const std::string &var) {
-    Type *type = nullptr;
-    if (var == "integer")
-        type = Type::getInt64PtrTy(*cgcontext.context);
-    else if (var == "character")
-        type = Type::getInt8PtrTy(*cgcontext.context);
-    else if (var == "real")
-        type = Type::getDoublePtrTy(*cgcontext.context);
-    else if (var.empty())
-        type = Type::getVoidTy(*cgcontext.context);
-    else
-    {
-        if (cgcontext.allocatedClasses.contains(var))
-            type = cgcontext.allocatedClasses[var]->getPointerTo();
-    }
-    return type;
-}
-
 llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgcontext) {
     Value* newVar = nullptr;
     Value* rightVal = nullptr;
@@ -439,7 +535,17 @@ llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgcontext) {
     }
     else
     {
-        newVar = cgcontext.builder->CreateAlloca(typeOf(cgcontext, type), 0, nullptr, name->value);
+        if (cgcontext.allocatedClasses.contains(type)) {
+            newVar = cgcontext.builder->CreateAlloca(ptrToTypeOf(cgcontext, type), 0, nullptr, name->value);
+            llvm::Type* int64type = llvm::Type::getInt64Ty(*cgcontext.context);
+            auto structType = typeOf(cgcontext, type);
+            auto malloc = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, structType, llvm::ConstantInt::get(llvm::Type::getInt64Ty(*cgcontext.context), cgcontext.mModule->getDataLayout().getTypeAllocSize(structType)), nullptr, cgcontext.mModule->getFunction("malloc"), "");
+            cgcontext.builder->Insert(malloc);
+            cgcontext.builder->CreateStore(malloc, newVar);
+        }
+        else {
+            newVar = cgcontext.builder->CreateAlloca(typeOf(cgcontext, type), 0, nullptr, name->value);
+        }
         cgcontext.locals()[name->value] = newVar;
         if (expr != NULL) {
             rightVal = expr->codegen(cgcontext);
@@ -451,7 +557,9 @@ llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgcontext) {
             auto constructorFunc = cgcontext.mModule->getFunction(type + "._DefaultConstructor_");
             if (constructorFunc != nullptr)
             {
-                cgcontext.builder->CreateCall(constructorFunc, {newVar});
+                auto p = cgcontext.builder->CreateLoad(newVar);
+                newVar->print(llvm::errs());
+                cgcontext.builder->CreateCall(constructorFunc, {p});
             }
         }
     }
@@ -608,41 +716,10 @@ std::string getParameterTypeName(ParameterType type)
     return "";
 }
 
-// array size is not calculating here!!!
-Type* getTypeFromExprNode(CodeGenContext &cgcontext, ExprNode* node)
-{
-    Type *retType = nullptr;
-    std::string retTypeName;
-    if (dynamic_cast<VariableExprNode*>(node) != nullptr)
-    {
-        retType = typeOf(cgcontext, dynamic_cast<VariableExprNode*>(node)->value);
-        retTypeName = dynamic_cast<VariableExprNode*>(node)->value;
-    }
-    else if (dynamic_cast<ArrayExprNode*>(node) != nullptr)
-    {
-        auto exprNode = dynamic_cast<ArrayExprNode*>(node);
-        auto arrExpr = exprNode;
-
-        //auto size = exprNode->size->codegen(cgcontext);
-        //auto arraySize = size;
-        if (arrExpr->type == "array")
-        {
-            for (auto &slice : *arrExpr->values)
-            {
-                auto castedSlice = dynamic_cast<ArrayExprNode*>(slice);
-                //auto sliceSize = castedSlice->size->codegen(cgcontext);
-                //auto newArraySize = BinaryOperator::Create(Instruction::Mul, sliceSize, arraySize, "", cgcontext.currentBlock());
-                //arraySize = newArraySize;
-                arrExpr = castedSlice;
-            }
-        }
-        retType = ptrToTypeOf(cgcontext, arrExpr->type);
-        retTypeName = arrExpr->type + "Array";
-    }
-    return retType;
-}
-
 llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
+    if (dynamic_cast<ExternFuncDecStatementNode*>(this) != nullptr) {
+        return dynamic_cast<ExternFuncDecStatementNode*>(this)->codegen(cgcontext);
+    }
     std::vector<llvm::Type*> argTypes;
     std::vector<int> refParams;
     int i = 1;
@@ -866,7 +943,39 @@ llvm::Value *TypeDecStatementNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *ExternFuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
-    return nullptr;
+    std::vector<llvm::Type*> argTypes;
+    std::vector<int> refParams;
+    int i = 1;
+    //std::string nameAddition;
+    //llvm::raw_string_ostream nameAdditionStream(nameAddition);
+    for (auto arg : *args)
+    {
+        Type* argType;
+        if (arg->parameterType == ParameterType::Out || arg->parameterType == ParameterType::Var)
+        {
+            // not tested
+            argType = getTypeFromExprNode(cgcontext, arg->type)->getPointerTo();
+            argTypes.push_back(argType);
+            refParams.push_back(i);
+        }
+        else
+        {
+            argType = getTypeFromExprNode(cgcontext, arg->type);
+            argTypes.push_back(argType);
+        }
+        //argType->print(nameAdditionStream);
+        i++;
+    }
+    Type *retType = getTypeFromExprNode(cgcontext, type);
+    if (retType->isStructTy()) {
+        retType = retType->getPointerTo();
+    }
+    std::string retTypeName;
+
+    FunctionType* funcType = FunctionType::get(retType, argTypes, false);
+    auto function = Function::Create(funcType, GlobalValue::ExternalLinkage, name->value, cgcontext.mModule);
+    function->setCallingConv(CallingConv::C);
+    return function;
 }
 
 llvm::Value *ElseIfStatementNode::codegen(CodeGenContext &cgcontext) {

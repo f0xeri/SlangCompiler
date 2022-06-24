@@ -3,19 +3,19 @@ module StdStringTests
 start
     variable-integer i := 0;
 
-
     variable-StdString.String str2;
     call str2.init("te11st11");
     output StdString.strlen(str2.arrayOfChars);
     output str2.len();
     let i := 0;
-    while i < 5000 repeat
+    while i < 50000 repeat
         call str2.concat("test11211");
         call str2.replaceAll("11", "ELEVEN");
         let i := i + 1;
     end while;
     output StdString.strlen(str2.arrayOfChars);
     output str2.len();
+    output str2.toString();
 
     // create tests for StdString.String.insert()
     variable-StdString.String str3;

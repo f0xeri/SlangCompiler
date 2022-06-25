@@ -340,30 +340,31 @@ llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
         // TODO: CreateLoad if args is out/var (it should fix this.method() calls too
         auto var = (*it)->codegen(cgcontext);
         auto loadValue = var;
-        /*if (dynamic_cast<NilExprNode*>(*it) == nullptr)
+        if (dynamic_cast<NilExprNode*>(*it) == nullptr && !var->getType()->isPointerTy())
         {
             if (funcDecl != nullptr) {
                 if (i < funcDecl->args->size()) {
                     if (funcDecl->args->at(i)->parameterType == ParameterType::Out || funcDecl->args->at(i)->parameterType == ParameterType::Var) {
-                        loadValue = cgcontext.builder->CreateLoad(var);
+                        loadValue = getPointerOperand(loadValue);
                     }
                 }
             }
             if (externFuncDecl != nullptr) {
                 if (i < externFuncDecl->args->size()) {
                     if (externFuncDecl->args->at(i)->parameterType == ParameterType::Out || externFuncDecl->args->at(i)->parameterType == ParameterType::Var) {
-                        loadValue = cgcontext.builder->CreateLoad(var);
+                        loadValue = getPointerOperand(loadValue);
+
                     }
                 }
             }
             if (methodDecl != nullptr) {
                 if (i < methodDecl->args->size()) {
                     if (methodDecl->args->at(i)->parameterType == ParameterType::Out || methodDecl->args->at(i)->parameterType == ParameterType::Var) {
-                        loadValue = cgcontext.builder->CreateLoad(var);
+                        loadValue = getPointerOperand(loadValue);
                     }
                 }
             }
-        }*/
+        }
         //auto arg = dynamic_cast<FuncParamDecStatementNode*>(*it);
         //if (arg->parameterType == ParameterType::Out || arg->parameterType == ParameterType::Var)
             //cgcontext.builder->CreateLoad(var);
@@ -382,7 +383,8 @@ llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
 
 llvm::Value *DeleteExprNode::codegen(CodeGenContext &cgcontext) {
     auto var = expr->codegen(cgcontext);
-    //auto call = cgcontext.builder->CreateCall(cgcontext.mModule->getFunction("free"), {var});
+    // GC_
+    //auto call = cgcontext.builder->CreateCall(cgcontext.mModule->getFunction("GC_free"), {var});
 
     auto call = CallInst::CreateFree(var, cgcontext.currentBlock());
     cgcontext.builder->Insert(call);

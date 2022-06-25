@@ -914,7 +914,10 @@ StatementNode* Parser::parseVarOrCall() {
         return new CallExprNode(new VariableExprNode(methodName), params);
     }
     else
+    {
+
         return new CallExprNode(new VariableExprNode(name, E_UNKNOWN, dotModule, dotClass), params);
+    }
     return nullptr;
 }
 
@@ -1058,10 +1061,11 @@ DeclarationNode *Parser::parseFunctionDecl() {
         function = new FuncDecStatementNode(type, funcName, isPrivate, isFunction, params, block);
     }
 
+    currentScope->insert(function);
     block = parseBlock(new VariableExprNode(name));
     if (dynamic_cast<ExternFuncDecStatementNode*>(function)) dynamic_cast<ExternFuncDecStatementNode*>(function)->block = block;
     else if (dynamic_cast<FuncDecStatementNode*>(function)) dynamic_cast<FuncDecStatementNode*>(function)->block = block;
-    currentScope->insert(function);
+
     if (token.type != TokenType::Semicolon)
     {
         llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Unexpected token \"" << token.data + "\", expected \"" + Lexer::getTokenName(TokenType::Semicolon) + "\".\n";

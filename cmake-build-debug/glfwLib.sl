@@ -23,15 +23,22 @@ module GLFWLib
     public extern procedure glfwPollEvents()
     end glfwPollEvents;
 
+    public extern procedure glfwGetWindowSize(out GLFWwindow window, out integer width, out integer height)
+    end glfwGetWindowSize;
 start
     if (glfwInit() == 0) then
         output "[ERROR] glfwInit() failed";
     end if;
     variable-GLFWwindow mainWindow;
     let mainWindow := glfwCreateWindow(800, 600, "Hello world from Slang", nil, nil);
-
+    variable-integer w;
+    variable-integer h;
     call glfwMakeContextCurrent(mainWindow);
     while (glfwWindowShouldClose(mainWindow) == 0) repeat
+        call glfwGetWindowSize(mainWindow, w, h);
+        output w;
+        output h;
+        output "  ";
         call glfwSwapBuffers(mainWindow);
         call glfwPollEvents();
     end while;

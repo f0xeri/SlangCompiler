@@ -27,7 +27,7 @@ module main
         return ra;
     end first;
 
-    public function factorial(int integer n): integer
+    public function factorial(in integer n): integer
         variable-integer result := 1;
             if n < 0 then
                 let result := 0;

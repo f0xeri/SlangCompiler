@@ -44,6 +44,7 @@
 #include <llvm/Support/FileSystem.h>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/Pass.h>
+#include <llvm/Support/DynamicLibrary.h>
 
 #include "TokenType.hpp"
 
@@ -56,6 +57,7 @@ enum E_TYPE {
     E_CHAR,
     E_INT,
     E_REAL,
+    E_FLOAT,
     E_BOOLEAN,
     E_ARRAY,
     E_STRING,
@@ -109,6 +111,16 @@ public:
     double value;
     explicit RealExprNode(double value): ExprNode(true), value(value) {
         _type = E_REAL;
+    }
+    virtual llvm::Value *codegen(CodeGenContext &cgcontext);
+};
+
+class FloatExprNode : public ExprNode
+{
+public:
+    double value;
+    explicit FloatExprNode(double value): ExprNode(true), value(value) {
+        _type = E_FLOAT;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };

@@ -109,7 +109,7 @@ public:
 
     bool oneOfDefaultTypes(const std::string &name)
     {
-        if (name == "integer" || name == "real" || name == "boolean" || name == "string" || name == "character") return true;
+        if (name == "integer" || name == "float" || name == "real" || name == "boolean" || name == "string" || name == "character") return true;
         return false;
     }
 
@@ -146,6 +146,17 @@ public:
             else
             {
                 field = new FieldVarDecNode(typeName, new VariableExprNode(name), isPrivate, type, new RealExprNode(0.0), index);
+            }
+        }
+        else if (type == "float")
+        {
+            if (dataType == TokenType::Float)
+            {
+                field = new FieldVarDecNode(typeName, new VariableExprNode(name), isPrivate, type, new FloatExprNode(std::stod(data)), index);
+            }
+            else
+            {
+                field = new FieldVarDecNode(typeName, new VariableExprNode(name), isPrivate, type, new FloatExprNode(0.0f), index);
             }
         }
         else if (type == "boolean")

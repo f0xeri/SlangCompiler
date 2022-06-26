@@ -15,6 +15,8 @@ static Type *typeOf(CodeGenContext &cgcontext, const std::string &var) {
         type = Type::getInt8Ty(*cgcontext.context);
     else if (var == "real")
         type = Type::getDoubleTy(*cgcontext.context);
+    else if (var == "float")
+        type = Type::getFloatTy(*cgcontext.context);
     else if (var == "boolean")
         type = Type::getInt1Ty(*cgcontext.context);
     else if (var.empty())
@@ -35,6 +37,8 @@ static Type *ptrToTypeOf(CodeGenContext &cgcontext, const std::string &var) {
         type = Type::getInt8PtrTy(*cgcontext.context);
     else if (var == "real")
         type = Type::getDoublePtrTy(*cgcontext.context);
+    else if (var == "float")
+        type = Type::getFloatPtrTy(*cgcontext.context);
     else if (var.empty())
         type = Type::getVoidTy(*cgcontext.context);
     else
@@ -119,6 +123,10 @@ llvm::Value *IntExprNode::codegen(CodeGenContext &cgcontext) {
 
 llvm::Value *RealExprNode::codegen(CodeGenContext &cgcontext) {
     return ConstantFP::get(Type::getDoubleTy(*cgcontext.context), value);
+}
+
+llvm::Value *FloatExprNode::codegen(CodeGenContext &cgcontext) {
+    return ConstantFP::get(Type::getFloatTy(*cgcontext.context), value);
 }
 
 llvm::Value *CharExprNode::codegen(CodeGenContext &cgcontext) {
@@ -217,7 +225,12 @@ llvm::Value *VariableExprNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *UnaryOperatorExprNode::codegen(CodeGenContext &cgcontext) {
-    return BinaryOperator::CreateNeg(right->codegen(cgcontext), "", cgcontext.currentBlock());
+    auto val = right->codegen(cgcontext);
+    if (val->getType()->isIntegerTy())
+        return BinaryOperator::CreateNeg(right->codegen(cgcontext), "", cgcontext.currentBlock());
+    else if (val->getType()->isFloatingPointTy())
+        return BinaryOperator::CreateFSub(ConstantFP::get(val->getType(), 0), val, "", cgcontext.currentBlock());
+    return nullptr;
 }
 
 llvm::Value *OperatorExprNode::codegen(CodeGenContext &cgcontext) {

@@ -29,6 +29,16 @@ void Parser::parse()
                 }
                 currentScope->insert(var);
             }
+            else if (dynamic_cast<ExternFuncDecStatementNode*>(decl.second) != nullptr)
+            {
+                auto func = dynamic_cast<ExternFuncDecStatementNode*>(decl.second);
+                if (!func->isPrivate)
+                {
+                    auto declFunc = new ExternFuncDecStatementNode(*func);
+                    declFunc->block = nullptr;
+                    currentScope->insert(declFunc);
+                }
+            }
             else if (dynamic_cast<VarDecStatementNode*>(decl.second) != nullptr)
             {
                 auto var = dynamic_cast<VarDecStatementNode*>(decl.second);
@@ -690,6 +700,7 @@ ExprNode *Parser::parsePrimary() {
     }
     else if (tok.type == TokenType::Integer) return new IntExprNode(std::stoi(tok.data));
     else if (tok.type == TokenType::Real) return new RealExprNode(std::stod(tok.data));
+    else if (tok.type == TokenType::Float) return new FloatExprNode(std::stof(tok.data));
     else if (tok.type == TokenType::LParen)
     {
         auto result = parseExpression();

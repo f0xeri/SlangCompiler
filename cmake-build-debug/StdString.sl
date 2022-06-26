@@ -89,7 +89,9 @@ module StdString
 
         // TODO: does it leak?
         public method init(String this)(in array[] character str)
-            delete this.arrayOfChars;
+            // delete clears not malloced pointer if we are passing element of array of objects
+            // TODO: fix array of objects initialization
+            //delete this.arrayOfChars;
             variable-integer capacity := strlen(str);
 
             variable-array[capacity + 1] character newCharArray;

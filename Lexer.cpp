@@ -96,7 +96,7 @@ Lexer::~Lexer() {
 void Lexer::tokenize() {
     while (pos < sourceCode.size()) {
         char symbol = sourceCode[pos];
-        if (isalpha(symbol)) {
+        if (isalpha(symbol) || symbol == '_') {
             tokenizeWord();
         } else if (isdigit(symbol)) {
             tokenizeNumber();
@@ -122,6 +122,7 @@ void Lexer::tokenizeNumber() {
     char symbol = sourceCode[pos];
     std::string str;
     bool real = false;
+    bool _float = false;
     while (isdigit(symbol) || symbol == '.') {
         if (symbol == '.') {
             if (!real) real = true;
@@ -134,13 +135,31 @@ void Lexer::tokenizeNumber() {
         symbol = sourceCode[++pos];
         currentSymbolNumber++;
     }
-    if (isalpha(symbol)) {
+    if (symbol == 'f') {
+        if (real) {
+            _float = true;
+            symbol = sourceCode[++pos];
+            currentSymbolNumber++;
+        }
+        else {
+            std::cout << "[ERROR] Integer number can't be followed by 'f'.\n";
+        }
+    }
+    else if (isalpha(symbol)) {
         std::cout << "[ERROR] Number can contain only digits.\n";
         exit(1);
     }
     pos--;
     if (DEBUG) std::cout << "NUMBER(" << str << ") ";
-    tokens.push_back({real ? TokenType::Real : TokenType::Integer, str, currentStringNumber, currentSymbolNumber});
+    if (real) {
+        if (_float) {
+            tokens.push_back({TokenType::Float, str, currentStringNumber, currentSymbolNumber});
+        } else {
+            tokens.push_back({TokenType::Real, str, currentStringNumber, currentSymbolNumber});
+        }
+    } else {
+        tokens.push_back({TokenType::Integer, str, currentStringNumber, currentSymbolNumber});
+    }
 }
 
 void Lexer::tokenizeString() {
@@ -190,7 +209,7 @@ void Lexer::tokenizeWord() {
     currentSymbolNumber++;
     std::string word;
     word += sourceCode[pos];
-    while (isalpha(sourceCode[tpos]) || isdigit(sourceCode[tpos])) {
+    while (isalpha(sourceCode[tpos]) || sourceCode[tpos] == '_' || isdigit(sourceCode[tpos])) {
         word += sourceCode[tpos];
         tpos++;
         currentSymbolNumber++;

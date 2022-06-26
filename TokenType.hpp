@@ -64,6 +64,8 @@ enum class TokenType
     VisibilityType,
     Identifier,
     Integer,
+    Integer32,
+    Float,
     Real,
     Boolean,
     String,

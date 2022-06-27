@@ -31,6 +31,7 @@ module glfw
 
     public extern procedure glfwSetWindowTitle(out GLFWwindow window, in array[] character title)
     end glfwSetWindowTitle;
+
 start
 
 end glfw.

@@ -340,9 +340,11 @@ public:
     std::string type;
     ExprNode *expr;
     bool isGlobal = false;
+    bool isPrivate = false;
+    bool isExtern = false;
 
     VarDecStatementNode(std::string type, VariableExprNode *name): type(std::move(type)), DeclarationNode(name), expr(nullptr) {}
-    VarDecStatementNode(std::string type, VariableExprNode *name, ExprNode *expr, bool isGlobal = false): type(std::move(type)), DeclarationNode(name), expr(expr), isGlobal(isGlobal) {}
+    VarDecStatementNode(std::string type, VariableExprNode *name, ExprNode *expr, bool isGlobal = false, bool isPrivate = false, bool isExtern = false): type(std::move(type)), DeclarationNode(name), expr(expr), isGlobal(isGlobal), isPrivate(isPrivate), isExtern(isExtern) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -352,8 +354,10 @@ public:
     std::vector<FuncParamDecStatementNode*> *args = nullptr;
     bool isFunction = false;
     bool isGlobal = false;
+    bool isPrivate = false;
+    bool isExtern = false;
 
-    FuncPointerStatementNode(ExprNode*  type, VariableExprNode *name, bool isFunction, bool isGlobal, std::vector<FuncParamDecStatementNode*> *args): type(type), DeclarationNode(name), isFunction(isFunction), isGlobal(isGlobal), args(args) {}
+    FuncPointerStatementNode(ExprNode*  type, VariableExprNode *name, bool isFunction, bool isGlobal, std::vector<FuncParamDecStatementNode*> *args, bool isPrivate = false, bool isExtern = false): type(type), DeclarationNode(name), isFunction(isFunction), isGlobal(isGlobal), args(args), isPrivate(isPrivate), isExtern(isExtern) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -365,9 +369,11 @@ public:
     bool isString;*/
 
     bool isGlobal = false;
+    bool isPrivate = false;
     ArrayExprNode* expr;
     int indicesCount = 1;
-    ArrayDecStatementNode(VariableExprNode *name, ArrayExprNode *expr, bool isGlobal, int indicesCount = 1) : DeclarationNode(name), expr(expr), isGlobal(isGlobal), indicesCount(indicesCount) {}
+    bool isExtern = false;
+    ArrayDecStatementNode(VariableExprNode *name, ArrayExprNode *expr, bool isGlobal, int indicesCount = 1, bool isPrivate = false, bool isExtern = false) : DeclarationNode(name), expr(expr), isGlobal(isGlobal), indicesCount(indicesCount), isPrivate(isPrivate), isExtern(isExtern) {}
 
     /*ArrayDecStatementNode(std::string type, VariableExprNode *value, ExprNode *size): type(std::move(type)), DeclarationNode(value), init(new std::vector<ExprNode*>()), size(size), isString(false) {}
     ArrayDecStatementNode(std::string type, VariableExprNode *value, std::vector<ExprNode*> *init): type(std::move(type)), DeclarationNode(value), init(init), size(new IntExprNode(init->size())), isString(false) {}
@@ -525,6 +531,7 @@ class CodeGenBlock {
 public:
     llvm::BasicBlock* block;
     std::map <std::string, llvm::Value*> locals;
+    std::map <std::string, DeclarationNode*> localsExprs;
 };
 
 class CodeGenContext {
@@ -546,6 +553,7 @@ public:
     std::string currentNameAddition;
     bool isMainModule = false;
     std::string moduleName;
+    bool callingExpr = false;
 
     LoadInst* currentTypeLoad;
 
@@ -642,6 +650,10 @@ public:
         return blocks.back()->locals;
     }
 
+    std::map <std::string, DeclarationNode*>& localsExprs() {
+        return blocks.back()->localsExprs;
+    }
+
     llvm::Value* localsLookup(const std::string &name) {
         Value *value = nullptr;
         for (auto &b : blocks)
@@ -689,8 +701,11 @@ public:
     {
         if (contains(name)) {
             auto decl = get(name);
-            if (dynamic_cast<FuncDecStatementNode*>(decl) != nullptr || dynamic_cast<ExternFuncDecStatementNode*>(decl) != nullptr)
+            if (dynamic_cast<FuncDecStatementNode*>(decl) != nullptr
+                || dynamic_cast<ExternFuncDecStatementNode*>(decl) != nullptr
+                ) {
                 return decl;
+            }
         }
         for (auto &g : *symbols)
         {
@@ -704,6 +719,17 @@ public:
                         return method;
                     }
                 }
+            }
+        }
+        return nullptr;
+    }
+
+    DeclarationNode* lookupFuncPointers(const std::string &name)
+    {
+        if (contains(name)) {
+            auto decl = get(name);
+            if (dynamic_cast<FuncPointerStatementNode*>(decl) != nullptr) {
+                return decl;
             }
         }
         return nullptr;

@@ -1,5 +1,5 @@
 module main
-    variable-integer globalint := 15;
+    public variable-integer globalint := 15;
     public class Time inherits Object
         public field-integer int := 2;
         public field-real r := 15.25;
@@ -16,7 +16,7 @@ module main
         end p1;
     end Time;
 
-    variable-real globalreal := 100.1;
+    public variable-real globalreal := 100.1;
 
     public class ABC inherits Time
 

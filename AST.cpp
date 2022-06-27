@@ -169,6 +169,7 @@ llvm::Value *StringExprNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *NilExprNode::codegen(CodeGenContext &cgcontext) {
+    if (type == nullptr) return nullptr;
     Type *retType = getTypeFromExprNode(cgcontext, type);
     auto nil = ConstantPointerNull::get(retType->getPointerTo());
     return nil;
@@ -281,6 +282,14 @@ llvm::Value *VariableExprNode::codegen(CodeGenContext &cgcontext) {
     if (type == nullptr)
         type = val->getType()->getPointerElementType();
     if (val->getType()->getPointerElementType()->isStructTy()) return val;
+    if (cgcontext.localsExprs()[value] != nullptr && cgcontext.callingExpr)
+    {
+        if (dynamic_cast<ArrayDecStatementNode*>(cgcontext.localsExprs()[value]) != nullptr)
+            if (val->getType()->getPointerElementType()->isPointerTy())
+                if (val->getType()->getPointerElementType()->getPointerElementType()->isStructTy())
+                    return val;
+    }
+    // check is it pointer to array
     return new LoadInst(type, val, "", false, cgcontext.currentBlock());
 }
 
@@ -407,13 +416,24 @@ llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
     auto funcDecl = dynamic_cast<FuncDecStatementNode*>(foundFunc);
     auto externFuncDecl = dynamic_cast<ExternFuncDecStatementNode*>(foundFunc);
     auto methodDecl = dynamic_cast<MethodDecNode*>(foundFunc);
+    auto funcPtrDecl = dynamic_cast<FuncPointerStatementNode*>(cgcontext.lookupFuncPointers(name->value));
     int i = 0;
+    cgcontext.callingExpr = true;
     for (auto it = args->begin(); it != args->end(); it++, i++)
     {
         // TODO: CreateLoad if args is out/var (it should fix this.method() calls too
         auto var = (*it)->codegen(cgcontext);
         auto loadValue = var;
-        if (dynamic_cast<NilExprNode*>(*it) == nullptr && !var->getType()->isPointerTy())
+        if (var->getType()->isPointerTy())
+        {
+            if (var->getType()->getPointerElementType()->isStructTy())
+            {
+                loadValue->getType()->print(nameAdditionStream);
+                argsRef.push_back(loadValue);
+                continue;
+            }
+        }
+        if (dynamic_cast<NilExprNode*>(*it) == nullptr)
         {
             if (funcDecl != nullptr) {
                 if (i < funcDecl->args->size()) {
@@ -426,13 +446,19 @@ llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
                 if (i < externFuncDecl->args->size()) {
                     if (externFuncDecl->args->at(i)->parameterType == ParameterType::Out || externFuncDecl->args->at(i)->parameterType == ParameterType::Var) {
                         loadValue = getPointerOperand(loadValue);
-
                     }
                 }
             }
             if (methodDecl != nullptr) {
                 if (i < methodDecl->args->size()) {
                     if (methodDecl->args->at(i)->parameterType == ParameterType::Out || methodDecl->args->at(i)->parameterType == ParameterType::Var) {
+                        loadValue = getPointerOperand(loadValue);
+                    }
+                }
+            }
+            if (funcPtrDecl != nullptr) {
+                if (i < funcPtrDecl->args->size()) {
+                    if (funcPtrDecl->args->at(i)->parameterType == ParameterType::Out || funcPtrDecl->args->at(i)->parameterType == ParameterType::Var) {
                         loadValue = getPointerOperand(loadValue);
                     }
                 }
@@ -444,6 +470,7 @@ llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
         loadValue->getType()->print(nameAdditionStream);
         argsRef.push_back(loadValue);
     }
+    cgcontext.callingExpr = false;
     Function *function = nullptr;
     function = cgcontext.mModule->getFunction(name->value + nameAddition);
     if (function == nullptr) {
@@ -626,8 +653,9 @@ llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgcontext) {
     {
         cgcontext.mModule->getOrInsertGlobal(name->value, typeOf(cgcontext, type));
         auto gVar = cgcontext.mModule->getNamedGlobal(name->value);
-        gVar->setLinkage(GlobalValue::ExternalLinkage);
-        if (expr != NULL)
+        if (isExtern) gVar->setLinkage(llvm::GlobalValue::WeakODRLinkage);
+        else gVar->setLinkage(GlobalValue::ExternalLinkage);
+        if (expr != NULL && !isExtern)
         {
             rightVal = expr->codegen(cgcontext);
             gVar->setInitializer(static_cast<Constant *>(rightVal));
@@ -649,6 +677,7 @@ llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgcontext) {
             newVar = cgcontext.builder->CreateAlloca(typeOf(cgcontext, type), 0, nullptr, name->value);
         }
         cgcontext.locals()[name->value] = newVar;
+        cgcontext.localsExprs()[name->value] = this;
         if (expr != NULL) {
             rightVal = expr->codegen(cgcontext);
             //new StoreInst(rightVal, newVar, false, cgcontext.currentBlock());
@@ -725,6 +754,7 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
     {
         auto lVar = cgcontext.builder->CreateAlloca(type->getPointerTo(), 0, nullptr, name->value);
         cgcontext.locals()[name->value] = lVar;
+        cgcontext.localsExprs()[name->value] = this;
     }
 
     auto elementSize = ConstantInt::get(int64type, cgcontext.dataLayout->getTypeAllocSize(type));
@@ -1229,8 +1259,9 @@ llvm::Value *FuncPointerStatementNode::codegen(CodeGenContext &cgcontext) {
     else {
         cgcontext.mModule->getOrInsertGlobal(name->value, funcType->getPointerTo());
         auto gVar = cgcontext.mModule->getNamedGlobal(name->value);
+        //if (isExtern) gVar->setLinkage(llvm::GlobalValue::AvailableExternallyLinkage);
         gVar->setLinkage(GlobalValue::ExternalLinkage);
-        gVar->setInitializer(ConstantPointerNull::get(funcType->getPointerTo()));
+        if (!isExtern) gVar->setInitializer(ConstantPointerNull::get(funcType->getPointerTo()));
         gVar->setAlignment(Align(8));
         cgcontext.globals()[name->value] = gVar;
     }

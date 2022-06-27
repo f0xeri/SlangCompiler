@@ -42,9 +42,31 @@ void Parser::parse()
             else if (dynamic_cast<VarDecStatementNode*>(decl.second) != nullptr)
             {
                 auto var = dynamic_cast<VarDecStatementNode*>(decl.second);
-                auto declVar = new VarDecStatementNode(*var);
-                declVar->expr = nullptr;
-                currentScope->insert(declVar);
+                if (!var->isPrivate)
+                {
+                    auto declVar = new VarDecStatementNode(*var);
+                    //declVar->expr = nullptr;
+                    currentScope->insert(declVar);
+                }
+            }
+            else if (dynamic_cast<ArrayDecStatementNode*>(decl.second) != nullptr)
+            {
+                auto var = dynamic_cast<ArrayDecStatementNode*>(decl.second);
+                if (!var->isPrivate)
+                {
+                    auto declVar = new ArrayDecStatementNode(*var);
+                    //declVar->expr = nullptr;
+                    currentScope->insert(declVar);
+                }
+            }
+            else if (dynamic_cast<FuncPointerStatementNode*>(decl.second) != nullptr)
+            {
+                auto var = dynamic_cast<FuncPointerStatementNode*>(decl.second);
+                if (!var->isPrivate)
+                {
+                    auto declVar = new FuncPointerStatementNode(*var);
+                    currentScope->insert(declVar);
+                }
             }
         }
     }
@@ -94,7 +116,7 @@ bool Parser::parseModuleDecl()
     while (token.type != TokenType::Start)
     {
         if (token.type == TokenType::VisibilityType) ret = parseVisibilityOperator();
-        else if (token.type == TokenType::Variable)  ret = parseVariableDecl(true);
+        //else if (token.type == TokenType::Variable)  ret = parseVariableDecl(true);
         else return false;
         advance();
     }
@@ -144,7 +166,9 @@ bool Parser::parseVisibilityOperator() {
     if (token.type == TokenType::Function) parseFunctionDecl();
     else if (token.type == TokenType::Procedure) parseFunctionDecl();
     else if (token.type == TokenType::Extern && (tokensIterator + 1)->type == TokenType::Class) {tokensIterator = tokensIterator - 1; parseTypeDecl();}
-    else if (token.type == TokenType::Extern) parseFunctionDecl();
+    else if (token.type == TokenType::Extern && ((tokensIterator + 1)->type == TokenType::Procedure || (tokensIterator + 1)->type == TokenType::Function)) parseFunctionDecl();
+    else if (token.type == TokenType::Extern && (tokensIterator + 1)->type == TokenType::Variable) parseVariableDecl(true);
+    else if (token.type == TokenType::Variable) parseVariableDecl(true);
     else if (token.type == TokenType::Class) parseTypeDecl();
     return true;
 }
@@ -689,7 +713,8 @@ ExprNode *Parser::parsePrimary() {
     Token tok = token;
     advance();
     if (tok.type == TokenType::Boolean) return new BooleanExprNode(tok.data == "true");
-    if (tok.type == TokenType::Nil) return new NilExprNode();
+    if (tok.type == TokenType::Nil)
+        return new NilExprNode();
     else if (tok.type == TokenType::String)
     {
         if (tok.data.size() == 1) return new CharExprNode(tok.data[0]);
@@ -891,6 +916,9 @@ StatementNode* Parser::parseVarOrCall() {
     else if (dynamic_cast<ExternFuncDecStatementNode*>(funcDecl) != nullptr) {
         funcDecl = dynamic_cast<ExternFuncDecStatementNode*>(funcDecl);
     }
+    else if (dynamic_cast<FuncPointerStatementNode*>(funcDecl) != nullptr) {
+        funcDecl = dynamic_cast<FuncPointerStatementNode*>(funcDecl);
+    }
     if (dynamic_cast<FuncDecStatementNode*>(funcDecl) != nullptr)
     {
         if (params->size() == dynamic_cast<FuncDecStatementNode*>(funcDecl)->args->size()) {
@@ -910,6 +938,18 @@ StatementNode* Parser::parseVarOrCall() {
             while (i < params->size()) {
                 if (dynamic_cast<NilExprNode*>(params->at(i)) != nullptr) {
                     dynamic_cast<NilExprNode*>(params->at(i))->type = dynamic_cast<ExternFuncDecStatementNode*>(funcDecl)->args->at(i)->type;
+                }
+                i++;
+            }
+        }
+    }
+    else if (dynamic_cast<FuncPointerStatementNode*>(funcDecl) != nullptr)
+    {
+        if (params->size() == dynamic_cast<FuncPointerStatementNode*>(funcDecl)->args->size()) {
+            int i = 0;
+            while (i < params->size()) {
+                if (dynamic_cast<NilExprNode*>(params->at(i)) != nullptr) {
+                    dynamic_cast<NilExprNode*>(params->at(i))->type = dynamic_cast<FuncPointerStatementNode*>(funcDecl)->args->at(i)->type;
                 }
                 i++;
             }
@@ -939,6 +979,21 @@ StatementNode* Parser::parseVarOrCall() {
 DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
     std::string type;
     std::string name;
+    bool isPrivate = false;
+    bool isExtern = false;
+    if (isGlobal)
+    {
+        tokensIterator--;
+        token = *tokensIterator;
+        if (token.data == "private") isPrivate = true;
+        advance();
+
+        if (token.type == TokenType::Extern)
+        {
+            isExtern = true;
+            advance();
+        }
+    }
     advance();
     consume(TokenType::Minus);
     ExprNode *expr = nullptr;
@@ -1045,15 +1100,15 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
         llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Name conflict - \"" << name << "\".\n";
         hasError = true;
     }
-    if (isGlobal) name = mainModuleNode->name->value + "." + name;
+    if (isGlobal && !isExtern) name = mainModuleNode->name->value + "." + name;
     if (isArray) {
-        result = new ArrayDecStatementNode(new VariableExprNode(name), dynamic_cast<ArrayExprNode*>(expr), isGlobal, indicesCount);
+        result = new ArrayDecStatementNode(new VariableExprNode(name), dynamic_cast<ArrayExprNode*>(expr), isGlobal, indicesCount, isPrivate, isExtern);
     }
     else if (isFuncPointer) {
-        result = new FuncPointerStatementNode(funcType, new VariableExprNode(name), isFunction, isGlobal, args);
+        result = new FuncPointerStatementNode(funcType, new VariableExprNode(name), isFunction, isGlobal, args, isPrivate, isExtern);
     }
     else {
-        result = new VarDecStatementNode(type, new VariableExprNode(name), expr, isGlobal);
+        result = new VarDecStatementNode(type, new VariableExprNode(name), expr, isGlobal, isPrivate, isExtern);
     }
     if (isGlobal) currentScope->insert(result);
     currentScope->insert(result);

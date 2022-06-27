@@ -438,28 +438,34 @@ llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
             if (funcDecl != nullptr) {
                 if (i < funcDecl->args->size()) {
                     if (funcDecl->args->at(i)->parameterType == ParameterType::Out || funcDecl->args->at(i)->parameterType == ParameterType::Var) {
-                        loadValue = getPointerOperand(loadValue);
+                        if (!loadValue->getType()->getPointerElementType()->isFunctionTy())
+                            loadValue = getPointerOperand(loadValue);
                     }
                 }
             }
             if (externFuncDecl != nullptr) {
                 if (i < externFuncDecl->args->size()) {
                     if (externFuncDecl->args->at(i)->parameterType == ParameterType::Out || externFuncDecl->args->at(i)->parameterType == ParameterType::Var) {
-                        loadValue = getPointerOperand(loadValue);
+                        if (!loadValue->getType()->getPointerElementType()->isFunctionTy())
+                            loadValue = getPointerOperand(loadValue);
                     }
                 }
             }
             if (methodDecl != nullptr) {
                 if (i < methodDecl->args->size()) {
                     if (methodDecl->args->at(i)->parameterType == ParameterType::Out || methodDecl->args->at(i)->parameterType == ParameterType::Var) {
-                        loadValue = getPointerOperand(loadValue);
+                        if (!loadValue->getType()->getPointerElementType()->isFunctionTy())
+                            loadValue = getPointerOperand(loadValue);
                     }
                 }
             }
             if (funcPtrDecl != nullptr) {
                 if (i < funcPtrDecl->args->size()) {
                     if (funcPtrDecl->args->at(i)->parameterType == ParameterType::Out || funcPtrDecl->args->at(i)->parameterType == ParameterType::Var) {
-                        loadValue = getPointerOperand(loadValue);
+                        if (loadValue->getType()->isPointerTy()) {
+                            if (!loadValue->getType()->getPointerElementType()->isFunctionTy())
+                                loadValue = getPointerOperand(loadValue);
+                        }
                     }
                 }
             }
@@ -653,8 +659,8 @@ llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgcontext) {
     {
         cgcontext.mModule->getOrInsertGlobal(name->value, typeOf(cgcontext, type));
         auto gVar = cgcontext.mModule->getNamedGlobal(name->value);
-        if (isExtern) gVar->setLinkage(llvm::GlobalValue::WeakODRLinkage);
-        else gVar->setLinkage(GlobalValue::ExternalLinkage);
+        if (isExtern) gVar->setLinkage(llvm::GlobalValue::ExternalLinkage);
+        else gVar->setLinkage(GlobalValue::InternalLinkage);
         if (expr != NULL && !isExtern)
         {
             rightVal = expr->codegen(cgcontext);
@@ -732,7 +738,8 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
     {
         cgcontext.mModule->getOrInsertGlobal(name->value, type->getPointerTo());
         auto gVar = cgcontext.mModule->getNamedGlobal(name->value);
-        gVar->setLinkage(GlobalValue::ExternalLinkage);
+        if (isExtern) gVar->setLinkage(llvm::GlobalValue::ExternalLinkage);
+        else gVar->setLinkage(GlobalValue::InternalLinkage);
         gVar->setInitializer(ConstantPointerNull::get(PointerType::get(type, 0)));
         gVar->setAlignment(Align(8));
         gVar->setDSOLocal(true);
@@ -1259,8 +1266,8 @@ llvm::Value *FuncPointerStatementNode::codegen(CodeGenContext &cgcontext) {
     else {
         cgcontext.mModule->getOrInsertGlobal(name->value, funcType->getPointerTo());
         auto gVar = cgcontext.mModule->getNamedGlobal(name->value);
-        //if (isExtern) gVar->setLinkage(llvm::GlobalValue::AvailableExternallyLinkage);
-        gVar->setLinkage(GlobalValue::ExternalLinkage);
+        if (isExtern) gVar->setLinkage(llvm::GlobalValue::ExternalLinkage);
+        else gVar->setLinkage(GlobalValue::InternalLinkage);
         if (!isExtern) gVar->setInitializer(ConstantPointerNull::get(funcType->getPointerTo()));
         gVar->setAlignment(Align(8));
         cgcontext.globals()[name->value] = gVar;

@@ -32,6 +32,9 @@ module glfw
     public extern procedure glfwSetWindowTitle(out GLFWwindow window, in array[] character title)
     end glfwSetWindowTitle;
 
+    // create glfwSetFramebufferSizeCallback
+    public extern procedure glfwSetFramebufferSizeCallback(out GLFWwindow window, out procedure(out GLFWwindow, in integer, in integer) callback)
+    end glfwSetFramebufferSizeCallback;
 start
 
 end glfw.

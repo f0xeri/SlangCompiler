@@ -239,6 +239,31 @@ public:
             }
             expr = arrExpr;
         }
+        else if (type == "function" || type == "procedure")
+        {
+            auto isFuncPointer = true;
+            auto isFunction = type == "function";
+            advance();
+            auto args = parseFuncParameters(false);
+            ExprNode* funcType = nullptr;
+
+            if (isFunction)
+            {
+                advance();
+                if (token.type == TokenType::Colon)
+                {
+                    advance();
+                    funcType = lookupTypes(token.data);
+                }
+                else
+                {
+                    funcType = new VariableExprNode("");
+                }
+            }
+            else funcType = new VariableExprNode("");
+            auto result = new FuncExprNode(funcType, args, isFunction);
+            expr = result;
+        }
         else
         {
             auto typeStatement = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(type));
@@ -351,7 +376,7 @@ public:
     bool parseVisibilityOperator();
     DeclarationNode* parseVariableDecl(bool isGlobal = false);
     bool parseStatement();
-    std::vector<FuncParamDecStatementNode *>* parseFuncParameters();
+    std::vector<FuncParamDecStatementNode *>* parseFuncParameters(bool named = true);
     DeclarationNode* parseFieldDecl(std::vector<DeclarationNode *> *fields, std::string &thisClassName, bool &constructorRequired, int index);
     MethodDecNode* parseMethodDecl(std::vector<MethodDecNode*> *methods, std::string &thisClassName);
     DeclarationNode * parseFunctionDecl();

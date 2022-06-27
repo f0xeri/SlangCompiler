@@ -251,7 +251,7 @@ DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, 
     return field;
 }
 
-std::vector<FuncParamDecStatementNode*> *Parser::parseFuncParameters()
+std::vector<FuncParamDecStatementNode*> *Parser::parseFuncParameters(bool named)
 {
     auto* params = new std::vector<FuncParamDecStatementNode*>();
     consume(TokenType::LParen);
@@ -266,7 +266,9 @@ std::vector<FuncParamDecStatementNode*> *Parser::parseFuncParameters()
         else if (ptype == "out") parameterType = ParameterType::Out;        // probably we dont need "out" type
         typeNode = lookupTypes(token.data);
         advance();
-        name = consume(TokenType::Identifier).data;
+        if (named) {
+            name = consume(TokenType::Identifier).data;
+        }
         params->push_back(new FuncParamDecStatementNode(typeNode, new VariableExprNode(name), parameterType));
         //advance();
         if (token.type != TokenType::Comma)
@@ -857,7 +859,9 @@ StatementNode* Parser::parseVarOrCall() {
             return new IndexExprNode(name, index, dotModule, dotClass, fieldIndex);
         }
     }
-    if (token.type != TokenType::LParen) return new VariableExprNode(name, E_UNKNOWN, dotModule, dotClass, fieldIndex);
+    if (token.type != TokenType::LParen) {
+        return new VariableExprNode(name, E_UNKNOWN, dotModule, dotClass, fieldIndex);
+    }
     if (!dotModule && currentScope->lookup(mainModuleNode->name->value + "." + name) != nullptr)
         name = mainModuleNode->name->value + "." + name;
     //else
@@ -938,9 +942,17 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
     advance();
     consume(TokenType::Minus);
     ExprNode *expr = nullptr;
-    type = consume(TokenType::Identifier).data;
+    type = token.data;
+    advance();
     bool isArray = false;
     int indicesCount = 0;
+
+    bool isFuncPointer = false;
+    bool isFunction = type == "function";
+    std::vector<FuncParamDecStatementNode *> *args = nullptr;
+    ExprNode* funcType;
+
+    DeclarationNode* result;
     if (oneOfDefaultTypes(type))
     {
         name = consume(TokenType::Identifier).data;
@@ -999,6 +1011,30 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
         advance();
         name = consume(TokenType::Identifier).data;
     }
+    // variable-function(in integer, in integer): integer funcPointer;
+    else if (type == "function" || type == "procedure")
+    {
+        isFuncPointer = true;
+        isFunction = type == "function";
+        args = parseFuncParameters(false);
+
+        if (isFunction)
+        {
+            advance();
+            if (token.type == TokenType::Colon)
+            {
+                advance();
+                funcType = lookupTypes(token.data);
+            }
+            else
+            {
+                funcType = new VariableExprNode("");
+            }
+        }
+        else funcType = new VariableExprNode("");
+        advance();
+        name = consume(TokenType::Identifier).data;
+    }
     else
     {
         type = parseTypeName(type);
@@ -1010,13 +1046,13 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
         hasError = true;
     }
     if (isGlobal) name = mainModuleNode->name->value + "." + name;
-    DeclarationNode* result;
-    if (isArray)
-    {
+    if (isArray) {
         result = new ArrayDecStatementNode(new VariableExprNode(name), dynamic_cast<ArrayExprNode*>(expr), isGlobal, indicesCount);
     }
-    else
-    {
+    else if (isFuncPointer) {
+        result = new FuncPointerStatementNode(funcType, new VariableExprNode(name), isFunction, isGlobal, args);
+    }
+    else {
         result = new VarDecStatementNode(type, new VariableExprNode(name), expr, isGlobal);
     }
     if (isGlobal) currentScope->insert(result);

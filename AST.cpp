@@ -80,6 +80,37 @@ Type* getTypeFromExprNode(CodeGenContext &cgcontext, ExprNode* node)
         retType = ptrToTypeOf(cgcontext, arrExpr->type);
         retTypeName = arrExpr->type + "Array";
     }
+    else if (dynamic_cast<FuncExprNode*>(node) != nullptr)
+    {
+        auto exprNode = dynamic_cast<FuncExprNode*>(node);
+        std::vector<llvm::Type*> argTypes;
+        std::vector<int> refParams;
+        int i = 1;
+        for (auto arg : *exprNode->args)
+        {
+            Type* argType;
+            if (arg->parameterType == ParameterType::Out || arg->parameterType == ParameterType::Var)
+            {
+                // not tested
+                argType = getTypeFromExprNode(cgcontext, arg->type)->getPointerTo();
+                argTypes.push_back(argType);
+                refParams.push_back(i);
+            }
+            else
+            {
+                argType = getTypeFromExprNode(cgcontext, arg->type);
+                argTypes.push_back(argType);
+            }
+            i++;
+        }
+        Type *retFuncType = getTypeFromExprNode(cgcontext, exprNode->type);
+        if (retFuncType->isStructTy()) {
+            retFuncType = retFuncType->getPointerTo();
+        }
+
+        FunctionType* funcType = FunctionType::get(retFuncType, argTypes, false);
+        retType = funcType;
+    }
     return retType;
 }
 
@@ -147,13 +178,42 @@ llvm::Value *ArrayExprNode::codegen(CodeGenContext &cgcontext) {
     return nullptr;
 }
 
+llvm::Value *FuncExprNode::codegen(CodeGenContext &cgcontext) {
+    return nullptr;
+}
+
 llvm::Value *BooleanExprNode::codegen(CodeGenContext &cgcontext) {
     return ConstantInt::get(Type::getInt1Ty(*cgcontext.context), value, false);
 }
 
 llvm::Value *VariableExprNode::codegen(CodeGenContext &cgcontext) {
-    Value* val;
+    Value *val = nullptr;
     Type *type = nullptr;
+    // check is it function pointer
+    //if (cgcontext.isFuncPointerAssignment)
+    {
+        auto func = cgcontext.lookupFuncs(value);
+        if (func == nullptr) {
+            func = cgcontext.lookupFuncs(cgcontext.moduleName + "." + value);
+        }
+        if (func != nullptr) {
+            auto funcDecl = dynamic_cast<FuncDecStatementNode*>(func);
+            auto externFuncDecl = dynamic_cast<ExternFuncDecStatementNode*>(func);
+            auto methodDecl = dynamic_cast<MethodDecNode*>(func);
+
+            Function *function = cgcontext.mModule->getFunction(value + cgcontext.currentNameAddition);
+
+            if (function == nullptr) {
+                function = cgcontext.mModule->getFunction(cgcontext.moduleName + "." + value + cgcontext.currentNameAddition);
+                if (function == nullptr) {
+                    llvm::errs() << "[ERROR] Codegen - no such function \"" << value << "\".\n";
+                }
+            }
+            val = function;
+            type = val->getType();
+            return val;
+        }
+    }
     // check local variables
     val = cgcontext.localsLookup(value);
     // check global variables if there is no local
@@ -217,7 +277,7 @@ llvm::Value *VariableExprNode::codegen(CodeGenContext &cgcontext) {
         auto elementPtr = cgcontext.builder->CreateInBoundsGEP(loadArr, dynamic_cast<IndexExprNode*>(this)->indexExpr->codegen(cgcontext));
         return cgcontext.builder->CreateLoad(elementPtr);
     }
-
+    if (val == nullptr) return nullptr;
     if (type == nullptr)
         type = val->getType()->getPointerElementType();
     if (val->getType()->getPointerElementType()->isStructTy()) return val;
@@ -384,13 +444,33 @@ llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
         loadValue->getType()->print(nameAdditionStream);
         argsRef.push_back(loadValue);
     }
-    Function *function = cgcontext.mModule->getFunction(name->value);
+    Function *function = nullptr;
+    function = cgcontext.mModule->getFunction(name->value + nameAddition);
     if (function == nullptr) {
-        function = cgcontext.mModule->getFunction(name->value + nameAddition);
+        llvm::Value* var = name->codegen(cgcontext);
+        bool err = false;
+        if (argsRef.size() == var->getType()->getPointerElementType()->getFunctionNumParams()) {
+            for (int j = 0; j < argsRef.size(); j++) {
+                if (argsRef[j]->getType() != var->getType()->getPointerElementType()->getFunctionParamType(j)) {
+                    err = true;
+                    break;
+                }
+            }
+        }
+        else {
+            err = true;
+        }
+        if (err) {
+            llvm::errs() << "[ERROR] Calling a function " << name->value << " with bad signature.\n";
+            return nullptr;
+        }
+        auto call = cgcontext.builder->CreateCall(static_cast<FunctionType*>(var->getType()->getPointerElementType()), var, makeArrayRef(argsRef));
+        return call;
     }
     if (function == nullptr)
         llvm::errs() << "[ERROR] Codegen - no such function \"" << name->value + nameAddition << "\".\n";
-    CallInst *call = CallInst::Create(function, makeArrayRef(argsRef), "", cgcontext.currentBlock());
+    //CallInst *call = CallInst::Create(function, makeArrayRef(argsRef), "", cgcontext.currentBlock());
+    auto call = cgcontext.builder->CreateCall(function, makeArrayRef(argsRef), "");
     return call;
 }
 
@@ -476,18 +556,25 @@ llvm::Value *AssignExprNode::codegen(CodeGenContext &cgcontext) {
         assignData = ConstantPointerNull::get(ptype);
     }
 
-    if (assignData->getType()->isPointerTy()) {
-        if (assignData->getType()->getPointerElementType()->isStructTy()) {
-            //assignData = cgcontext.builder->CreateLoad(assignData);
-            //var = cgcontext.builder->CreateLoad(var);
+    std::string nameAddition;
+    llvm::raw_string_ostream nameAdditionStream(nameAddition);
+    if (var->getType()->isPointerTy()) {
+        if (var->getType()->getPointerElementType()->isPointerTy()) {
+            if (var->getType()->getPointerElementType()->getPointerElementType()->isFunctionTy()) {
+                auto func = var->getType()->getPointerElementType()->getPointerElementType();
+                auto n = func->getFunctionNumParams();
+                for (int i = 0; i < n; i++){
+                    func->getFunctionParamType(i)->print(nameAdditionStream);
+                }
+                cgcontext.isFuncPointerAssignment = true;
+                cgcontext.currentNameAddition = nameAddition;
+                assignData = right->codegen(cgcontext);
+                cgcontext.isFuncPointerAssignment = false;
+                cgcontext.currentNameAddition = "";
+            }
         }
     }
-
     return new StoreInst(assignData, var, false, cgcontext.currentBlock());
-}
-
-llvm::Value *FuncExprNode::codegen(CodeGenContext &cgcontext) {
-    return nullptr;
 }
 
 llvm::Value *CastExprNode::codegen(CodeGenContext &cgcontext) {
@@ -1104,6 +1191,51 @@ llvm::Value *WhileStatementNode::codegen(CodeGenContext &cgcontext) {
     cgcontext.ret(whileEnd);
     cgcontext.builder->SetInsertPoint(whileEnd);
     return whileEnd;
+}
+
+llvm::Value *FuncPointerStatementNode::codegen(CodeGenContext &cgcontext) {
+    std::vector<llvm::Type*> argTypes;
+    std::vector<int> refParams;
+    int i = 1;
+    for (auto arg : *args)
+    {
+        Type* argType;
+        if (arg->parameterType == ParameterType::Out || arg->parameterType == ParameterType::Var)
+        {
+            // not tested
+            argType = getTypeFromExprNode(cgcontext, arg->type)->getPointerTo();
+            argTypes.push_back(argType);
+            refParams.push_back(i);
+        }
+        else
+        {
+            argType = getTypeFromExprNode(cgcontext, arg->type);
+            argTypes.push_back(argType);
+        }
+        i++;
+    }
+    Type *retType = getTypeFromExprNode(cgcontext, type);
+    if (retType->isStructTy()) {
+        retType = retType->getPointerTo();
+    }
+    std::string retTypeName;
+
+    FunctionType* funcType = FunctionType::get(retType, argTypes, false);
+    llvm::Value* var = nullptr;
+    if (!isGlobal) {
+        var = cgcontext.builder->CreateAlloca(funcType->getPointerTo(), nullptr);
+        cgcontext.locals()[name->value] = var;
+    }
+    else {
+        cgcontext.mModule->getOrInsertGlobal(name->value, funcType->getPointerTo());
+        auto gVar = cgcontext.mModule->getNamedGlobal(name->value);
+        gVar->setLinkage(GlobalValue::ExternalLinkage);
+        gVar->setInitializer(ConstantPointerNull::get(funcType->getPointerTo()));
+        gVar->setAlignment(Align(8));
+        cgcontext.globals()[name->value] = gVar;
+    }
+    //auto t = cgcontext.mModule->getFunction("GC_init")->getType();
+    return var;
 }
 
 llvm::Value *ModuleStatementNode::codegen(CodeGenContext &cgcontext) {

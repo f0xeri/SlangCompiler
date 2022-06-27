@@ -271,13 +271,34 @@ public:
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
+class DeclarationNode : public StatementNode
+{
+public:
+    virtual ~DeclarationNode() = default;
+    VariableExprNode *name;
+
+    DeclarationNode(VariableExprNode *name) : name(name){};
+    virtual llvm::Value *codegen(CodeGenContext &cgcontext);
+};
+
+class FuncParamDecStatementNode : public DeclarationNode {
+public:
+    ParameterType parameterType;
+    ExprNode * type;
+    ExprNode *expr;
+
+    FuncParamDecStatementNode(ExprNode* type, VariableExprNode *name, ParameterType parameterType): type(type), DeclarationNode(name), parameterType(parameterType), expr(nullptr) {}
+    FuncParamDecStatementNode(ExprNode* type, VariableExprNode *name, ParameterType parameterType, ExprNode *expr): type(type), DeclarationNode(name), parameterType(parameterType), expr(expr) {}
+    virtual llvm::Value *codegen(CodeGenContext &cgcontext);
+};
+
 class FuncExprNode: public ExprNode {
 public:
-    VariableExprNode *functor;
-    std::vector<ExprNode*> *args;
+    ExprNode* type;
+    bool isFunction = true;
+    std::vector<FuncParamDecStatementNode*> *args;
 
-    explicit FuncExprNode(VariableExprNode *functor): ExprNode(false), functor(functor), args(new std::vector<ExprNode*>()) {}
-    FuncExprNode(VariableExprNode *functor, std::vector<ExprNode*> *args): ExprNode(false), functor(functor), args(args) {}
+    FuncExprNode(ExprNode* type, std::vector<FuncParamDecStatementNode*> *args, bool isFunction): ExprNode(false), type(type), args(args), isFunction(isFunction) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -314,16 +335,6 @@ public:
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
-class DeclarationNode : public StatementNode
-{
-public:
-    virtual ~DeclarationNode() = default;
-    VariableExprNode *name;
-
-    DeclarationNode(VariableExprNode *name) : name(name){};
-    virtual llvm::Value *codegen(CodeGenContext &cgcontext);
-};
-
 class VarDecStatementNode : public DeclarationNode {
 public:
     std::string type;
@@ -335,14 +346,14 @@ public:
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
-class FuncParamDecStatementNode : public DeclarationNode {
+class FuncPointerStatementNode : public DeclarationNode {
 public:
-    ParameterType parameterType;
-    ExprNode * type;
-    ExprNode *expr;
+    ExprNode* type;
+    std::vector<FuncParamDecStatementNode*> *args = nullptr;
+    bool isFunction = false;
+    bool isGlobal = false;
 
-    FuncParamDecStatementNode(ExprNode* type, VariableExprNode *name, ParameterType parameterType): type(type), DeclarationNode(name), parameterType(parameterType), expr(nullptr) {}
-    FuncParamDecStatementNode(ExprNode* type, VariableExprNode *name, ParameterType parameterType, ExprNode *expr): type(type), DeclarationNode(name), parameterType(parameterType), expr(expr) {}
+    FuncPointerStatementNode(ExprNode*  type, VariableExprNode *name, bool isFunction, bool isGlobal, std::vector<FuncParamDecStatementNode*> *args): type(type), DeclarationNode(name), isFunction(isFunction), isGlobal(isGlobal), args(args) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -531,6 +542,8 @@ public:
     std::vector<CodeGenBlock*> blocks;
     std::map<std::string, StructType *> allocatedClasses;
     FuncDecStatementNode *currentFunc = nullptr;
+    bool isFuncPointerAssignment = false;
+    std::string currentNameAddition;
     bool isMainModule = false;
     std::string moduleName;
 
@@ -674,7 +687,11 @@ public:
 
     DeclarationNode* lookupFuncs(const std::string &name)
     {
-        if (contains(name)) return get(name);
+        if (contains(name)) {
+            auto decl = get(name);
+            if (dynamic_cast<FuncDecStatementNode*>(decl) != nullptr || dynamic_cast<ExternFuncDecStatementNode*>(decl) != nullptr)
+                return decl;
+        }
         for (auto &g : *symbols)
         {
             if (dynamic_cast<TypeDecStatementNode*>(g.second) != nullptr)

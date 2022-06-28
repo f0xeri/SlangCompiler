@@ -812,6 +812,81 @@ llvm::Value *FuncParamDecStatementNode::codegen(CodeGenContext &cgcontext) {
     return nullptr;
 }
 
+void generateMallocLoopsRecursive(CodeGenContext &cgcontext, int i, int indicesCount, Type* currentType, vector<ExprNode *>* sizes, std::vector<Value*> jvars, Value *currentArr, Value *var)
+{
+    if (i == indicesCount) return;
+    Function *TheFunctionMain = cgcontext.builder->GetInsertBlock()->getParent();
+    BasicBlock* whileIterMain = BasicBlock::Create(*cgcontext.context, "", TheFunctionMain, 0);
+    BasicBlock* whileEndMain = BasicBlock::Create(*cgcontext.context, "", TheFunctionMain, 0);
+    BasicBlock* whileCheckMain = BasicBlock::Create(*cgcontext.context, "", TheFunctionMain, 0);
+    // Check condition satisfaction
+    BranchInst::Create(whileCheckMain, cgcontext.currentBlock());
+    cgcontext.pushBlock(whileCheckMain);
+    cgcontext.builder->SetInsertPoint(whileCheckMain);
+    // Whether break the loop
+    auto jvar = cgcontext.builder->CreateLoad(jvars[i]);
+    auto sz = sizes->at(i - 1)->codegen(cgcontext);
+    auto cmpVal = cgcontext.builder->CreateICmp(ICmpInst::ICMP_SLT, jvar, sz, "j<sz");
+    BranchInst::Create(whileIterMain, whileEndMain, cmpVal, cgcontext.currentBlock());
+    cgcontext.popBlock();
+    // Entering loop block
+    cgcontext.pushBlock(whileIterMain);
+    cgcontext.builder->SetInsertPoint(whileIterMain);
+
+    // Statements go here
+    currentType = currentType->getPointerElementType();
+
+    jvar = cgcontext.builder->CreateLoad(jvars[i]);
+    llvm::Type* int32type = llvm::Type::getInt32Ty(*cgcontext.context);
+    auto allocSz = sizes->at(i)->codegen(cgcontext);
+    auto currentElementSize = ConstantInt::get(int32type, cgcontext.dataLayout->getTypeAllocSize(currentType));
+    auto allocSize = BinaryOperator::Create(Instruction::Mul, allocSz, currentElementSize, "", cgcontext.currentBlock());
+    // GC_malloc
+    currentArr = CallInst::CreateMalloc(cgcontext.currentBlock(), int32type, currentType, allocSize, nullptr, cgcontext.mModule->getFunction("malloc"), "");
+    // malloc
+    //auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int32type, type, allocSize, nullptr, nullptr, "");
+    cgcontext.builder->Insert(currentArr);
+    llvm::Value *arrLoad = var;
+
+    auto formatStr = cgcontext.builder->CreateGlobalStringPtr("%d %d\n");
+    cgcontext.builder->CreateCall(cgcontext.mModule->getFunction("printf"), {formatStr, allocSz, jvar});
+    for (int k = 1; k <= i; k++)
+    {
+        arrLoad = cgcontext.builder->CreateLoad(arrLoad);
+        jvar = cgcontext.builder->CreateLoad(jvars[k]);
+
+        auto sext = cgcontext.builder->CreateSExt(jvar, llvm::Type::getInt64Ty(*cgcontext.context));
+        auto arrPtr = cgcontext.builder->CreateGEP(arrLoad, sext);
+        //cgcontext.builder->CreateStore(currentArr, arrPtr);
+    }
+
+    if (i == indicesCount - 1)
+    {
+        jvar = cgcontext.builder->CreateLoad(jvars[i]);
+        auto add = cgcontext.builder->CreateAdd(jvar, ConstantInt::get(int32type, 1));
+        cgcontext.builder->CreateStore(add, jvars[i]);
+    }
+    else
+    {
+        cgcontext.builder->CreateStore(ConstantInt::get(int32type, 0), jvars[i + 1]);
+    }
+
+    generateMallocLoopsRecursive(cgcontext, i + 1, indicesCount, currentType, sizes, jvars, currentArr, var);
+    // Jump back to condition checking
+    BranchInst::Create(whileCheckMain, cgcontext.currentBlock());
+
+    cgcontext.popBlock();
+    // Return END
+
+    cgcontext.ret(whileEndMain);
+    cgcontext.builder->SetInsertPoint(whileEndMain);
+    if (i > 1) {
+        auto endJvar = cgcontext.builder->CreateLoad(jvars[i - 1]);
+        auto endAdd = cgcontext.builder->CreateAdd(endJvar, ConstantInt::get(int32type, 1));
+        cgcontext.builder->CreateStore(endAdd, jvars[i - 1]);
+    }
+}
+
 llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
     auto exprNode = dynamic_cast<ArrayExprNode*>(expr);
     auto arrExpr = exprNode;
@@ -888,7 +963,21 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
 
     auto currentArr = arr;
     auto currentType = finalType;
-    for (int i = 1; i < indicesCount; i++)
+
+    if (indicesCount > 1)
+    {
+        std::vector<llvm::Value*> jvars;
+        jvars.reserve(indicesCount);
+        for (int i = 0; i < indicesCount; i++) {
+            jvars.push_back(cgcontext.builder->CreateAlloca(int32type, 0, nullptr, "j" + std::to_string(i)));
+            cgcontext.builder->CreateStore(ConstantInt::get(int32type, 0), jvars[i]);
+        }
+        int i = 1;
+
+        generateMallocLoopsRecursive(cgcontext, i, indicesCount, currentType, sizes, jvars, currentArr, var);
+    }
+
+    /*for (int i = 1; i < indicesCount; i++)
     {
         auto j = cgcontext.builder->CreateAlloca(int32type, 0, nullptr, "j");
         cgcontext.builder->CreateStore(ConstantInt::get(int32type, 0), j);
@@ -941,7 +1030,7 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
         // Return END
         cgcontext.ret(whileEnd);
         cgcontext.builder->SetInsertPoint(whileEnd);
-    }
+    }*/
 
 
     if (isGlobal)

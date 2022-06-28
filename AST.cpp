@@ -438,24 +438,39 @@ llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
             if (funcDecl != nullptr) {
                 if (i < funcDecl->args->size()) {
                     if (funcDecl->args->at(i)->parameterType == ParameterType::Out || funcDecl->args->at(i)->parameterType == ParameterType::Var) {
-                        if (!loadValue->getType()->getPointerElementType()->isFunctionTy())
+                        if (loadValue->getType()->isPointerTy()) {
+                            if (!loadValue->getType()->getPointerElementType()->isFunctionTy())
+                                loadValue = getPointerOperand(loadValue);
+                        }
+                        else {
                             loadValue = getPointerOperand(loadValue);
+                        }
                     }
                 }
             }
             if (externFuncDecl != nullptr) {
                 if (i < externFuncDecl->args->size()) {
                     if (externFuncDecl->args->at(i)->parameterType == ParameterType::Out || externFuncDecl->args->at(i)->parameterType == ParameterType::Var) {
-                        if (!loadValue->getType()->getPointerElementType()->isFunctionTy())
+                        if (loadValue->getType()->isPointerTy()) {
+                            if (!loadValue->getType()->getPointerElementType()->isFunctionTy())
+                                loadValue = getPointerOperand(loadValue);
+                        }
+                        else {
                             loadValue = getPointerOperand(loadValue);
+                        }
                     }
                 }
             }
             if (methodDecl != nullptr) {
                 if (i < methodDecl->args->size()) {
                     if (methodDecl->args->at(i)->parameterType == ParameterType::Out || methodDecl->args->at(i)->parameterType == ParameterType::Var) {
-                        if (!loadValue->getType()->getPointerElementType()->isFunctionTy())
+                        if (loadValue->getType()->isPointerTy()) {
+                            if (!loadValue->getType()->getPointerElementType()->isFunctionTy())
+                                loadValue = getPointerOperand(loadValue);
+                        }
+                        else {
                             loadValue = getPointerOperand(loadValue);
+                        }
                     }
                 }
             }
@@ -466,6 +481,10 @@ llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
                             if (!loadValue->getType()->getPointerElementType()->isFunctionTy())
                                 loadValue = getPointerOperand(loadValue);
                         }
+                        else {
+                            loadValue = getPointerOperand(loadValue);
+                        }
+
                     }
                 }
             }

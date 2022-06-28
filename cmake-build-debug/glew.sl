@@ -40,6 +40,10 @@ module gl
     public extern procedure glDrawArrays(in integer mode, in integer first, in integer count):
     end glDrawArrays;
 
+    // create glDrawElements
+    public extern procedure glDrawElements(in integer mode, in integer count, in integer type, out integer indices):
+    end glDrawElements;
+
     // create glViewport
     public extern procedure glViewport(in integer x, in integer y, in integer width, in integer height):
     end glViewport;

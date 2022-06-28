@@ -54,8 +54,8 @@ start
     let vertices[7] := 0.5f;
     let vertices[8] := 0.0f;
 
-    variable-integer vertexBufferObject;
-    variable-integer vertexArrayObject;
+    variable-integer vertexBufferObject := 0;
+    variable-integer vertexArrayObject := 0;
 
     call __glewGenVertexArrays(1, vertexArrayObject);
     call __glewGenBuffers(1, vertexBufferObject);

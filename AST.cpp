@@ -588,12 +588,35 @@ llvm::Value *BlockExprNode::codegen(CodeGenContext &cgcontext) {
     return nullptr;
 }
 
+std::vector<ExprNode*>* getSizesOfArray(DeclarationNode* expr) {
+    auto sizes = new std::vector<ExprNode*>();
+    auto array = dynamic_cast<ArrayDecStatementNode*>(expr);
+    auto exprNode = dynamic_cast<ArrayExprNode*>(array->expr);
+    auto arrExpr = exprNode;
+    sizes->push_back(arrExpr->size);
+    if (arrExpr->type == "array")
+    {
+        for (auto &slice : *arrExpr->values)
+        {
+            sizes->push_back(dynamic_cast<ArrayExprNode*>(slice)->size);
+        }
+    }
+    return sizes;
+}
+
+llvm::Value* calcIndex(IndexesExprNode* expr, CodeGenContext &cgcontext) {
+
+
+    return nullptr;
+}
+
 llvm::Value *AssignExprNode::codegen(CodeGenContext &cgcontext) {
     auto assignData = right->codegen(cgcontext);
     Value* var;
     Type *type = nullptr;
     // check local variables
     var = cgcontext.localsLookup(left->value);
+    auto varExpr = cgcontext.localsExprsLookup(left->value);
     // check global variables if there is no local
     if (var == nullptr)
     {
@@ -647,6 +670,19 @@ llvm::Value *AssignExprNode::codegen(CodeGenContext &cgcontext) {
         return ret;
     }
 
+    if (dynamic_cast<IndexesExprNode*>(left) != nullptr)
+    {
+        auto indexesExpr = dynamic_cast<IndexesExprNode*>(left);
+        //int n = calcNumberOfIndexes(varExpr, nullptr);
+        //if (n > indexesExpr->indexes->size())
+        //{
+            //llvm::errs() << "[ERROR] Too much indexes in expression.\n";
+            //return nullptr;
+        //}
+
+        return nullptr;
+    }
+
     // TODO: at least it works for arrays, check for other types
     if (dynamic_cast<NilExprNode*>(right) != nullptr)
     {
@@ -690,7 +726,6 @@ llvm::Value *ExprStatementNode::codegen(CodeGenContext &cgcontext) {
 llvm::Value *ReturnStatementNode::codegen(CodeGenContext &cgcontext) {
     return cgcontext.builder->CreateRet(expr->codegen(cgcontext));
 }
-
 llvm::Value *OutputStatementNode::codegen(CodeGenContext &cgcontext) {
     Value *value = expr->codegen(cgcontext);
     std::vector<Value *> printArgs;
@@ -789,33 +824,36 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
     }
     auto size = exprNode->size->codegen(cgcontext);
     auto arraySize = size;
+    auto sizes = getSizesOfArray(this);
     if (arrExpr->type == "array")
     {
         for (auto &slice : *arrExpr->values)
         {
             auto castedSlice = dynamic_cast<ArrayExprNode*>(slice);
-            auto sliceSize = castedSlice->size->codegen(cgcontext);
-            auto newArraySize = BinaryOperator::Create(Instruction::Mul, sliceSize, arraySize, "", cgcontext.currentBlock());
-            arraySize = newArraySize;
             arrExpr = castedSlice;
         }
     }
     auto type = typeOf(cgcontext, arrExpr->type);
-    llvm::Type* int64type = llvm::Type::getInt32Ty(*cgcontext.context);
+    auto finalType = type;
+    for (int i = 1; i < this->indicesCount; i++) {
+        finalType = finalType->getPointerTo();
+    }
+
+    llvm::Type* int32type = llvm::Type::getInt32Ty(*cgcontext.context);
 
     if (isGlobal)
     {
-        cgcontext.mModule->getOrInsertGlobal(name->value, type->getPointerTo());
+        cgcontext.mModule->getOrInsertGlobal(name->value, finalType->getPointerTo());
         auto gVar = cgcontext.mModule->getNamedGlobal(name->value);
         if (isExtern) gVar->setLinkage(llvm::GlobalValue::ExternalLinkage);
         else gVar->setLinkage(GlobalValue::InternalLinkage);
-        gVar->setInitializer(ConstantPointerNull::get(PointerType::get(type, 0)));
+        gVar->setInitializer(ConstantPointerNull::get(PointerType::get(finalType, 0)));
         gVar->setAlignment(Align(8));
         gVar->setDSOLocal(true);
         cgcontext.globals()[name->value] = gVar;
 
-        FunctionType* type = FunctionType::get(Type::getVoidTy(*cgcontext.context), {}, false);
-        Function *constructorFunc = Function::Create(type, Function::ExternalLinkage, Twine(name->value + "_constructor"), cgcontext.mModule);
+        FunctionType* funcType = FunctionType::get(Type::getVoidTy(*cgcontext.context), {}, false);
+        Function *constructorFunc = Function::Create(funcType, Function::ExternalLinkage, Twine(name->value + "_constructor"), cgcontext.mModule);
         BasicBlock *bb = BasicBlock::Create(*cgcontext.context, name->value + "_constructorEntry", constructorFunc, nullptr);
         cgcontext.pushBlock(bb);
         cgcontext.builder->SetInsertPoint(bb);
@@ -828,31 +866,97 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
     }
     else
     {
-        auto lVar = cgcontext.builder->CreateAlloca(type->getPointerTo(), 0, nullptr, name->value);
+        auto lVar = cgcontext.builder->CreateAlloca(finalType->getPointerTo(), 0, nullptr, name->value);
         cgcontext.locals()[name->value] = lVar;
         cgcontext.localsExprs()[name->value] = this;
     }
 
-    auto elementSize = ConstantInt::get(int64type, cgcontext.dataLayout->getTypeAllocSize(type));
+    llvm::Value *var = nullptr;
+    if (isGlobal)
+        var = cgcontext.mModule->getNamedGlobal(name->value);
+    else
+        var = cgcontext.locals()[name->value];
+
+    auto elementSize = ConstantInt::get(int32type, cgcontext.dataLayout->getTypeAllocSize(finalType));
     auto allocSize = BinaryOperator::Create(Instruction::Mul, elementSize, arraySize, "", cgcontext.currentBlock());
     // GC_malloc
-    auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, cgcontext.mModule->getFunction("malloc"), "");
+    auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int32type, finalType, allocSize, nullptr, cgcontext.mModule->getFunction("malloc"), "");
     // malloc
-    //auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, nullptr, "");
+    //auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int32type, type, allocSize, nullptr, nullptr, "");
     cgcontext.builder->Insert(arr);
+    cgcontext.builder->CreateStore(arr, var);
+
+    auto currentArr = arr;
+    auto currentType = finalType;
+    for (int i = 1; i < indicesCount; i++)
+    {
+        auto j = cgcontext.builder->CreateAlloca(int32type, 0, nullptr, "j");
+        cgcontext.builder->CreateStore(ConstantInt::get(int32type, 0), j);
+        auto sz = sizes->at(i - 1)->codegen(cgcontext);
+        Function *TheFunction = cgcontext.builder->GetInsertBlock()->getParent();
+        BasicBlock* whileIter = BasicBlock::Create(*cgcontext.context, "", TheFunction, 0);
+        BasicBlock* whileEnd = BasicBlock::Create(*cgcontext.context, "", TheFunction, 0);
+        BasicBlock* whileCheck = BasicBlock::Create(*cgcontext.context, "", TheFunction, 0);
+        // Check condition satisfaction
+        BranchInst::Create(whileCheck, cgcontext.currentBlock());
+        cgcontext.pushBlock(whileCheck);
+        cgcontext.builder->SetInsertPoint(whileCheck);
+        // Whether break the loop
+        auto jvar = cgcontext.builder->CreateLoad(j);
+        auto cmpVal = cgcontext.builder->CreateICmp(ICmpInst::ICMP_SLT, jvar, sz, "j<sz");
+        BranchInst::Create(whileIter, whileEnd, cmpVal, cgcontext.currentBlock());
+        cgcontext.popBlock();
+        // Entering loop block
+        cgcontext.pushBlock(whileIter);
+        cgcontext.builder->SetInsertPoint(whileIter);
+
+        // Statements go here
+        currentType = currentType->getPointerElementType();
+
+        jvar = cgcontext.builder->CreateLoad(j);
+        //auto formatStr = cgcontext.builder->CreateGlobalStringPtr("%d\n");
+        //cgcontext.builder->CreateCall(cgcontext.mModule->getFunction("printf"), {formatStr, jvar});
+
+        auto allocSz = sizes->at(i)->codegen(cgcontext);
+        auto currentElementSize = ConstantInt::get(int32type, cgcontext.dataLayout->getTypeAllocSize(currentType));
+        allocSize = BinaryOperator::Create(Instruction::Mul, allocSz, currentElementSize, "", cgcontext.currentBlock());
+        // GC_malloc
+        currentArr = CallInst::CreateMalloc(cgcontext.currentBlock(), int32type, currentType, allocSize, nullptr, cgcontext.mModule->getFunction("malloc"), "");
+        // malloc
+        //auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int32type, type, allocSize, nullptr, nullptr, "");
+        cgcontext.builder->Insert(currentArr);
+        auto arrLoad = cgcontext.builder->CreateLoad(var);
+        jvar = cgcontext.builder->CreateLoad(j);
+        auto sext = cgcontext.builder->CreateSExt(jvar, llvm::Type::getInt64Ty(*cgcontext.context));
+        auto arrPtr = cgcontext.builder->CreateGEP(arrLoad, sext);
+        //cgcontext.builder->CreateStore(currentArr, arrPtr);
+        jvar = cgcontext.builder->CreateLoad(j);
+        auto add = cgcontext.builder->CreateAdd(jvar, ConstantInt::get(int32type, 1));
+        cgcontext.builder->CreateStore(add, j);
+
+        // Jump back to condition checking
+        BranchInst::Create(whileCheck, cgcontext.currentBlock());
+
+        cgcontext.popBlock();
+        // Return END
+        cgcontext.ret(whileEnd);
+        cgcontext.builder->SetInsertPoint(whileEnd);
+    }
+
+
     if (isGlobal)
     {
-        auto gVar = cgcontext.mModule->getNamedGlobal(name->value);
-        cgcontext.builder->CreateStore(arr, gVar);
+        //auto gVar = cgcontext.mModule->getNamedGlobal(name->value);
+        //cgcontext.builder->CreateStore(arr, var);
         cgcontext.builder->CreateRetVoid();
         cgcontext.popBlock();
-        return gVar;
+        return var;
     }
     else
     {
         auto lVar = cgcontext.locals()[name->value];
-        cgcontext.builder->CreateStore(arr, lVar);
-        return lVar;
+        //cgcontext.builder->CreateStore(arr, lVar);
+        return var;
     }
     //ArrayType *arrayType = ArrayType::get(type, reinterpret_cast<ConstantInt*>(arraySize)->getZExtValue());
     //AllocaInst *alloc = new AllocaInst(arrayType, value->value, cgcontext.currentBlock());
@@ -974,12 +1078,14 @@ llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
             if ((*it)->parameterType == ParameterType::Out || (*it)->parameterType == ParameterType::Var) {
                 auto var = new AllocaInst(getTypeFromExprNode(cgcontext, (*it)->type)->getPointerTo(), 0, nullptr, (*it)->name->value, bb);
                 cgcontext.locals()[(*it)->name->value] = var;
+                cgcontext.localsExprs()[(*it)->name->value] = (*it);
                 Value *argumentValue = &(*argsValues);
                 argumentValue->setName(getParameterTypeName((*it)->parameterType) + (*it)->name->value);
                 StoreInst *inst = new StoreInst(argumentValue, cgcontext.locals()[(*it)->name->value], false, bb);
             } else {
                 auto var = new AllocaInst(getTypeFromExprNode(cgcontext, (*it)->type), 0, nullptr, (*it)->name->value, bb);
                 cgcontext.locals()[(*it)->name->value] = var;
+                cgcontext.localsExprs()[(*it)->name->value] = (*it);
                 Value *argumentValue = &(*argsValues);
                 argumentValue->setName(getParameterTypeName((*it)->parameterType) + (*it)->name->value);
                 StoreInst *inst = new StoreInst(argumentValue, cgcontext.locals()[(*it)->name->value], false, bb);
@@ -1046,6 +1152,7 @@ llvm::Value *FieldArrayVarDecNode::codegen(CodeGenContext &cgcontext) {
     llvm::Type* int64type = llvm::Type::getInt32Ty(*cgcontext.context);
 
     cgcontext.locals()[name->value] = elementPtr;
+    cgcontext.localsExprs()[name->value] = this;
 
     auto elementSize = ConstantInt::get(int64type, cgcontext.dataLayout->getTypeAllocSize(type));
     auto allocSize = BinaryOperator::Create(Instruction::Mul, elementSize, arraySize, "", cgcontext.currentBlock());
@@ -1331,6 +1438,7 @@ llvm::Value *FuncPointerStatementNode::codegen(CodeGenContext &cgcontext) {
     if (!isGlobal) {
         var = cgcontext.builder->CreateAlloca(funcType->getPointerTo(), nullptr);
         cgcontext.locals()[name->value] = var;
+        cgcontext.localsExprs()[name->value] = this;
     }
     else {
         cgcontext.mModule->getOrInsertGlobal(name->value, funcType->getPointerTo());
@@ -1354,5 +1462,62 @@ llvm::Value *ImportStatementNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *IndexesExprNode::codegen(CodeGenContext &cgcontext) {
+    Value* var;
+    Type *type = nullptr;
+    // check local variables
+    var = cgcontext.localsLookup(value);
+    auto varExpr = cgcontext.localsExprsLookup(value);
+    // check global variables if there is no local
+    if (var == nullptr)
+    {
+        // check global variable declared in current module
+        if (cgcontext.globals().find(cgcontext.moduleName + "." + value) == cgcontext.globals().end())
+        {
+            // check other global variables
+            if (cgcontext.globals().find(value) == cgcontext.globals().end())
+            {
+                // check type fields
+                auto typeVarName = value.substr(0, value.rfind('.'));
+                auto typeVar = cgcontext.localsLookup(typeVarName);
+                if (typeVar != nullptr)
+                {
+                    Type* typeOfTypeVar = nullptr;
+                    // type variable exists, get type
+                    // we should check is it pointer to pointer to struct or just pointer to struct
+                    if (dotClass)
+                    {
+                        if (typeVar->getType()->getPointerElementType()->isStructTy()) {
+                            typeOfTypeVar = typeVar->getType()->getPointerElementType();
+                            auto elementPtr = cgcontext.builder->CreateStructGEP(typeOfTypeVar, typeVar, index);
+                            var = elementPtr;
+                        }
+                        else if (typeVar->getType()->getPointerElementType()->getPointerElementType()->isStructTy()) {
+                            typeOfTypeVar = typeVar->getType()->getPointerElementType()->getPointerElementType();
+                            auto loadThis = cgcontext.builder->CreateLoad(typeVar);
+                            cgcontext.currentTypeLoad = loadThis;
+                            auto elementPtr = cgcontext.builder->CreateStructGEP(typeOfTypeVar, loadThis, index);
+                            var = elementPtr;
+                        }
+                    }
+                    else llvm::errs() << "[ERROR] Variable \"" << typeVarName << "\" is not a custom type.\n";
+                }
+                else llvm::errs() << "[ERROR] Undeclared Variable \"" << value << "\".\n";
+            }
+            else
+                var = cgcontext.globals()[value];
+        }
+        else
+        {
+            var = cgcontext.globals()[cgcontext.moduleName + "." + value];
+        }
+    }
+
+    auto loadArr = cgcontext.builder->CreateLoad(var);
+    varExpr = cgcontext.localsExprs()[value];
+    //int a = calcNumberOfIndexes(varExpr, nullptr);
+
+    //auto elementPtr = cgcontext.builder->CreateInBoundsGEP(loadArr, indexExpr->codegen(cgcontext));
+    //if (isPointer) return elementPtr;
+    //return cgcontext.builder->CreateLoad(elementPtr, false);
     return nullptr;
 }

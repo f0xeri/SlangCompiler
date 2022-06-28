@@ -654,6 +654,19 @@ public:
         return blocks.back()->localsExprs;
     }
 
+    DeclarationNode* localsExprsLookup(const std::string &name) {
+        DeclarationNode *value = nullptr;
+        for (auto &b : blocks)
+        {
+            if (b->localsExprs.contains(name))
+            {
+                value = b->localsExprs[name];
+                break;
+            }
+        }
+        return value;
+    }
+
     llvm::Value* localsLookup(const std::string &name) {
         Value *value = nullptr;
         for (auto &b : blocks)

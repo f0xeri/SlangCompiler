@@ -755,7 +755,7 @@ StatementNode* Parser::parseVarOrCall() {
     bool fieldExists = false;
     bool methodExists = false;
 
-    ExprNode* varExpr;
+    ExprNode* varExpr = nullptr;
 
     int fieldIndex = -1;
     std::string methodName;
@@ -829,16 +829,23 @@ StatementNode* Parser::parseVarOrCall() {
         advance();
     }
     // if we have an array
+    auto indexes = new std::vector<ExprNode*>();
     if (token.type == TokenType::LBracket)
     {
-        isIndex = true;
         if (dotClass && !fieldExists) {
             llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Field " + name + "." + token.data + " is not declared in " + type->name->value + " type.\n";
             hasError = true;
         }
-        advance();
-        auto index = parseExpression();
-        consume(TokenType::RBracket);
+        isIndex = true;
+        ExprNode* index = nullptr;
+        while (token.type == TokenType::LBracket)
+        {
+            advance();
+            index = parseExpression();
+            indexes->push_back(index);
+            expect(TokenType::RBracket);
+            advance();
+        }
         if (token.type == TokenType::Dot)
         {
             advance();
@@ -877,11 +884,22 @@ StatementNode* Parser::parseVarOrCall() {
                 }
             }
             advance();
-            varExpr = new IndexExprNode(name, index, dotModule, dotClass, fieldIndex, true);
+            //varExpr = new IndexesExprNode(name, indexes, dotModule, dotClass, fieldIndex, true);
+            if (indexes->size() == 1)
+                varExpr = new IndexExprNode(name, indexes->at(0), dotModule, dotClass, fieldIndex, true);
+            else
+                varExpr = new IndexesExprNode(name, indexes, dotModule, dotClass, fieldIndex, true);
+            //varExpr = new IndexExprNode(name, index, dotModule, dotClass, fieldIndex, true);
         }
         else
         {
-            return new IndexExprNode(name, index, dotModule, dotClass, fieldIndex);
+            //varExpr = new IndexExprNode(name, index, dotModule, dotClass, fieldIndex, true);
+            //return new IndexesExprNode(name, indexes, dotModule, dotClass, fieldIndex);
+            if (indexes->size() == 1)
+                return new IndexExprNode(name, indexes->at(0), dotModule, dotClass, fieldIndex);
+            else
+                return new IndexesExprNode(name, indexes, dotModule, dotClass, fieldIndex);
+
         }
     }
     if (token.type != TokenType::LParen) {

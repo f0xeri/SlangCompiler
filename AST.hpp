@@ -590,7 +590,7 @@ public:
 
     Function* GC_MallocFunction() {
         vector<Type*> args;
-        args.push_back(Type::getInt64Ty(*context));
+        args.push_back(Type::getInt32Ty(*context));
         FunctionType* type = FunctionType::get(Type::getInt8PtrTy(*context), args, false);
         Function *GC_MallocFunc = Function::Create(type, Function::ExternalLinkage, Twine("GC_malloc"), mModule);
         GC_MallocFunc->setCallingConv(CallingConv::C);

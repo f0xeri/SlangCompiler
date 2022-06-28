@@ -4,10 +4,6 @@ module openglTests
     public procedure resizeCallback(out glfw.GLFWwindow window, in integer width, in integer height):
         call glViewport(0, 0, width, height);
     end resizeCallback;
-
-    public procedure resizeCallback():
-
-    end resizeCallback;
 start
     if (glfwInit() == 0) then
         output "[ERROR] glfwInit() failed";
@@ -43,27 +39,31 @@ start
     call __glewDeleteShader(vertexShader);
     call __glewDeleteShader(fragmentShader);
 
-    variable-array[9] float vertices;
-    let vertices[0] := -0.5f;
-    let vertices[1] := -0.5f;
-    let vertices[2] := 0.0f;
-    let vertices[3] := 0.5f;
-    let vertices[4] := -0.5f;
-    let vertices[5] := 0.0f;
-    let vertices[6] := 0.0f;
-    let vertices[7] := 0.5f;
-    let vertices[8] := 0.0f;
+    variable-array[12] float vertices;
+    let vertices[0] :=  0.5f;  let vertices[1]  :=  0.5f;   let vertices[2]  := 0.0f;
+    let vertices[3] :=  0.5f;  let vertices[4]  := -0.5f;   let vertices[5]  := 0.0f;
+    let vertices[6] := -0.5f;  let vertices[7]  := -0.5f;   let vertices[8]  := 0.0f;
+    let vertices[9] := -0.5f;  let vertices[10] :=  0.5f;   let vertices[11] := 0.0f;
+
+    variable-array[6] integer indices;
+    let indices[0] := 0; let indices[1] := 1; let indices[2] := 3;
+    let indices[3] := 1; let indices[4] := 2; let indices[5] := 3;
 
     variable-integer vertexBufferObject := 0;
     variable-integer vertexArrayObject := 0;
+    variable-integer indexBufferObject := 0;
 
     call __glewGenVertexArrays(1, vertexArrayObject);
     call __glewGenBuffers(1, vertexBufferObject);
+    call __glewGenBuffers(1, indexBufferObject);
 
     call __glewBindVertexArray(vertexArrayObject);
 
     call __glewBindBuffer(34962, vertexBufferObject);
-    call __glewBufferData(34962, 36, vertices, 35044);
+    call __glewBufferData(34962, 48, vertices, 35044);
+
+    call __glewBindBuffer(34963, indexBufferObject);
+    call __glewBufferData(34963, 24, indices, 35044);
 
     call __glewVertexAttribPointer(0, 3, 5126, 0, 3 * 4, nil);
     call __glewEnableVertexAttribArray(0);
@@ -77,7 +77,8 @@ start
 
         call __glewUseProgram(shaderProgram);
         call __glewBindVertexArray(vertexArrayObject);
-        call glDrawArrays(4, 0, 3);
+        // call glDrawArrays(4, 0, 3);
+        call glDrawElements(4, 6, 5125, nil);
 
         call glfwSwapBuffers(mainWindow);
         call glfwPollEvents();

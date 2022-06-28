@@ -10,7 +10,7 @@ using namespace llvm;
 static Type *typeOf(CodeGenContext &cgcontext, const std::string &var) {
     Type *type = nullptr;
     if (var == "integer")
-        type = Type::getInt64Ty(*cgcontext.context);
+        type = Type::getInt32Ty(*cgcontext.context);
     else if (var == "character")
         type = Type::getInt8Ty(*cgcontext.context);
     else if (var == "real")
@@ -32,7 +32,7 @@ static Type *typeOf(CodeGenContext &cgcontext, const std::string &var) {
 static Type *ptrToTypeOf(CodeGenContext &cgcontext, const std::string &var) {
     Type *type = nullptr;
     if (var == "integer")
-        type = Type::getInt64PtrTy(*cgcontext.context);
+        type = Type::getInt32PtrTy(*cgcontext.context);
     else if (var == "character")
         type = Type::getInt8PtrTy(*cgcontext.context);
     else if (var == "real")
@@ -50,7 +50,7 @@ static Type *ptrToTypeOf(CodeGenContext &cgcontext, const std::string &var) {
 }
 
 // array size is not calculating here!!!
-Type* getTypeFromExprNode(CodeGenContext &cgcontext, ExprNode* node)
+Type* getTypeFromExprNode(CodeGenContext &cgcontext, ExprNode* node, ParameterType paramType = ParameterType::In)
 {
     Type *retType = nullptr;
     std::string retTypeName;
@@ -111,6 +111,10 @@ Type* getTypeFromExprNode(CodeGenContext &cgcontext, ExprNode* node)
         FunctionType* funcType = FunctionType::get(retFuncType, argTypes, false);
         retType = funcType;
     }
+    if (paramType == ParameterType::Out || paramType == ParameterType::Var)
+    {
+        retType = retType->getPointerTo();
+    }
     return retType;
 }
 
@@ -118,12 +122,12 @@ static Value* mycast(Value* value, Type* type, CodeGenContext& cgcontext) {
     if (type == value->getType())
         return value;
     if (type == Type::getDoubleTy(*cgcontext.context)) {
-        if (value->getType() == Type::getInt64Ty(*cgcontext.context) || value->getType() == Type::getInt8Ty(*cgcontext.context))
+        if (value->getType() == Type::getInt32Ty(*cgcontext.context) || value->getType() == Type::getInt8Ty(*cgcontext.context))
             value = new SIToFPInst(value, type, "", cgcontext.currentBlock());
         else
             llvm::errs() << "[ERROR] Cannot cast this value.\n";
     }
-    else if (type == Type::getInt64Ty(*cgcontext.context)) {
+    else if (type == Type::getInt32Ty(*cgcontext.context)) {
         if (value->getType() == Type::getDoubleTy(*cgcontext.context))
             value = new FPToSIInst(value, type, "", cgcontext.currentBlock());
         else if (value->getType() == Type::getInt8Ty(*cgcontext.context))
@@ -132,24 +136,27 @@ static Value* mycast(Value* value, Type* type, CodeGenContext& cgcontext) {
             value = new ZExtInst(value, type, "", cgcontext.currentBlock());
         else if (value->getType() == Type::getInt8PtrTy(*cgcontext.context))
             value = new PtrToIntInst(value, type, "", cgcontext.currentBlock());
-        else if (value->getType() == Type::getInt64PtrTy(*cgcontext.context))
+        else if (value->getType() == Type::getInt32PtrTy(*cgcontext.context))
             value = new PtrToIntInst(value, type, "", cgcontext.currentBlock());
         else
             llvm::errs() << "[ERROR] Cannot cast this value.\n";
     } else if (type == Type::getInt8Ty(*cgcontext.context)) {
         if (value->getType() == Type::getDoubleTy(*cgcontext.context))
             value = new FPToSIInst(value, type, "", cgcontext.currentBlock());
-        else if (value->getType() == Type::getInt64Ty(*cgcontext.context))
+        else if (value->getType() == Type::getInt32Ty(*cgcontext.context))
             value = new TruncInst(value, type, "", cgcontext.currentBlock());
         else
             llvm::errs() << "[ERROR] Cannot cast this value.\n";
-    } else
+    } else if (type == Type::getInt8PtrTy(*cgcontext.context)) {
+        value = cgcontext.builder->CreateBitCast(value, type);
+    }
+    else
         llvm::errs() << "[ERROR] Cannot cast this value.\n";
     return value;
 }
 
 llvm::Value *IntExprNode::codegen(CodeGenContext &cgcontext) {
-    return ConstantInt::get(Type::getInt64Ty(*cgcontext.context), value, true);
+    return ConstantInt::get(Type::getInt32Ty(*cgcontext.context), value, true);
 }
 
 llvm::Value *RealExprNode::codegen(CodeGenContext &cgcontext) {
@@ -207,7 +214,8 @@ llvm::Value *VariableExprNode::codegen(CodeGenContext &cgcontext) {
             if (function == nullptr) {
                 function = cgcontext.mModule->getFunction(cgcontext.moduleName + "." + value + cgcontext.currentNameAddition);
                 if (function == nullptr) {
-                    llvm::errs() << "[ERROR] Codegen - no such function \"" << value << "\".\n";
+                    //llvm::errs() << "[ERROR] Codegen - no such function \"" << value << "\".\n";
+                    return nullptr;
                 }
             }
             val = function;
@@ -339,8 +347,8 @@ llvm::Value *OperatorExprNode::codegen(CodeGenContext &cgcontext) {
 
         }
         else {
-            leftVal = mycast(leftVal, Type::getInt64Ty(*cgcontext.context), cgcontext);
-            rightVal = mycast(rightVal, Type::getInt64Ty(*cgcontext.context), cgcontext);
+            leftVal = mycast(leftVal, Type::getInt32Ty(*cgcontext.context), cgcontext);
+            rightVal = mycast(rightVal, Type::getInt32Ty(*cgcontext.context), cgcontext);
         }
     }
 
@@ -437,33 +445,55 @@ llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
         {
             if (funcDecl != nullptr) {
                 if (i < funcDecl->args->size()) {
-                    if (funcDecl->args->at(i)->parameterType == ParameterType::Out || funcDecl->args->at(i)->parameterType == ParameterType::Var) {
+                    auto currArg = funcDecl->args->at(i);
+                    auto argType = getTypeFromExprNode(cgcontext, currArg->type);
+                    if (currArg->parameterType == ParameterType::Out || currArg->parameterType == ParameterType::Var) {
                         if (loadValue->getType()->isPointerTy()) {
                             if (!loadValue->getType()->getPointerElementType()->isFunctionTy())
                                 loadValue = getPointerOperand(loadValue);
                         }
                         else {
                             loadValue = getPointerOperand(loadValue);
+                        }
+                    }
+                    if (argType != loadValue->getType()) {
+                        if (currArg->parameterType == ParameterType::Out || currArg->parameterType == ParameterType::Var) {
+                            loadValue = mycast(var, getTypeFromExprNode(cgcontext, currArg->type)->getPointerTo(), cgcontext);
+                        }
+                        else {
+                            loadValue = mycast(loadValue, getTypeFromExprNode(cgcontext, currArg->type), cgcontext);
                         }
                     }
                 }
             }
             if (externFuncDecl != nullptr) {
                 if (i < externFuncDecl->args->size()) {
-                    if (externFuncDecl->args->at(i)->parameterType == ParameterType::Out || externFuncDecl->args->at(i)->parameterType == ParameterType::Var) {
+                    auto currArg = externFuncDecl->args->at(i);
+                    auto argType = getTypeFromExprNode(cgcontext, currArg->type);
+                    if (currArg->parameterType == ParameterType::Out || currArg->parameterType == ParameterType::Var) {
                         if (loadValue->getType()->isPointerTy()) {
                             if (!loadValue->getType()->getPointerElementType()->isFunctionTy())
                                 loadValue = getPointerOperand(loadValue);
                         }
                         else {
                             loadValue = getPointerOperand(loadValue);
+                        }
+                    }
+                    if (argType != loadValue->getType()) {
+                        if (currArg->parameterType == ParameterType::Out || currArg->parameterType == ParameterType::Var) {
+                            loadValue = mycast(var, getTypeFromExprNode(cgcontext, currArg->type)->getPointerTo(), cgcontext);
+                        }
+                        else {
+                            loadValue = mycast(loadValue, getTypeFromExprNode(cgcontext, currArg->type), cgcontext);
                         }
                     }
                 }
             }
             if (methodDecl != nullptr) {
                 if (i < methodDecl->args->size()) {
-                    if (methodDecl->args->at(i)->parameterType == ParameterType::Out || methodDecl->args->at(i)->parameterType == ParameterType::Var) {
+                    auto currArg = methodDecl->args->at(i);
+                    auto argType = getTypeFromExprNode(cgcontext, currArg->type);
+                    if (currArg->parameterType == ParameterType::Out || currArg->parameterType == ParameterType::Var) {
                         if (loadValue->getType()->isPointerTy()) {
                             if (!loadValue->getType()->getPointerElementType()->isFunctionTy())
                                 loadValue = getPointerOperand(loadValue);
@@ -472,11 +502,21 @@ llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
                             loadValue = getPointerOperand(loadValue);
                         }
                     }
+                    if (argType != loadValue->getType()) {
+                        if (currArg->parameterType == ParameterType::Out || currArg->parameterType == ParameterType::Var) {
+                            loadValue = mycast(var, getTypeFromExprNode(cgcontext, currArg->type)->getPointerTo(), cgcontext);
+                        }
+                        else {
+                            loadValue = mycast(loadValue, getTypeFromExprNode(cgcontext, currArg->type), cgcontext);
+                        }
+                    }
                 }
             }
             if (funcPtrDecl != nullptr) {
                 if (i < funcPtrDecl->args->size()) {
-                    if (funcPtrDecl->args->at(i)->parameterType == ParameterType::Out || funcPtrDecl->args->at(i)->parameterType == ParameterType::Var) {
+                    auto currArg = funcPtrDecl->args->at(i);
+                    auto argType = getTypeFromExprNode(cgcontext, currArg->type, currArg->parameterType);
+                    if (currArg->parameterType == ParameterType::Out || currArg->parameterType == ParameterType::Var) {
                         if (loadValue->getType()->isPointerTy()) {
                             if (!loadValue->getType()->getPointerElementType()->isFunctionTy())
                                 loadValue = getPointerOperand(loadValue);
@@ -484,7 +524,14 @@ llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
                         else {
                             loadValue = getPointerOperand(loadValue);
                         }
-
+                    }
+                    if (argType != loadValue->getType()) {
+                        if (currArg->parameterType == ParameterType::Out || currArg->parameterType == ParameterType::Var) {
+                            loadValue = mycast(var, getTypeFromExprNode(cgcontext, currArg->type)->getPointerTo(), cgcontext);
+                        }
+                        else {
+                            loadValue = mycast(loadValue, getTypeFromExprNode(cgcontext, currArg->type), cgcontext);
+                        }
                     }
                 }
             }
@@ -621,6 +668,9 @@ llvm::Value *AssignExprNode::codegen(CodeGenContext &cgcontext) {
                 cgcontext.isFuncPointerAssignment = true;
                 cgcontext.currentNameAddition = nameAddition;
                 assignData = right->codegen(cgcontext);
+                if (assignData == nullptr) {
+                    llvm::errs() << "[ERROR] Codegen - no such function found when assigning to \"" << left->value << "\".\n";
+                }
                 cgcontext.isFuncPointerAssignment = false;
                 cgcontext.currentNameAddition = "";
             }
@@ -645,14 +695,14 @@ llvm::Value *OutputStatementNode::codegen(CodeGenContext &cgcontext) {
     Value *value = expr->codegen(cgcontext);
     std::vector<Value *> printArgs;
     Value *formatStr;
-    if (value->getType()->isIntegerTy() && value->getType()->getIntegerBitWidth() == 64) {
+    if (value->getType()->isIntegerTy() && value->getType()->getIntegerBitWidth() == 32) {
         formatStr = cgcontext.builder->CreateGlobalStringPtr("%d\n");
     }
     else if (value->getType()->isIntegerTy() && value->getType()->getIntegerBitWidth() == 8) {
         formatStr = cgcontext.builder->CreateGlobalStringPtr("%c\n");
     }
     else if (value->getType()->isIntegerTy() && value->getType()->getIntegerBitWidth() == 1) {
-        value = cgcontext.builder->CreateIntCast(value, Type::getInt64Ty(*cgcontext.context), false);
+        value = cgcontext.builder->CreateIntCast(value, Type::getInt32Ty(*cgcontext.context), false);
         formatStr = cgcontext.builder->CreateGlobalStringPtr("%d\n");
     }
     else if (value->getType()->isDoubleTy()) {
@@ -692,9 +742,9 @@ llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgcontext) {
     {
         if (cgcontext.allocatedClasses.contains(type)) {
             newVar = cgcontext.builder->CreateAlloca(ptrToTypeOf(cgcontext, type), 0, nullptr, name->value);
-            llvm::Type* int64type = llvm::Type::getInt64Ty(*cgcontext.context);
+            llvm::Type* int64type = llvm::Type::getInt32Ty(*cgcontext.context);
             auto structType = typeOf(cgcontext, type);
-            auto malloc = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, structType, llvm::ConstantInt::get(llvm::Type::getInt64Ty(*cgcontext.context), cgcontext.mModule->getDataLayout().getTypeAllocSize(structType)), nullptr, cgcontext.mModule->getFunction("malloc"), "");
+            auto malloc = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, structType, llvm::ConstantInt::get(llvm::Type::getInt32Ty(*cgcontext.context), cgcontext.mModule->getDataLayout().getTypeAllocSize(structType)), nullptr, cgcontext.mModule->getFunction("malloc"), "");
             cgcontext.builder->Insert(malloc);
             cgcontext.builder->CreateStore(malloc, newVar);
         }
@@ -751,7 +801,7 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
         }
     }
     auto type = typeOf(cgcontext, arrExpr->type);
-    llvm::Type* int64type = llvm::Type::getInt64Ty(*cgcontext.context);
+    llvm::Type* int64type = llvm::Type::getInt32Ty(*cgcontext.context);
 
     if (isGlobal)
     {
@@ -993,7 +1043,7 @@ llvm::Value *FieldArrayVarDecNode::codegen(CodeGenContext &cgcontext) {
         }
     }
     auto type = typeOf(cgcontext, arrExpr->type);
-    llvm::Type* int64type = llvm::Type::getInt64Ty(*cgcontext.context);
+    llvm::Type* int64type = llvm::Type::getInt32Ty(*cgcontext.context);
 
     cgcontext.locals()[name->value] = elementPtr;
 

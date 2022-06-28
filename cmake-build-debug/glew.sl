@@ -1,4 +1,6 @@
 module gl
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~extern~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
     public extern function glewInit(): integer
     end glewInit;
 
@@ -41,12 +43,16 @@ module gl
     end glDrawArrays;
 
     // create glDrawElements
-    public extern procedure glDrawElements(in integer mode, in integer count, in integer type, out integer indices):
+    public extern procedure glDrawElements(in integer mode, in integer count, in integer type, out character indices):
     end glDrawElements;
 
     // create glViewport
     public extern procedure glViewport(in integer x, in integer y, in integer width, in integer height):
     end glViewport;
+
+    // create glPolygonMode
+    public extern procedure glPolygonMode(in integer face, in integer mode):
+    end glPolygonMode;
 
     // create __glewCreateShader
     public extern variable-function(in integer): integer __glewCreateShader;
@@ -93,14 +99,16 @@ module gl
     // create __glewBindBuffer
     public extern variable-procedure(in integer, in integer) __glewBindBuffer;
 
-    // create __glewBufferData
-    public extern variable-procedure(in integer, in integer, in array[] float, in integer) __glewBufferData;
+    // create __glewBufferData                               // void*
+    public extern variable-procedure(in integer, in integer, out character, in integer) __glewBufferData;
 
     // create __glewVertexAttribPointer
     public extern variable-procedure(in integer, in integer, in integer, in integer, in integer, out integer) __glewVertexAttribPointer;
 
     // create __glewEnableVertexAttribArray
     public extern variable-procedure(in integer) __glewEnableVertexAttribArray;
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~interface~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 start
 end gl.

@@ -1,5 +1,5 @@
 import StdString;
-module array
+module arrays
 start
     variable-array[20] array[30] array[40] integer arr3d;
 
@@ -37,4 +37,4 @@ start
         let j := 0;
         let i := i + 1;
     end while;
-end array.
+end arrays.

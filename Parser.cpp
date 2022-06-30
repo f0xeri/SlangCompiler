@@ -1069,6 +1069,7 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
                 arrType = token.data;
                 if (!oneOfDefaultTypes(arrType) && arrType != "array")
                 {
+                    advance();
                     type = parseTypeName(arrType);
                     auto typeStatement = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(type));
                     if (typeStatement == nullptr)
@@ -1076,6 +1077,8 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
                         llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Unknown type \"" << type << "\".\n";
                         hasError = true;
                     }
+                    tokensIterator--;
+                    token = *tokensIterator;
                 }
             }
             arrExpr->values->push_back(new ArrayExprNode(arrType, size, nullptr));

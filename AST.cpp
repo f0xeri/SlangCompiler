@@ -261,6 +261,27 @@ llvm::Value *VariableExprNode::codegen(CodeGenContext &cgcontext) {
                             auto elementPtr = cgcontext.builder->CreateInBoundsGEP(val, dynamic_cast<IndexExprNode*>(this)->indexExpr->codegen(cgcontext));
                             return cgcontext.builder->CreateLoad(elementPtr);
                         }
+                        else if (dynamic_cast<IndexesExprNode*>(this) != nullptr)
+                        {
+                            auto indexesExpr = dynamic_cast<IndexesExprNode*>(this);
+                            auto arrExpr = dynamic_cast<ArrayDecStatementNode*>(cgcontext.localsExprsLookup(value));
+                            if (arrExpr == nullptr) {
+                                llvm::errs() << "[ERROR] Variable \"" << value << "\" is not an array.\n";
+                            }
+                            if (arrExpr->indicesCount > indexesExpr->indexes->size()) {
+                                llvm::errs() << "[ERROR] Too much indexes in expression. (\"" << value << "\")n";
+                            }
+                            auto loadArr = val;
+                            llvm::Value *elementPtr = nullptr;
+                            for (int i = 0; i < indexesExpr->indexes->size(); i++) {
+                                auto index = indexesExpr->indexes->at(i)->codegen(cgcontext);
+                                elementPtr = cgcontext.builder->CreateInBoundsGEP(loadArr, index);
+                                loadArr = cgcontext.builder->CreateLoad(elementPtr);
+                            }
+                            auto ret = cgcontext.builder->CreateLoad(elementPtr);
+
+                            return ret;
+                        }
                         else
                             return val;
                     }
@@ -286,6 +307,29 @@ llvm::Value *VariableExprNode::codegen(CodeGenContext &cgcontext) {
         auto elementPtr = cgcontext.builder->CreateInBoundsGEP(loadArr, dynamic_cast<IndexExprNode*>(this)->indexExpr->codegen(cgcontext));
         return cgcontext.builder->CreateLoad(elementPtr);
     }
+
+    if (dynamic_cast<IndexesExprNode*>(this) != nullptr)
+    {
+        auto indexesExpr = dynamic_cast<IndexesExprNode*>(this);
+        auto arrExpr = dynamic_cast<ArrayDecStatementNode*>(cgcontext.localsExprsLookup(value));
+        if (arrExpr == nullptr) {
+            llvm::errs() << "[ERROR] Variable \"" << value << "\" is not an array.\n";
+        }
+        if (arrExpr->indicesCount > indexesExpr->indexes->size()) {
+            llvm::errs() << "[ERROR] Too much indexes in expression. (\"" << value << "\")n";
+        }
+        auto loadArr = cgcontext.builder->CreateLoad(val);
+        llvm::Value *elementPtr = nullptr;
+        for (int i = 0; i < indexesExpr->indexes->size(); i++) {
+            auto index = indexesExpr->indexes->at(i)->codegen(cgcontext);
+            elementPtr = cgcontext.builder->CreateInBoundsGEP(loadArr, index);
+            loadArr = cgcontext.builder->CreateLoad(elementPtr);
+        }
+        auto ret = cgcontext.builder->CreateLoad(elementPtr);
+
+        return ret;
+    }
+
     if (val == nullptr) return nullptr;
     if (type == nullptr)
         type = val->getType()->getPointerElementType();
@@ -673,14 +717,23 @@ llvm::Value *AssignExprNode::codegen(CodeGenContext &cgcontext) {
     if (dynamic_cast<IndexesExprNode*>(left) != nullptr)
     {
         auto indexesExpr = dynamic_cast<IndexesExprNode*>(left);
-        //int n = calcNumberOfIndexes(varExpr, nullptr);
-        //if (n > indexesExpr->indexes->size())
-        //{
-            //llvm::errs() << "[ERROR] Too much indexes in expression.\n";
-            //return nullptr;
-        //}
+        auto arrExpr = dynamic_cast<ArrayDecStatementNode*>(varExpr);
+        if (arrExpr == nullptr) {
+            llvm::errs() << "[ERROR] Variable \"" << left->value << "\" is not an array.\n";
+        }
+        if (arrExpr->indicesCount > indexesExpr->indexes->size()) {
+            llvm::errs() << "[ERROR] Too much indexes in expression. (\"" << left->value << "\")n";
+        }
+        auto loadArr = cgcontext.builder->CreateLoad(var);
+        llvm::Value *elementPtr = nullptr;
+        for (int i = 0; i < indexesExpr->indexes->size(); i++) {
+            auto index = indexesExpr->indexes->at(i)->codegen(cgcontext);
+            elementPtr = cgcontext.builder->CreateInBoundsGEP(loadArr, index);
+            loadArr = cgcontext.builder->CreateLoad(elementPtr);
+        }
+        auto ret = cgcontext.builder->CreateStore(assignData, elementPtr);
 
-        return nullptr;
+        return ret;
     }
 
     // TODO: at least it works for arrays, check for other types
@@ -816,9 +869,9 @@ void generateMallocLoopsRecursive(CodeGenContext &cgcontext, int i, int indicesC
 {
     if (i == indicesCount) return;
     Function *TheFunctionMain = cgcontext.builder->GetInsertBlock()->getParent();
+    BasicBlock* whileCheckMain = BasicBlock::Create(*cgcontext.context, "", TheFunctionMain, 0);
     BasicBlock* whileIterMain = BasicBlock::Create(*cgcontext.context, "", TheFunctionMain, 0);
     BasicBlock* whileEndMain = BasicBlock::Create(*cgcontext.context, "", TheFunctionMain, 0);
-    BasicBlock* whileCheckMain = BasicBlock::Create(*cgcontext.context, "", TheFunctionMain, 0);
     // Check condition satisfaction
     BranchInst::Create(whileCheckMain, cgcontext.currentBlock());
     cgcontext.pushBlock(whileCheckMain);
@@ -835,10 +888,11 @@ void generateMallocLoopsRecursive(CodeGenContext &cgcontext, int i, int indicesC
 
     // Statements go here
     currentType = currentType->getPointerElementType();
-
     jvar = cgcontext.builder->CreateLoad(jvars[i]);
+
     llvm::Type* int32type = llvm::Type::getInt32Ty(*cgcontext.context);
     auto allocSz = sizes->at(i)->codegen(cgcontext);
+
     auto currentElementSize = ConstantInt::get(int32type, cgcontext.dataLayout->getTypeAllocSize(currentType));
     auto allocSize = BinaryOperator::Create(Instruction::Mul, allocSz, currentElementSize, "", cgcontext.currentBlock());
     // GC_malloc
@@ -846,19 +900,21 @@ void generateMallocLoopsRecursive(CodeGenContext &cgcontext, int i, int indicesC
     // malloc
     //auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int32type, type, allocSize, nullptr, nullptr, "");
     cgcontext.builder->Insert(currentArr);
-    llvm::Value *arrLoad = var;
 
-    auto formatStr = cgcontext.builder->CreateGlobalStringPtr("%d %d\n");
-    cgcontext.builder->CreateCall(cgcontext.mModule->getFunction("printf"), {formatStr, allocSz, jvar});
+    llvm::Value *arrLoad = cgcontext.builder->CreateLoad(var);
+    llvm::Value *arrPtr = nullptr;
+
     for (int k = 1; k <= i; k++)
     {
-        arrLoad = cgcontext.builder->CreateLoad(arrLoad);
         jvar = cgcontext.builder->CreateLoad(jvars[k]);
 
         auto sext = cgcontext.builder->CreateSExt(jvar, llvm::Type::getInt64Ty(*cgcontext.context));
-        auto arrPtr = cgcontext.builder->CreateGEP(arrLoad, sext);
-        //cgcontext.builder->CreateStore(currentArr, arrPtr);
+        arrPtr = cgcontext.builder->CreateInBoundsGEP(arrLoad, sext);
+        arrLoad = cgcontext.builder->CreateLoad(arrPtr);
+
     }
+
+    cgcontext.builder->CreateStore(currentArr, arrPtr);
 
     if (i == indicesCount - 1)
     {
@@ -870,6 +926,10 @@ void generateMallocLoopsRecursive(CodeGenContext &cgcontext, int i, int indicesC
     {
         cgcontext.builder->CreateStore(ConstantInt::get(int32type, 0), jvars[i + 1]);
     }
+
+    //auto jvar1 = cgcontext.builder->CreateLoad(jvars[i - 1]);
+    //auto formatStr = cgcontext.builder->CreateGlobalStringPtr("%d %d %d\n");
+    //cgcontext.builder->CreateCall(cgcontext.mModule->getFunction("printf"), {formatStr, allocSz, jvar1, jvar});
 
     generateMallocLoopsRecursive(cgcontext, i + 1, indicesCount, currentType, sizes, jvars, currentArr, var);
     // Jump back to condition checking
@@ -1602,11 +1662,22 @@ llvm::Value *IndexesExprNode::codegen(CodeGenContext &cgcontext) {
     }
 
     auto loadArr = cgcontext.builder->CreateLoad(var);
-    varExpr = cgcontext.localsExprs()[value];
-    //int a = calcNumberOfIndexes(varExpr, nullptr);
+    //varExpr = cgcontext.localsExprs()[value];
 
-    //auto elementPtr = cgcontext.builder->CreateInBoundsGEP(loadArr, indexExpr->codegen(cgcontext));
-    //if (isPointer) return elementPtr;
-    //return cgcontext.builder->CreateLoad(elementPtr, false);
-    return nullptr;
+    auto arrExpr = dynamic_cast<ArrayDecStatementNode*>(varExpr);
+    if (arrExpr == nullptr) {
+        llvm::errs() << "[ERROR] Variable \"" << varExpr->name->value << "\" is not an array.\n";
+    }
+    if (arrExpr->indicesCount > indexes->size()) {
+        llvm::errs() << "[ERROR] Too much indexes in expression. (\"" << varExpr->name->value << "\")n";
+    }
+
+    llvm::Value *elementPtr = nullptr;
+    for (int i = 0; i < indexes->size(); i++) {
+        auto index = indexes->at(i)->codegen(cgcontext);
+        elementPtr = cgcontext.builder->CreateInBoundsGEP(loadArr, index);
+        loadArr = cgcontext.builder->CreateLoad(elementPtr);
+    }
+    if (isPointer) return elementPtr;
+    return cgcontext.builder->CreateLoad(elementPtr, false);
 }

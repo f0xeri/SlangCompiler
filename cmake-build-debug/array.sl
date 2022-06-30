@@ -1,7 +1,40 @@
-module f1
+import StdString;
+module array
 start
-    variable-array[2] array[3] array[4] array[5] array[6] array[7] integer arr;
+    variable-array[20] array[30] array[40] integer arr3d;
 
-    //let arr[i][j][k] := 0;
-    //output arr[i][j][k];
-end f1.
+    variable-integer i := 0;
+    variable-integer j := 0;
+    variable-integer k := 0;
+    variable-integer counter := 1;
+
+    while i < 20 repeat
+        while j < 30 repeat
+            while k < 40 repeat
+                let arr3d[i][j][k] := counter;
+                let counter := counter + 1;
+                let k := k + 1;
+            end while;
+            let k := 0;
+            let j := j + 1;
+        end while;
+        let j := 0;
+        let i := i + 1;
+    end while;
+
+    let i := 0;
+    let j := 0;
+    let k := 0;
+    while i < 20 repeat
+        while j < 30 repeat
+            while k < 40 repeat
+                output arr3d[i][j][k];
+                let k := k + 1;
+            end while;
+            let k := 0;
+            let j := j + 1;
+        end while;
+        let j := 0;
+        let i := i + 1;
+    end while;
+end array.

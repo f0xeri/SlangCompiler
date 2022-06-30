@@ -348,7 +348,8 @@ MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std
     if (token.type == TokenType::Colon)
     {
         advance();
-        type = lookupTypes(token.data);
+        auto typeStr = parseTypeName(token.data);
+        type = lookupTypes(typeStr);
         isFunction = true;
     }
     else
@@ -1186,7 +1187,8 @@ DeclarationNode *Parser::parseFunctionDecl() {
         if (token.type == TokenType::Colon)
         {
             advance();
-            type = lookupTypes(token.data);
+            auto typeStr = parseTypeName(token.data);
+            type = lookupTypes(typeStr);
         }
         else
         {

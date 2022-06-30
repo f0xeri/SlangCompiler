@@ -1,9 +1,9 @@
 module main
 start
-    variable-integer n;
+    public variable-integer n;
     input n;
 
-    variable-integer result := 1;
+    public variable-integer result := 1;
     if n < 0 then
         let result := 0;
     else if n == 0 then

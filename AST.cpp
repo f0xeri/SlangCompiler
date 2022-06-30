@@ -66,6 +66,7 @@ Type* getTypeFromExprNode(CodeGenContext &cgcontext, ExprNode* node, ParameterTy
 
         //auto size = exprNode->size->codegen(cgcontext);
         //auto arraySize = size;
+        auto indicesCount = 1;
         if (arrExpr->type == "array")
         {
             for (auto &slice : *arrExpr->values)
@@ -75,9 +76,14 @@ Type* getTypeFromExprNode(CodeGenContext &cgcontext, ExprNode* node, ParameterTy
                 //auto newArraySize = BinaryOperator::Create(Instruction::Mul, sliceSize, arraySize, "", cgcontext.currentBlock());
                 //arraySize = newArraySize;
                 arrExpr = castedSlice;
+                indicesCount++;
             }
         }
+
         retType = ptrToTypeOf(cgcontext, arrExpr->type);
+        for (int i = 1; i < indicesCount; i++) {
+            retType = retType->getPointerTo();
+        }
         retTypeName = arrExpr->type + "Array";
     }
     else if (dynamic_cast<FuncExprNode*>(node) != nullptr)

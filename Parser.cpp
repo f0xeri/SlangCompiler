@@ -203,24 +203,33 @@ DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, 
         std::string arrType = token.data;
         ArrayExprNode *arrExpr = new ArrayExprNode(arrType, size, new std::vector<ExprNode *>());
         int indicesCount = 1;
-        while (token.data == "array") {
+        while (token.data == "array")
+        {
             indicesCount++;
             advance();
             consume(TokenType::LBracket);
             size = parseExpression();
             consume(TokenType::RBracket);
-            if (token.type == TokenType::Identifier) {
+            if (token.type == TokenType::Identifier)
+            {
                 arrType = token.data;
-                if (!oneOfDefaultTypes(arrType) && arrType != "array") {
-                    auto typeStatement = dynamic_cast<TypeDecStatementNode *>(currentScope->lookup(type));
-                    if (typeStatement == nullptr) {
+                if (!oneOfDefaultTypes(arrType) && arrType != "array")
+                {
+                    advance();
+                    type = parseTypeName(arrType);
+                    auto typeStatement = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(type));
+                    if (typeStatement == nullptr)
+                    {
                         llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Unknown type \"" << type << "\".\n";
                         hasError = true;
                     }
+                    tokensIterator--;
+                    token = *tokensIterator;
                 }
             }
             arrExpr->values->push_back(new ArrayExprNode(arrType, size, nullptr));
         }
+        expr = arrExpr;
         advance();
         name = consume(TokenType::Identifier).data;
         constructorRequired = true;
@@ -759,6 +768,8 @@ StatementNode* Parser::parseVarOrCall() {
 
     int fieldIndex = -1;
     std::string methodName;
+
+    FieldArrayVarDecNode *fieldArray = nullptr;
     // if we have dot
     if (token.type == TokenType::Dot)
     {
@@ -810,7 +821,10 @@ StatementNode* Parser::parseVarOrCall() {
                     name += "." + token.data;
                     fieldExists = true;
                     if (dynamic_cast<FieldVarDecNode*>(field) != nullptr) fieldIndex = dynamic_cast<FieldVarDecNode*>(field)->index;
-                    else if (dynamic_cast<FieldArrayVarDecNode*>(field)) fieldIndex = dynamic_cast<FieldArrayVarDecNode*>(field)->index;
+                    else if (dynamic_cast<FieldArrayVarDecNode*>(field)) {
+                        fieldIndex = dynamic_cast<FieldArrayVarDecNode*>(field)->index;
+                        fieldArray = dynamic_cast<FieldArrayVarDecNode*>(field);
+                    }
                     break;
                 }
             }
@@ -850,14 +864,25 @@ StatementNode* Parser::parseVarOrCall() {
         {
             advance();
             //TODO: call methods of array object
-            auto var = currentScope->lookup(name);
-            if (var == nullptr)
-            {
-                llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") " + name + " is not declared.\n";
-                hasError = true;
-            }
+            //auto var = currentScope->lookup(name);
+            //if (var == nullptr)
+            //{
+                //llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") " + name + " is not declared.\n";
+                //hasError = true;
+            //}
 
-            type = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(getArrayFinalType(dynamic_cast<ArrayDecStatementNode *>(var)->expr)));
+            if (fieldArray != nullptr) {
+                type = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(getArrayFinalType(fieldArray->var->expr)));
+            }
+            else {
+                auto var = currentScope->lookup(name);
+                if (var == nullptr)
+                {
+                    llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") " + name + " is not declared.\n";
+                    hasError = true;
+                }
+                type = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(getArrayFinalType(dynamic_cast<ArrayDecStatementNode *>(var)->expr)));
+            }
             if (type != nullptr) dotClass = true;
             if (dotClass)
             {

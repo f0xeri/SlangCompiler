@@ -319,5 +319,6 @@ module StdString
             end if;
         end setSymbol;
     end String;
+
 start
 end StdString.

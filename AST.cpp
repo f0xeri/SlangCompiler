@@ -264,13 +264,17 @@ llvm::Value *VariableExprNode::codegen(CodeGenContext &cgcontext) {
                         else if (dynamic_cast<IndexesExprNode*>(this) != nullptr)
                         {
                             auto indexesExpr = dynamic_cast<IndexesExprNode*>(this);
-                            auto arrExpr = dynamic_cast<ArrayDecStatementNode*>(cgcontext.localsExprsLookup(value));
+                            /*auto arrExpr = dynamic_cast<ArrayDecStatementNode*>(cgcontext.localsExprsLookup(value));
+                            if (arrExpr == nullptr) {
+                                auto field = dynamic_cast<FieldArrayVarDecNode *>(cgcontext.localsExprsLookup(value));
+                                if (field != nullptr) arrExpr = field->var;
+                            }
                             if (arrExpr == nullptr) {
                                 llvm::errs() << "[ERROR] Variable \"" << value << "\" is not an array.\n";
                             }
                             if (arrExpr->indicesCount > indexesExpr->indexes->size()) {
                                 llvm::errs() << "[ERROR] Too much indexes in expression. (\"" << value << "\")n";
-                            }
+                            }*/
                             auto loadArr = val;
                             llvm::Value *elementPtr = nullptr;
                             for (int i = 0; i < indexesExpr->indexes->size(); i++) {
@@ -311,13 +315,17 @@ llvm::Value *VariableExprNode::codegen(CodeGenContext &cgcontext) {
     if (dynamic_cast<IndexesExprNode*>(this) != nullptr)
     {
         auto indexesExpr = dynamic_cast<IndexesExprNode*>(this);
-        auto arrExpr = dynamic_cast<ArrayDecStatementNode*>(cgcontext.localsExprsLookup(value));
+        /*auto arrExpr = dynamic_cast<ArrayDecStatementNode*>(cgcontext.localsExprsLookup(value));
+        if (arrExpr == nullptr) {
+            auto field = dynamic_cast<FieldArrayVarDecNode *>(cgcontext.localsExprsLookup(value));
+            if (field != nullptr) arrExpr = field->var;
+        }
         if (arrExpr == nullptr) {
             llvm::errs() << "[ERROR] Variable \"" << value << "\" is not an array.\n";
         }
         if (arrExpr->indicesCount > indexesExpr->indexes->size()) {
             llvm::errs() << "[ERROR] Too much indexes in expression. (\"" << value << "\")n";
-        }
+        }*/
         auto loadArr = cgcontext.builder->CreateLoad(val);
         llvm::Value *elementPtr = nullptr;
         for (int i = 0; i < indexesExpr->indexes->size(); i++) {
@@ -380,7 +388,7 @@ llvm::Value *OperatorExprNode::codegen(CodeGenContext &cgcontext) {
     bool floatOp = false;
     if (castNeeded)
     {
-        if (leftVal->getType()->isDoubleTy() || rightVal->getType()->isDoubleTy())
+        if (leftVal->getType()->isDoubleTy() || rightVal->getType()->isDoubleTy() || leftVal->getType()->isFloatTy() || rightVal->getType()->isFloatTy())
         {
             leftVal = mycast(leftVal, Type::getDoubleTy(*cgcontext.context), cgcontext);
             rightVal = mycast(rightVal, Type::getDoubleTy(*cgcontext.context), cgcontext);
@@ -439,17 +447,17 @@ llvm::Value *OperatorExprNode::codegen(CodeGenContext &cgcontext) {
             case TokenType::Division:
                 return BinaryOperator::Create(Instruction::FDiv, leftVal, rightVal, "", cgcontext.currentBlock());
             case TokenType::Equal:
-                return new ICmpInst(*cgcontext.currentBlock(), ICmpInst::FCMP_OEQ, leftVal, rightVal, "");
+                return new FCmpInst(*cgcontext.currentBlock(), ICmpInst::FCMP_OEQ, leftVal, rightVal, "");
             case TokenType::NotEqual:
-                return new ICmpInst(*cgcontext.currentBlock(), ICmpInst::FCMP_ONE, leftVal, rightVal, "");
+                return new FCmpInst(*cgcontext.currentBlock(), ICmpInst::FCMP_ONE, leftVal, rightVal, "");
             case TokenType::Greater:
-                return new ICmpInst(*cgcontext.currentBlock(), ICmpInst::FCMP_OGT, leftVal, rightVal, "");
+                return new FCmpInst(*cgcontext.currentBlock(), ICmpInst::FCMP_OGT, leftVal, rightVal, "");
             case TokenType::GreaterOrEqual:
-                return new ICmpInst(*cgcontext.currentBlock(), ICmpInst::FCMP_OGE, leftVal, rightVal, "");
+                return new FCmpInst(*cgcontext.currentBlock(), ICmpInst::FCMP_OGE, leftVal, rightVal, "");
             case TokenType::Less:
-                return new ICmpInst(*cgcontext.currentBlock(), ICmpInst::FCMP_OLT, leftVal, rightVal, "");
+                return new FCmpInst(*cgcontext.currentBlock(), ICmpInst::FCMP_OLT, leftVal, rightVal, "");
             case TokenType::LessOrEqual:
-                return new ICmpInst(*cgcontext.currentBlock(), ICmpInst::FCMP_OLE, leftVal, rightVal, "");
+                return new FCmpInst(*cgcontext.currentBlock(), ICmpInst::FCMP_OLE, leftVal, rightVal, "");
         }
     }
     llvm::errs() << "[ERROR] Unknown or wrong operator.\n";
@@ -673,6 +681,7 @@ llvm::Value *AssignExprNode::codegen(CodeGenContext &cgcontext) {
                 // check type fields
                 auto typeVarName = left->value.substr(0, left->value.rfind('.'));
                 auto typeVar = cgcontext.localsLookup(typeVarName);
+                auto typeExpr = cgcontext.localsExprsLookup(typeVarName);
                 if (typeVar != nullptr)
                 {
                     Type* typeOfTypeVar = nullptr;
@@ -692,6 +701,7 @@ llvm::Value *AssignExprNode::codegen(CodeGenContext &cgcontext) {
                             auto elementPtr = cgcontext.builder->CreateStructGEP(typeOfTypeVar, loadThis, left->index);
                             var = elementPtr;
                         }
+
                     }
                     else llvm::errs() << "[ERROR] Variable \"" << typeVarName << "\" is not a custom type.\n";
                 }
@@ -717,13 +727,17 @@ llvm::Value *AssignExprNode::codegen(CodeGenContext &cgcontext) {
     if (dynamic_cast<IndexesExprNode*>(left) != nullptr)
     {
         auto indexesExpr = dynamic_cast<IndexesExprNode*>(left);
-        auto arrExpr = dynamic_cast<ArrayDecStatementNode*>(varExpr);
+        /*auto arrExpr = dynamic_cast<ArrayDecStatementNode*>(varExpr);
         if (arrExpr == nullptr) {
-            llvm::errs() << "[ERROR] Variable \"" << left->value << "\" is not an array.\n";
+            auto field = dynamic_cast<FieldArrayVarDecNode *>(varExpr);
+            if (field != nullptr) arrExpr = field->var;
+        }
+        if (arrExpr == nullptr) {
+            //llvm::errs() << "[ERROR] Variable \"" << left->value << "\" is not an array.\n";
         }
         if (arrExpr->indicesCount > indexesExpr->indexes->size()) {
-            llvm::errs() << "[ERROR] Too much indexes in expression. (\"" << left->value << "\")n";
-        }
+            //llvm::errs() << "[ERROR] Too much indexes in expression. (\"" << left->value << "\")n";
+        }*/
         auto loadArr = cgcontext.builder->CreateLoad(var);
         llvm::Value *elementPtr = nullptr;
         for (int i = 0; i < indexesExpr->indexes->size(); i++) {
@@ -794,6 +808,10 @@ llvm::Value *OutputStatementNode::codegen(CodeGenContext &cgcontext) {
         formatStr = cgcontext.builder->CreateGlobalStringPtr("%d\n");
     }
     else if (value->getType()->isDoubleTy()) {
+        formatStr = cgcontext.builder->CreateGlobalStringPtr("%f\n");
+    }
+    else if (value->getType()->isFloatTy()) {
+        value = cgcontext.builder->CreateFPExt(value, Type::getDoubleTy(*cgcontext.context));
         formatStr = cgcontext.builder->CreateGlobalStringPtr("%f\n");
     }
     else if (value->getType()->isPointerTy()) {
@@ -1278,40 +1296,56 @@ llvm::Value *FieldVarDecNode::codegen(CodeGenContext &cgcontext) {
 
 llvm::Value *FieldArrayVarDecNode::codegen(CodeGenContext &cgcontext) {
     auto elementPtr = cgcontext.builder->CreateStructGEP(cgcontext.allocatedClasses[cgcontext.moduleName + "." + typeName], cgcontext.currentTypeLoad, index);
-
     auto arrDec = this->var;
     auto exprNode = dynamic_cast<ArrayExprNode*>(arrDec->expr);
     auto arrExpr = exprNode;
 
     auto size = exprNode->size->codegen(cgcontext);
     auto arraySize = size;
-
+    auto sizes = getSizesOfArray(this->var);
     if (arrExpr->type == "array")
     {
         for (auto &slice : *arrExpr->values)
         {
             auto castedSlice = dynamic_cast<ArrayExprNode*>(slice);
-            auto sliceSize = castedSlice->size->codegen(cgcontext);
-            auto newArraySize = BinaryOperator::Create(Instruction::Mul, sliceSize, arraySize, "", cgcontext.currentBlock());
-            arraySize = newArraySize;
             arrExpr = castedSlice;
         }
     }
     auto type = typeOf(cgcontext, arrExpr->type);
-    llvm::Type* int64type = llvm::Type::getInt32Ty(*cgcontext.context);
+    auto finalType = type;
+    for (int i = 1; i < var->indicesCount; i++) {
+        finalType = finalType->getPointerTo();
+    }
+
+    llvm::Type* int32type = llvm::Type::getInt32Ty(*cgcontext.context);
 
     cgcontext.locals()[name->value] = elementPtr;
     cgcontext.localsExprs()[name->value] = this;
 
-    auto elementSize = ConstantInt::get(int64type, cgcontext.dataLayout->getTypeAllocSize(type));
+    auto elementSize = ConstantInt::get(int32type, cgcontext.dataLayout->getTypeAllocSize(finalType));
     auto allocSize = BinaryOperator::Create(Instruction::Mul, elementSize, arraySize, "", cgcontext.currentBlock());
     // GC_malloc
-    auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, cgcontext.mModule->getFunction("malloc"), "");
+    auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int32type, finalType, allocSize, nullptr, cgcontext.mModule->getFunction("malloc"), "");
     // malloc
-    //auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, type, allocSize, nullptr, nullptr, "");
+    //auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int32type, type, allocSize, nullptr, nullptr, "");
     cgcontext.builder->Insert(arr);
-
     cgcontext.builder->CreateStore(arr, elementPtr);
+
+    auto currentArr = arr;
+    auto currentType = finalType;
+
+    if (var->indicesCount > 1)
+    {
+        std::vector<llvm::Value*> jvars;
+        jvars.reserve(var->indicesCount);
+        for (int i = 0; i < var->indicesCount; i++) {
+            jvars.push_back(cgcontext.builder->CreateAlloca(int32type, 0, nullptr, "j" + std::to_string(i)));
+            cgcontext.builder->CreateStore(ConstantInt::get(int32type, 0), jvars[i]);
+        }
+        int i = 1;
+
+        generateMallocLoopsRecursive(cgcontext, i, var->indicesCount, currentType, sizes, jvars, currentArr, elementPtr);
+    }
     return elementPtr;
 }
 
@@ -1333,20 +1367,18 @@ llvm::Value *TypeDecStatementNode::codegen(CodeGenContext &cgcontext) {
         {
             auto exprNode = dynamic_cast<FieldArrayVarDecNode*>(field)->var;
             auto arrExpr = dynamic_cast<ArrayExprNode*>(exprNode->expr);
-            auto size = arrExpr->size->codegen(cgcontext);
-            auto arraySize = size;
             if (arrExpr->type == "array")
             {
                 for (auto &slice : *arrExpr->values)
                 {
                     auto castedSlice = dynamic_cast<ArrayExprNode*>(slice);
-                    auto sliceSize = castedSlice->size->codegen(cgcontext);
-                    auto newArraySize = BinaryOperator::Create(Instruction::Mul, sliceSize, arraySize, "", cgcontext.currentBlock());
-                    arraySize = newArraySize;
                     arrExpr = castedSlice;
                 }
             }
             type = ptrToTypeOf(cgcontext, arrExpr->type);
+            for (int i = 1; i < exprNode->indicesCount; i++) {
+                type = type->getPointerTo();
+            }
         }
         else
             type = typeOf(cgcontext, dynamic_cast<FieldVarDecNode*>(field)->type);
@@ -1664,13 +1696,18 @@ llvm::Value *IndexesExprNode::codegen(CodeGenContext &cgcontext) {
     auto loadArr = cgcontext.builder->CreateLoad(var);
     //varExpr = cgcontext.localsExprs()[value];
 
-    auto arrExpr = dynamic_cast<ArrayDecStatementNode*>(varExpr);
+    // move it to parser
+    /*auto arrExpr = dynamic_cast<ArrayDecStatementNode*>(varExpr);
+    if (arrExpr == nullptr) {
+        auto field = dynamic_cast<FieldArrayVarDecNode*>(varExpr);
+        if (field != nullptr) arrExpr = field->var;
+    }
     if (arrExpr == nullptr) {
         llvm::errs() << "[ERROR] Variable \"" << varExpr->name->value << "\" is not an array.\n";
     }
     if (arrExpr->indicesCount > indexes->size()) {
         llvm::errs() << "[ERROR] Too much indexes in expression. (\"" << varExpr->name->value << "\")n";
-    }
+    }*/
 
     llvm::Value *elementPtr = nullptr;
     for (int i = 0; i < indexes->size(); i++) {

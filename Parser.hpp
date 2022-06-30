@@ -227,12 +227,16 @@ public:
                     arrType = token.data;
                     if (!oneOfDefaultTypes(arrType) && arrType != "array")
                     {
-                        auto typeStatement = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(type));
+                        advance();
+                        auto typeStr = parseTypeName(arrType);
+                        auto typeStatement = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(typeStr));
                         if (typeStatement == nullptr)
                         {
                             llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Unknown type \"" << type << "\".\n";
                             hasError = true;
                         }
+                        tokensIterator--;
+                        token = *tokensIterator;
                     }
                 }
                 arrExpr->values->push_back(new ArrayExprNode(arrType, size, nullptr));

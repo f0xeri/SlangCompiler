@@ -320,48 +320,6 @@ module StdString
         end setSymbol;
     end String;
 
-
-    public function IntToString(in integer num): String
-        variable-String stringRes;
-        variable-boolean isNegative := false;
-        if (num == 0) then
-            variable-array[2] character zeroStr;
-            call stringRes.init("0\0");
-            return stringRes;
-        end if;
-        if (num < 0) then
-            let isNegative := true;
-            let num := -num;
-        end if;
-        variable-integer numOfDigits := 0;
-        if (isNegative) then
-            let numOfDigits := 1;
-        end if;
-        variable-integer tempNumber := num;
-        while (tempNumber != 0) repeat
-            let tempNumber := tempNumber / 10;
-            let numOfDigits := numOfDigits + 1;
-        end while;
-
-        variable-array[numOfDigits + 1] character str;
-        variable-integer min := 0;
-        if (isNegative) then
-            let str[0] := "-";
-            let min := 1;
-        end if;
-        variable-integer i := numOfDigits - 1;
-        let str[i + 1] := "\0";
-        let tempNumber := num;
-        while (i >= min) repeat
-            variable-integer numVal := tempNumber % 10;
-            let tempNumber := tempNumber / 10;
-            let str[i] := numVal + "0";
-            let i := i - 1;
-        end while;
-        call stringRes.init(str);
-        return stringRes;
-    end IntToString;
-
     public function IntToCharArray(in integer num): array[] character
         variable-boolean isNegative := false;
         if (num == 0) then
@@ -402,6 +360,12 @@ module StdString
         return str;
     end IntToCharArray;
 
+    public function IntToString(in integer num): String
+        variable-String stringRes;
+        call stringRes.init(IntToCharArray(num));
+        return stringRes;
+    end IntToString;
+
     public function RealToCharArray(in real num, in integer symbolsAfterPoint): array[] character
         variable-integer ipart := num;
         variable-real fpart := num - ipart;
@@ -440,43 +404,8 @@ module StdString
     end RealToCharArray;
 
     public function RealToString(in real num, in integer symbolsAfterPoint): String
-        variable-integer ipart := num;
-        variable-real fpart := num - ipart;
-        variable-array[0] character intPartStr;
-        let intPartStr := IntToCharArray(ipart);
-        variable-integer ipartSize := strlen(intPartStr);
-        if (num < 0) then
-            let fpart := -fpart;
-        end if;
-        variable-real tempFpart := fpart;
-        variable-integer fpartSize := 0;
-        while (fabs(tempFpart % 10.0 - 0.0) >= 0.000001) repeat
-            let tempFpart := tempFpart * 10;
-            let fpartSize := fpartSize + 1;
-        end while;
-
-        variable-integer finalSize := ipartSize + symbolsAfterPoint + 1;
-        variable-array[finalSize] character str;
-        let str := strcpy(str, intPartStr);
-        variable-integer i := 0;
-        let tempFpart := fpart;
-        if (symbolsAfterPoint > 0) then
-            let str[ipartSize] := ".";
-            let tempFpart := tempFpart * 10;
-            let i := ipartSize + 1;
-            while (i < ipartSize + symbolsAfterPoint + 1) repeat
-                if (i <= ipartSize + fpartSize) then
-                    let str[i] := tempFpart % 10 + "0";
-                else
-                    let str[i] := "0";
-                end if;
-                let tempFpart := tempFpart * 10;
-                let i := i + 1;
-            end while;
-        end if;
-        let str[finalSize] := "\0";
         variable-String stringRes;
-        call stringRes.init(str);
+        call stringRes.init(IntToCharArray(num));
         return stringRes;
     end RealToString;
 

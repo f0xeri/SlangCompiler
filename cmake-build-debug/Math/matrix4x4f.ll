@@ -28,6 +28,88 @@ declare i8* @GC_malloc(i32)
 
 declare void @GC_free(i8*)
 
+declare double @sin(double)
+
+declare double @cos(double)
+
+declare double @sqrt(double)
+
+declare double @exp(double)
+
+declare double @log(double)
+
+declare double @log2(double)
+
+declare double @log10(double)
+
+declare double @pow(double, double)
+
+declare double @sinh(double)
+
+declare double @cosh(double)
+
+declare double @tanh(double)
+
+declare double @asin(double)
+
+declare double @acos(double)
+
+declare double @atan(double)
+
+declare double @atan2(double, double)
+
+declare double @sin.1(double)
+
+declare double @cos.2(double)
+
+declare double @tan(double)
+
+declare double @asinh(double)
+
+declare double @acosh(double)
+
+declare double @atanh(double)
+
+declare double @hypot(double, double)
+
+declare double @cbrt(double)
+
+declare double @ceil(double)
+
+declare double @floor(double)
+
+declare double @trunc(double)
+
+declare double @round(double)
+
+declare double @ldexp(double, i32)
+
+declare double @frexp(double, i32*)
+
+declare double @modf(double, double*)
+
+declare double @fmod(double, double)
+
+declare double @copysign(double, double)
+
+declare double @nextafter(double, double)
+
+declare double @nexttoward(double, double)
+
+declare double @fdim(double, double)
+
+declare double @fmax(double, double)
+
+declare double @fmin(double, double)
+
+declare double @fma(double, double, double)
+
+declare i1 @isnan(double)
+
+declare i1 @signbit(double)
+
+declare double @fabs(double)
+
 declare i32 @"StdString.strleni8*"(i8*)
 
 declare i8* @"StdString.strcpyi8*i8*"(i8*, i8*)
@@ -37,8 +119,6 @@ declare i8* @"StdString.strcati8*i8*"(i8*, i8*)
 declare i32 @"StdString.strstri8*i8*"(i8*, i8*)
 
 declare i32 @"StdString.strstri8*i8*i32"(i8*, i8*, i32)
-
-declare i8* @StdString.IntToStringi32(i32)
 
 declare void @StdString.String._DefaultConstructor_(%StdString.String*)
 
@@ -67,6 +147,12 @@ declare i8* @"StdString.String.toString%StdString.String*"(%StdString.String*)
 declare i8 @"StdString.String.getSymbol%StdString.String*i32"(%StdString.String*, i32)
 
 declare void @"StdString.String.setSymbol%StdString.String*i32i8"(%StdString.String*, i32, i8)
+
+declare i8* @StdString.IntToCharArrayi32(i32)
+
+declare %StdString.String* @StdString.IntToStringi32(i32)
+
+declare i8* @StdString.RealToCharArraydoublei32(double, i32)
 
 declare %StdString.String* @StdString.RealToStringdoublei32(double, i32)
 
@@ -451,26 +537,29 @@ entry:
   store i8 %81, i8* %char, align 1
   %82 = load i8, i8* %char, align 1
   %83 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @6, i32 0, i32 0), i8 %82)
-  %str = alloca i8*, align 8
-  %84 = mul i32 1, 17
-  %85 = tail call i8* @malloc(i32 %84)
-  store i8* %85, i8** %str, align 8
-  %86 = call i8* @StdString.IntToStringi32(i32 178)
-  store i8* %86, i8** %str, align 8
-  %87 = load i8*, i8** %str, align 8
-  %88 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @7, i32 0, i32 0), i8* %87)
-  %89 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @9, i32 0, i32 0), i8* getelementptr inbounds ([5 x i8], [5 x i8]* @8, i32 0, i32 0))
+  %str = alloca %StdString.String*, align 8
+  %malloccall8 = tail call i8* @malloc(i32 16)
+  %84 = bitcast i8* %malloccall8 to %StdString.String*
+  store %StdString.String* %84, %StdString.String** %str, align 8
+  %85 = load %StdString.String*, %StdString.String** %str, align 8
+  call void @StdString.String._DefaultConstructor_(%StdString.String* %85)
+  %86 = call %StdString.String* @StdString.IntToStringi32(i32 178)
+  store %StdString.String* %86, %StdString.String** %str, align 8
+  %87 = load %StdString.String*, %StdString.String** %str, align 8
+  %88 = call i8* @"StdString.String.toString%StdString.String*"(%StdString.String* %87)
+  %89 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @7, i32 0, i32 0), i8* %88)
+  %90 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @9, i32 0, i32 0), i8* getelementptr inbounds ([5 x i8], [5 x i8]* @8, i32 0, i32 0))
   %str2 = alloca %StdString.String*, align 8
   %malloccall9 = tail call i8* @malloc(i32 16)
-  %90 = bitcast i8* %malloccall9 to %StdString.String*
-  store %StdString.String* %90, %StdString.String** %str2, align 8
-  %91 = load %StdString.String*, %StdString.String** %str2, align 8
-  call void @StdString.String._DefaultConstructor_(%StdString.String* %91)
-  %92 = call %StdString.String* @StdString.RealToStringdoublei32(double 1.782000e+02, i32 8)
-  store %StdString.String* %92, %StdString.String** %str2, align 8
-  %93 = load %StdString.String*, %StdString.String** %str2, align 8
-  %94 = call i8* @"StdString.String.toString%StdString.String*"(%StdString.String* %93)
-  %95 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @10, i32 0, i32 0), i8* %94)
+  %91 = bitcast i8* %malloccall9 to %StdString.String*
+  store %StdString.String* %91, %StdString.String** %str2, align 8
+  %92 = load %StdString.String*, %StdString.String** %str2, align 8
+  call void @StdString.String._DefaultConstructor_(%StdString.String* %92)
+  %93 = call %StdString.String* @StdString.RealToStringdoublei32(double 0x406647F61672324D, i32 8)
+  store %StdString.String* %93, %StdString.String** %str2, align 8
+  %94 = load %StdString.String*, %StdString.String** %str2, align 8
+  %95 = call i8* @"StdString.String.toString%StdString.String*"(%StdString.String* %94)
+  %96 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @10, i32 0, i32 0), i8* %95)
   ret i32 0
 }
 

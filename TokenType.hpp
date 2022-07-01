@@ -41,6 +41,7 @@ enum class TokenType
     Minus,
     Division,
     Multiplication,
+    Remainder,
 
     LParen,
     RParen,

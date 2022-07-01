@@ -75,6 +75,45 @@ module StdString
         return -1;
     end strstr;
 
+    public function IntToString(in integer num): array[] character
+        variable-boolean isNegative := false;
+        if (num == 0) then
+            variable-array[2] character zeroStr;
+            let zeroStr[0] := "0";
+            let zeroStr[1] := "\0";
+            return zeroStr;
+        end if;
+        if (num < 0) then
+            let isNegative := true;
+            let num := -num;
+        end if;
+        variable-integer numOfDigits := 0;
+        if (isNegative) then
+            let numOfDigits := 1;
+        end if;
+        variable-integer tempNumber := num;
+        while (tempNumber != 0) repeat
+            let tempNumber := tempNumber / 10;
+            let numOfDigits := numOfDigits + 1;
+        end while;
+
+        variable-array[numOfDigits + 1] character str;
+        variable-integer min := 0;
+        if (isNegative) then
+            let str[0] := "-";
+            let min := 1;
+        end if;
+        variable-integer i := numOfDigits - 1;
+        let str[i + 1] := "\0";
+        let tempNumber := num;
+        while (i >= min) repeat
+            variable-integer numVal := tempNumber % 10;
+            let tempNumber := tempNumber / 10;
+            let str[i] := numVal + "0";
+            let i := i - 1;
+        end while;
+        return str;
+    end IntToString;
 
     public class String inherits Object
         private field-array[0] character arrayOfChars;
@@ -320,5 +359,40 @@ module StdString
         end setSymbol;
     end String;
 
+    // create float to char array function
+    public function RealToString(in real num, in integer symbolsAfterPoint): String
+        variable-integer ipart := num;
+        variable-real fpart := num - ipart;
+        variable-array[0] character intPartStr;
+        let intPartStr := IntToString(ipart);
+        variable-integer ipartSize := strlen(intPartStr);
+
+        variable-real tempFpart := fpart;
+        variable-integer fpartSize := 0;
+        while (tempFpart % 10 - 0.0 >= 0.0001) repeat
+            let tempFpart := tempFpart * 10;
+            let fpartSize := fpartSize + 1;
+        end while;
+
+        variable-integer finalSize := ipartSize + symbolsAfterPoint + 1;
+        variable-array[finalSize] character str;
+        let str := strcpy(str, intPartStr);
+        variable-integer i := 0;
+        let tempFpart := fpart;
+        if (symbolsAfterPoint > 0) then
+            let str[ipartSize] := ".";
+            let tempFpart := tempFpart * 10;
+            let i := ipartSize + 1;
+            while (i < ipartSize + symbolsAfterPoint + 1) repeat
+                let str[i] := tempFpart % 10 + "0";
+                let tempFpart := tempFpart * 10;
+                let i := i + 1;
+            end while;
+        end if;
+        let str[finalSize] := "\0";
+        variable-String stringRes;
+        call stringRes.init(str);
+        return stringRes;
+    end RealToString;
 start
 end StdString.

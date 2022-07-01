@@ -11,6 +11,9 @@ module glfw
     public extern function glfwCreateWindow(in integer width, in integer height, in array[] character title, out GLFWmonitor monitor, out GLFWwindow share): GLFWwindow
     end glfwCreateWindow;
 
+    public extern function glfwSwapInterval(in integer interval): integer
+    end glfwSwapInterval;
+
     public extern procedure glfwMakeContextCurrent(out GLFWwindow window)
     end glfwMakeContextCurrent;
 

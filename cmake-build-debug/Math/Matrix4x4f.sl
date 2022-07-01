@@ -48,4 +48,15 @@ start
     variable-array[4] array[4] StdString.String b;
     let b := m.test();
     output b[2][1].toString();
+
+    variable-integer int := 255;
+    variable-character char := int + "0";
+    output char;
+    variable-array[17] character str;
+    let str := StdString.IntToString(178);
+    output str;
+    output "~~~~";
+    variable-StdString.String str2;
+    let str2 := StdString.RealToString(178.2, 8);
+    output str2.toString();
 end matrix4x4f.

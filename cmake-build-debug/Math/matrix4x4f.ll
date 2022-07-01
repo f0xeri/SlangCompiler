@@ -11,6 +11,11 @@ target triple = "x86_64-w64-windows-gnu"
 @3 = private unnamed_addr constant [4 x i8] c"%f\0A\00", align 1
 @4 = private unnamed_addr constant [4 x i8] c"%f\0A\00", align 1
 @5 = private unnamed_addr constant [4 x i8] c"%s\0A\00", align 1
+@6 = private unnamed_addr constant [4 x i8] c"%c\0A\00", align 1
+@7 = private unnamed_addr constant [4 x i8] c"%s\0A\00", align 1
+@8 = private unnamed_addr constant [5 x i8] c"~~~~\00", align 1
+@9 = private unnamed_addr constant [4 x i8] c"%s\0A\00", align 1
+@10 = private unnamed_addr constant [4 x i8] c"%s\0A\00", align 1
 
 declare i32 @printf(i8*, ...)
 
@@ -32,6 +37,8 @@ declare i8* @"StdString.strcati8*i8*"(i8*, i8*)
 declare i32 @"StdString.strstri8*i8*"(i8*, i8*)
 
 declare i32 @"StdString.strstri8*i8*i32"(i8*, i8*, i32)
+
+declare i8* @StdString.IntToStringi32(i32)
 
 declare void @StdString.String._DefaultConstructor_(%StdString.String*)
 
@@ -60,6 +67,8 @@ declare i8* @"StdString.String.toString%StdString.String*"(%StdString.String*)
 declare i8 @"StdString.String.getSymbol%StdString.String*i32"(%StdString.String*, i32)
 
 declare void @"StdString.String.setSymbol%StdString.String*i32i8"(%StdString.String*, i32, i8)
+
+declare %StdString.String* @StdString.RealToStringdoublei32(double, i32)
 
 define void @matrix4x4f.Matrix4x4f._DefaultConstructor_(%matrix4x4f.Matrix4x4f* %0) {
 matrix4x4f.Matrix4x4f_DefaultConstructor_Entry:
@@ -432,6 +441,36 @@ entry:
   %75 = load %StdString.String, %StdString.String* %74, align 8
   %76 = call i8* @"StdString.String.toString%StdString.String*"(%StdString.String* %74)
   %77 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @5, i32 0, i32 0), i8* %76)
+  %int = alloca i32, align 4
+  store i32 255, i32* %int, align 4
+  %char = alloca i8, align 1
+  %78 = load i32, i32* %int, align 4
+  %79 = sext i8 48 to i32
+  %80 = add i32 %78, %79
+  %81 = trunc i32 %80 to i8
+  store i8 %81, i8* %char, align 1
+  %82 = load i8, i8* %char, align 1
+  %83 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @6, i32 0, i32 0), i8 %82)
+  %str = alloca i8*, align 8
+  %84 = mul i32 1, 17
+  %85 = tail call i8* @malloc(i32 %84)
+  store i8* %85, i8** %str, align 8
+  %86 = call i8* @StdString.IntToStringi32(i32 178)
+  store i8* %86, i8** %str, align 8
+  %87 = load i8*, i8** %str, align 8
+  %88 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @7, i32 0, i32 0), i8* %87)
+  %89 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @9, i32 0, i32 0), i8* getelementptr inbounds ([5 x i8], [5 x i8]* @8, i32 0, i32 0))
+  %str2 = alloca %StdString.String*, align 8
+  %malloccall9 = tail call i8* @malloc(i32 16)
+  %90 = bitcast i8* %malloccall9 to %StdString.String*
+  store %StdString.String* %90, %StdString.String** %str2, align 8
+  %91 = load %StdString.String*, %StdString.String** %str2, align 8
+  call void @StdString.String._DefaultConstructor_(%StdString.String* %91)
+  %92 = call %StdString.String* @StdString.RealToStringdoublei32(double 1.782000e+02, i32 8)
+  store %StdString.String* %92, %StdString.String** %str2, align 8
+  %93 = load %StdString.String*, %StdString.String** %str2, align 8
+  %94 = call i8* @"StdString.String.toString%StdString.String*"(%StdString.String* %93)
+  %95 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @10, i32 0, i32 0), i8* %94)
   ret i32 0
 }
 

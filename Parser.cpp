@@ -708,6 +708,9 @@ ExprNode *Parser::parseMulDiv() {
         if (match(TokenType::Division)) {
             result = new OperatorExprNode(result, TokenType::Division, parseUnary());
         }
+        if (match(TokenType::Remainder)) {
+            result = new OperatorExprNode(result, TokenType::Remainder, parseUnary());
+        }
         break;
     }
 

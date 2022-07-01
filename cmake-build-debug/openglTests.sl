@@ -1,9 +1,33 @@
 import glew;
 import glfw;
+import StdString;
+import StdMath;
 module openglTests
     public procedure resizeCallback(out glfw.GLFWwindow window, in integer width, in integer height):
         call glViewport(0, 0, width, height);
     end resizeCallback;
+
+    private variable-float lastTime := 0.0f;
+    private variable-integer nbFrames := 0;
+
+    public procedure showFPS(out glfw.GLFWwindow window):
+        variable-real currentTime;
+        let currentTime := glfwGetTime();
+        variable-real delta := currentTime - lastTime;
+        let nbFrames := nbFrames + 1;
+        if (delta >= 1.0) then
+            variable-real fps := nbFrames / delta;
+            variable-StdString.String str;
+            call str.init("slang opengl 3.3 [FPS: ");
+            variable-StdString.String fpsStr;
+            let fpsStr := StdString.RealToString(round(fps), 0);
+            call str.concat(fpsStr.toString());
+            call str.concat("] ");
+            call glfwSetWindowTitle(window, str.toString());
+            let nbFrames := 0;
+            let lastTime := currentTime;
+        end if;
+    end showFPS;
 start
     if (glfwInit() == 0) then
         output "[ERROR] glfwInit() failed";
@@ -14,6 +38,7 @@ start
     let resizeCallbackPtr := resizeCallback;
     call glfwSetFramebufferSizeCallback(mainWindow, resizeCallbackPtr);
     call glfwMakeContextCurrent(mainWindow);
+    call glfwSwapInterval(0);
     call glEnable(3042); // gl blend
     if (glewInit() != 0) then
         output "[ERROR] glewInit() failed";
@@ -72,6 +97,8 @@ start
     call __glewBindVertexArray(0);
 
     while (glfwWindowShouldClose(mainWindow) == 0) repeat
+        call showFPS(mainWindow);
+
         call glClear(16384);
         call glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 

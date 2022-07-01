@@ -130,6 +130,16 @@ static Value* mycast(Value* value, Type* type, CodeGenContext& cgcontext) {
     if (type == Type::getDoubleTy(*cgcontext.context)) {
         if (value->getType() == Type::getInt32Ty(*cgcontext.context) || value->getType() == Type::getInt8Ty(*cgcontext.context))
             value = new SIToFPInst(value, type, "", cgcontext.currentBlock());
+        else if (value->getType() == Type::getFloatTy(*cgcontext.context))
+            value = new FPExtInst(value, type, "", cgcontext.currentBlock());
+        else
+            llvm::errs() << "[ERROR] Cannot cast this value.\n";
+    }
+    else if (type == Type::getFloatTy(*cgcontext.context)) {
+        if (value->getType() == Type::getInt32Ty(*cgcontext.context) || value->getType() == Type::getInt8Ty(*cgcontext.context))
+            value = new SIToFPInst(value, type, "", cgcontext.currentBlock());
+        else if (value->getType() == Type::getDoubleTy(*cgcontext.context))
+            value = new FPTruncInst(value, type, "", cgcontext.currentBlock());
         else
             llvm::errs() << "[ERROR] Cannot cast this value.\n";
     }
@@ -184,7 +194,20 @@ llvm::Value *StringExprNode::codegen(CodeGenContext &cgcontext) {
 llvm::Value *NilExprNode::codegen(CodeGenContext &cgcontext) {
     if (type == nullptr) return nullptr;
     Type *retType = getTypeFromExprNode(cgcontext, type);
-    auto nil = ConstantPointerNull::get(retType->getPointerTo());
+    llvm::Value* nil = nullptr;
+    if (retType->isStructTy()) {
+        nil = ConstantPointerNull::get(retType->getPointerTo());
+    }
+    else if (retType->isPointerTy()) {
+        if (!retType->getPointerElementType()->isPointerTy()) {
+            nil = ConstantPointerNull::get(static_cast<PointerType *>(retType));
+        }
+    }
+    else {
+        nil = ConstantPointerNull::get(retType->getPointerTo());
+    }
+
+    if (nil == nullptr) llvm::errs() << "[ERROR] Cannot cast this value.\n";
     return nil;
 }
 
@@ -423,6 +446,8 @@ llvm::Value *OperatorExprNode::codegen(CodeGenContext &cgcontext) {
                 return BinaryOperator::Create(Instruction::Mul, leftVal, rightVal, "", cgcontext.currentBlock());
             case TokenType::Division:
                 return BinaryOperator::Create(Instruction::SDiv, leftVal, rightVal, "", cgcontext.currentBlock());
+            case TokenType::Remainder:
+                return BinaryOperator::Create(Instruction::SRem, leftVal, rightVal, "", cgcontext.currentBlock());
             case TokenType::Equal:
                 return new ICmpInst(*cgcontext.currentBlock(), ICmpInst::ICMP_EQ, leftVal, rightVal, "");
             case TokenType::NotEqual:
@@ -452,6 +477,8 @@ llvm::Value *OperatorExprNode::codegen(CodeGenContext &cgcontext) {
                 return BinaryOperator::Create(Instruction::FMul, leftVal, rightVal, "", cgcontext.currentBlock());
             case TokenType::Division:
                 return BinaryOperator::Create(Instruction::FDiv, leftVal, rightVal, "", cgcontext.currentBlock());
+            case TokenType::Remainder:
+                return BinaryOperator::Create(Instruction::FRem, leftVal, rightVal, "", cgcontext.currentBlock());
             case TokenType::Equal:
                 return new FCmpInst(*cgcontext.currentBlock(), ICmpInst::FCMP_OEQ, leftVal, rightVal, "");
             case TokenType::NotEqual:
@@ -726,6 +753,9 @@ llvm::Value *AssignExprNode::codegen(CodeGenContext &cgcontext) {
     {
         auto loadArr = cgcontext.builder->CreateLoad(var);
         auto elementPtr = cgcontext.builder->CreateInBoundsGEP(loadArr, dynamic_cast<IndexExprNode*>(left)->indexExpr->codegen(cgcontext));
+        if (assignData->getType() != var->getType()->getPointerElementType()) {
+            assignData = mycast(assignData, elementPtr->getType()->getPointerElementType(), cgcontext);
+        }
         auto ret = cgcontext.builder->CreateStore(assignData, elementPtr);
         return ret;
     }
@@ -750,6 +780,9 @@ llvm::Value *AssignExprNode::codegen(CodeGenContext &cgcontext) {
             auto index = indexesExpr->indexes->at(i)->codegen(cgcontext);
             elementPtr = cgcontext.builder->CreateInBoundsGEP(loadArr, index);
             loadArr = cgcontext.builder->CreateLoad(elementPtr);
+        }
+        if (assignData->getType() != var->getType()->getPointerElementType()) {
+            assignData = mycast(assignData, elementPtr->getType()->getPointerElementType(), cgcontext);
         }
         auto ret = cgcontext.builder->CreateStore(assignData, elementPtr);
 
@@ -784,6 +817,10 @@ llvm::Value *AssignExprNode::codegen(CodeGenContext &cgcontext) {
                 cgcontext.currentNameAddition = "";
             }
         }
+    }
+
+    if (assignData->getType() != var->getType()->getPointerElementType()) {
+        assignData = mycast(assignData, var->getType()->getPointerElementType(), cgcontext);
     }
     return new StoreInst(assignData, var, false, cgcontext.currentBlock());
 }
@@ -868,6 +905,9 @@ llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgcontext) {
         if (expr != NULL) {
             rightVal = expr->codegen(cgcontext);
             //new StoreInst(rightVal, newVar, false, cgcontext.currentBlock());
+            if (rightVal->getType() != newVar->getType()->getPointerElementType()) {
+                rightVal = mycast(rightVal, newVar->getType()->getPointerElementType(), cgcontext);
+            }
             cgcontext.builder->CreateStore(rightVal, newVar);
         }
         if (cgcontext.allocatedClasses.contains(type))

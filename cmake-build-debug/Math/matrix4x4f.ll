@@ -555,7 +555,7 @@ entry:
   store %StdString.String* %91, %StdString.String** %str2, align 8
   %92 = load %StdString.String*, %StdString.String** %str2, align 8
   call void @StdString.String._DefaultConstructor_(%StdString.String* %92)
-  %93 = call %StdString.String* @StdString.RealToStringdoublei32(double 0x406647F61672324D, i32 8)
+  %93 = call %StdString.String* @StdString.RealToStringdoublei32(double 1.782480e+02, i32 5)
   store %StdString.String* %93, %StdString.String** %str2, align 8
   %94 = load %StdString.String*, %StdString.String** %str2, align 8
   %95 = call i8* @"StdString.String.toString%StdString.String*"(%StdString.String* %94)

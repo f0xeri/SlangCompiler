@@ -875,17 +875,67 @@ llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgcontext) {
     Value* rightVal = nullptr;
     if (isGlobal)
     {
-        cgcontext.mModule->getOrInsertGlobal(name->value, typeOf(cgcontext, type));
+        if (cgcontext.allocatedClasses.contains(type)) {
+            cgcontext.mModule->getOrInsertGlobal(name->value, ptrToTypeOf(cgcontext, type));
+        }
+        else {
+            cgcontext.mModule->getOrInsertGlobal(name->value, typeOf(cgcontext, type));
+        }
+        //cgcontext.mModule->getOrInsertGlobal(name->value, typeOf(cgcontext, type));
         auto gVar = cgcontext.mModule->getNamedGlobal(name->value);
         if (isExtern) gVar->setLinkage(llvm::GlobalValue::ExternalLinkage);
         else gVar->setLinkage(GlobalValue::InternalLinkage);
-        if (expr != NULL && !isExtern)
+
+        if (!isExtern)
         {
-            rightVal = expr->codegen(cgcontext);
-            gVar->setInitializer(static_cast<Constant *>(rightVal));
+            if (expr != nullptr) {
+                rightVal = expr->codegen(cgcontext);
+                gVar->setInitializer(static_cast<Constant *>(rightVal));
+            }
+            else {
+                if (cgcontext.allocatedClasses.contains(type)) {
+                    rightVal = ConstantPointerNull::get(static_cast<PointerType *>(ptrToTypeOf(cgcontext, type)));
+                }
+                else {
+                    rightVal = Constant::getNullValue(typeOf(cgcontext, type));
+                }
+                gVar->setInitializer(static_cast<Constant *>(rightVal));
+            }
         }
         gVar->setAlignment(Align(8));
         cgcontext.globals()[name->value] = gVar;
+        newVar = gVar;
+
+        // we should call default constructor if global is pointer to struct
+        if (cgcontext.allocatedClasses.contains(type))
+        {
+            FunctionType* funcType = FunctionType::get(Type::getVoidTy(*cgcontext.context), {}, false);
+            Function *constructorFunc = Function::Create(funcType, Function::ExternalLinkage, Twine(name->value + "_constructor"), cgcontext.mModule);
+            BasicBlock *bb = BasicBlock::Create(*cgcontext.context, name->value + "_constructorEntry", constructorFunc, nullptr);
+            cgcontext.pushBlock(bb);
+            cgcontext.builder->SetInsertPoint(bb);
+            getOrCreateSanitizerCtorAndInitFunctions(
+                    *cgcontext.mModule, cgcontext.moduleName + "_GLOBAL_" + name->value, name->value + "_constructor", {}, {},
+                    // This callback is invoked when the functions are created the first
+                    // time. Hook them into the global ctors list in that case:
+                    [&](Function *Ctor, FunctionCallee) { appendToGlobalCtors(*cgcontext.mModule, Ctor, 65535); });
+
+            llvm::Type* int32type = llvm::Type::getInt32Ty(*cgcontext.context);
+            auto structType = typeOf(cgcontext, type);
+            auto malloc = CallInst::CreateMalloc(cgcontext.currentBlock(), int32type, structType, llvm::ConstantInt::get(llvm::Type::getInt32Ty(*cgcontext.context), cgcontext.mModule->getDataLayout().getTypeAllocSize(structType)), nullptr, cgcontext.mModule->getFunction("malloc"), "");
+            cgcontext.builder->Insert(malloc);
+            cgcontext.builder->CreateStore(malloc, newVar);
+            auto structConstructorFunc = cgcontext.mModule->getFunction(type + "._DefaultConstructor_");
+            if (constructorFunc != nullptr)
+            {
+                auto p = cgcontext.builder->CreateLoad(newVar);
+                newVar->print(llvm::errs());
+                cgcontext.builder->CreateCall(structConstructorFunc, {p});
+            }
+
+            cgcontext.builder->CreateRetVoid();
+            cgcontext.popBlock();
+        }
     }
     else
     {
@@ -1058,7 +1108,7 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
         cgcontext.builder->SetInsertPoint(bb);
 
         getOrCreateSanitizerCtorAndInitFunctions(
-                *cgcontext.mModule, cgcontext.moduleName + "_GLOBAL_", name->value + "_constructor", {}, {},
+                *cgcontext.mModule, cgcontext.moduleName + "_GLOBAL_" + name->value, name->value + "_constructor", {}, {},
                 // This callback is invoked when the functions are created the first
                 // time. Hook them into the global ctors list in that case:
                 [&](Function *Ctor, FunctionCallee) { appendToGlobalCtors(*cgcontext.mModule, Ctor, 65535); });

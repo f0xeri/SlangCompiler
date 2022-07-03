@@ -405,7 +405,7 @@ module StdString
 
     public function RealToString(in real num, in integer symbolsAfterPoint): String
         variable-String stringRes;
-        call stringRes.init(IntToCharArray(num));
+        call stringRes.init(RealToCharArray(num, symbolsAfterPoint));
         return stringRes;
     end RealToString;
 

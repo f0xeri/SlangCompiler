@@ -798,8 +798,13 @@ StatementNode* Parser::parseVarOrCall() {
             auto var = currentScope->lookup(name);
             if (var == nullptr)
             {
-                llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") " + name + " is not declared.\n";
-                hasError = true;
+                var = currentScope->lookup(mainModuleNode->name->value + "." + name);
+                if (var == nullptr)
+                {
+                    llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Variable " << name << " does not exist.\n";
+                    hasError = true;
+                    return nullptr;
+                }
             }
             type = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(dynamic_cast<VarDecStatementNode*>(var)->type));
             if (type != nullptr) dotClass = true;
@@ -882,8 +887,13 @@ StatementNode* Parser::parseVarOrCall() {
                 auto var = currentScope->lookup(name);
                 if (var == nullptr)
                 {
-                    llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") " + name + " is not declared.\n";
-                    hasError = true;
+                    var = currentScope->lookup(mainModuleNode->name->value + "." + name);
+                    if (var == nullptr)
+                    {
+                        llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Variable " << name << " does not exist.\n";
+                        hasError = true;
+                        return nullptr;
+                    }
                 }
                 type = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(getArrayFinalType(dynamic_cast<ArrayDecStatementNode *>(var)->expr)));
             }
@@ -1160,7 +1170,8 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
     else {
         result = new VarDecStatementNode(type, new VariableExprNode(name), expr, isGlobal, isPrivate, isExtern);
     }
-    if (isGlobal) currentScope->insert(result);
+    //if (isGlobal)
+        //currentScope->insert(result);
     currentScope->insert(result);
     return result;
 }

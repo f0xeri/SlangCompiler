@@ -57,6 +57,6 @@ start
     output str.toString();
     output "~~~~";
     variable-StdString.String str2;
-    let str2 := StdString.RealToString(178.24879, 8);
+    let str2 := StdString.RealToString(178.248, 5);
     output str2.toString();
 end matrix4x4f.

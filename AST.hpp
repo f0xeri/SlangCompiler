@@ -356,8 +356,9 @@ public:
     bool isGlobal = false;
     bool isPrivate = false;
     bool isExtern = false;
+    ExprNode* expr;
 
-    FuncPointerStatementNode(ExprNode*  type, VariableExprNode *name, bool isFunction, bool isGlobal, std::vector<FuncParamDecStatementNode*> *args, bool isPrivate = false, bool isExtern = false): type(type), DeclarationNode(name), isFunction(isFunction), isGlobal(isGlobal), args(args), isPrivate(isPrivate), isExtern(isExtern) {}
+    FuncPointerStatementNode(ExprNode*  type, VariableExprNode *name, bool isFunction, bool isGlobal, std::vector<FuncParamDecStatementNode*> *args, ExprNode* expr, bool isPrivate = false, bool isExtern = false): type(type), DeclarationNode(name), isFunction(isFunction), isGlobal(isGlobal), args(args), expr(expr), isPrivate(isPrivate), isExtern(isExtern) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 

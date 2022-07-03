@@ -9,18 +9,16 @@ module openglTests
 
     private variable-float lastTime := 0.0f;
     private variable-integer nbFrames := 0;
-    public variable-array[128] StdString.String arrr;
     public variable-StdString.String str;
     public procedure showFPS(out glfw.GLFWwindow window):
-        variable-real currentTime;
-        let currentTime := glfwGetTime();
+        variable-real currentTime := glfwGetTime();
         variable-real delta := currentTime - lastTime;
         let nbFrames := nbFrames + 1;
         if (delta >= 1.0) then
             variable-real fps := nbFrames / delta;
             //variable-StdString.String str;
             call str.init("slang opengl 3.3 [FPS: ");
-            call str.concat(StdString.RealToCharArray(fps, 8));
+            call str.concat(StdString.RealToCharArray(round(fps), 0));
             call str.concat("] ");
             call glfwSetWindowTitle(window, str.toString());
             let nbFrames := 0;
@@ -29,14 +27,11 @@ module openglTests
         end if;
     end showFPS;
 start
-    output arrr[0].toString();
     if (glfwInit() == 0) then
         output "[ERROR] glfwInit() failed";
     end if;
-    variable-glfw.GLFWwindow mainWindow;
-    let mainWindow := glfwCreateWindow(800, 600, "slang triangle opengl 3.3", nil, nil);
-    variable-procedure(out glfw.GLFWwindow, in integer, in integer) resizeCallbackPtr;
-    let resizeCallbackPtr := resizeCallback;
+    variable-glfw.GLFWwindow mainWindow := glfwCreateWindow(800, 600, "slang triangle opengl 3.3", nil, nil);
+    variable-procedure(out glfw.GLFWwindow, in integer, in integer) resizeCallbackPtr := resizeCallback;
     call glfwSetFramebufferSizeCallback(mainWindow, resizeCallbackPtr);
     call glfwMakeContextCurrent(mainWindow);
     call glfwSwapInterval(0);

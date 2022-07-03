@@ -952,7 +952,7 @@ llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgcontext) {
         }
         cgcontext.locals()[name->value] = newVar;
         cgcontext.localsExprs()[name->value] = this;
-        if (expr != NULL) {
+        if (expr != nullptr) {
             rightVal = expr->codegen(cgcontext);
             //new StoreInst(rightVal, newVar, false, cgcontext.currentBlock());
             if (rightVal->getType() != newVar->getType()->getPointerElementType()) {
@@ -1686,6 +1686,7 @@ llvm::Value *WhileStatementNode::codegen(CodeGenContext &cgcontext) {
 llvm::Value *FuncPointerStatementNode::codegen(CodeGenContext &cgcontext) {
     std::vector<llvm::Type*> argTypes;
     std::vector<int> refParams;
+    llvm::Value* rightVal = nullptr;
     int i = 1;
     for (auto arg : *args)
     {
@@ -1725,6 +1726,39 @@ llvm::Value *FuncPointerStatementNode::codegen(CodeGenContext &cgcontext) {
         if (!isExtern) gVar->setInitializer(ConstantPointerNull::get(funcType->getPointerTo()));
         gVar->setAlignment(Align(8));
         cgcontext.globals()[name->value] = gVar;
+        var = gVar;
+    }
+    if (expr != nullptr) {
+        std::string nameAddition;
+        llvm::raw_string_ostream nameAdditionStream(nameAddition);
+        if (var->getType()->isPointerTy()) {
+            if (var->getType()->getPointerElementType()->isPointerTy()) {
+                if (var->getType()->getPointerElementType()->getPointerElementType()->isFunctionTy()) {
+                    auto func = var->getType()->getPointerElementType()->getPointerElementType();
+                    auto n = func->getFunctionNumParams();
+                    for (int i = 0; i < n; i++){
+                        func->getFunctionParamType(i)->print(nameAdditionStream);
+                    }
+                    cgcontext.isFuncPointerAssignment = true;
+                    cgcontext.currentNameAddition = nameAddition;
+                    rightVal = expr->codegen(cgcontext);
+                    if (rightVal == nullptr) {
+                        llvm::errs() << "[ERROR] Codegen - no such function found when assigning to \"" << name->value << "\".\n";
+                    }
+                    cgcontext.isFuncPointerAssignment = false;
+                    cgcontext.currentNameAddition = "";
+                }
+            }
+        }
+        if (rightVal->getType() != var->getType()->getPointerElementType()) {
+            rightVal = mycast(rightVal, var->getType()->getPointerElementType(), cgcontext);
+        }
+        if (isGlobal) {
+            cgcontext.mModule->getNamedGlobal(name->value)->setInitializer(static_cast<Constant *>(rightVal));
+        }
+        else {
+            cgcontext.builder->CreateStore(rightVal, var);
+        }
     }
     //auto t = cgcontext.mModule->getFunction("GC_init")->getType();
     return var;

@@ -1068,12 +1068,6 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
     if (oneOfDefaultTypes(type))
     {
         name = consume(TokenType::Identifier).data;
-        if (token.type == TokenType::Assign)
-        {
-            advance();
-            expr = parseExpression();
-        }
-        expect(TokenType::Semicolon);
     }
     else if (type == "array")
     {
@@ -1155,6 +1149,12 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
         type = parseTypeName(type);
         name = consume(TokenType::Identifier).data;
     }
+    if (token.type == TokenType::Assign)
+    {
+        advance();
+        expr = parseExpression();
+    }
+    expect(TokenType::Semicolon);
     if (currentScope->lookup(name) != nullptr || oneOfDefaultTypes(name))
     {
         llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Name conflict - \"" << name << "\".\n";
@@ -1165,7 +1165,7 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
         result = new ArrayDecStatementNode(new VariableExprNode(name), dynamic_cast<ArrayExprNode*>(expr), isGlobal, indicesCount, isPrivate, isExtern);
     }
     else if (isFuncPointer) {
-        result = new FuncPointerStatementNode(funcType, new VariableExprNode(name), isFunction, isGlobal, args, isPrivate, isExtern);
+        result = new FuncPointerStatementNode(funcType, new VariableExprNode(name), isFunction, isGlobal, args, expr, isPrivate, isExtern);
     }
     else {
         result = new VarDecStatementNode(type, new VariableExprNode(name), expr, isGlobal, isPrivate, isExtern);

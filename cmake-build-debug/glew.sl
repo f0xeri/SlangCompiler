@@ -108,6 +108,56 @@ module gl
     // create __glewEnableVertexAttribArray
     public extern variable-procedure(in integer) __glewEnableVertexAttribArray;
 
+    // create __glewUniform1f
+    public extern variable-procedure(in integer, in float) __glewUniform1f;
+
+    // create __glewUniform2f
+    public extern variable-procedure(in integer, in float, in float) __glewUniform2f;
+
+    // create __glewUniform3f
+    public extern variable-procedure(in integer, in float, in float, in float) __glewUniform3f;
+
+    // create __glewUniform4f
+    public extern variable-procedure(in integer, in float, in float, in float, in float) __glewUniform4f;
+
+    // create __glewUniform1i
+    public extern variable-procedure(in integer, in integer) __glewUniform1i;
+
+    // create __glewUniform2i
+    public extern variable-procedure(in integer, in integer, in integer) __glewUniform2i;
+
+    // create __glewUniform3i
+    public extern variable-procedure(in integer, in integer, in integer, in integer) __glewUniform3i;
+
+    // create __glewUniform4i
+    public extern variable-procedure(in integer, in integer, in integer, in integer, in integer) __glewUniform4i;
+
+    // create __glewUniformMatrix4fv
+    public extern variable-procedure(in integer, in integer, in integer, in array[] float) __glewUniformMatrix4fv;
+
+    // create glBindTexture
+    public extern procedure glBindTexture(in integer target, in integer texture):
+    end glBindTexture;
+
+    // create glGenTextures
+    public extern procedure glGenTextures(in integer n, out integer textures):
+    end glGenTextures;
+
+    // create glPixelStorei
+    public extern procedure glPixelStorei(in integer pname, in integer param):
+    end glPixelStorei;
+
+    // create glTexImage2D
+    public extern procedure glTexImage2D(in integer target, in integer level, in integer internalformat, in integer width, in integer height, in integer border, in integer format, in integer type, out character pixels):
+    end glTexImage2D;
+
+    // create __glewGenerateMipmap
+    public extern variable-procedure(in integer) __glewGenerateMipmap;
+
+    // create glTexParameteri
+    public extern procedure glTexParameteri(in integer target, in integer pname, in integer param):
+    end glTexParameteri;
+
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~interface~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 start

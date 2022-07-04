@@ -543,7 +543,8 @@ llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
                     }
                     if (argType != loadValue->getType()) {
                         if (currArg->parameterType == ParameterType::Out || currArg->parameterType == ParameterType::Var) {
-                            loadValue = mycast(var, getTypeFromExprNode(cgcontext, currArg->type)->getPointerTo(), cgcontext);
+                            if (loadValue->getType() != getTypeFromExprNode(cgcontext, currArg->type)->getPointerTo())
+                                loadValue = mycast(var, getTypeFromExprNode(cgcontext, currArg->type)->getPointerTo(), cgcontext);
                         }
                         else {
                             loadValue = mycast(loadValue, getTypeFromExprNode(cgcontext, currArg->type), cgcontext);
@@ -566,7 +567,8 @@ llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
                     }
                     if (argType != loadValue->getType()) {
                         if (currArg->parameterType == ParameterType::Out || currArg->parameterType == ParameterType::Var) {
-                            loadValue = mycast(var, getTypeFromExprNode(cgcontext, currArg->type)->getPointerTo(), cgcontext);
+                            if (loadValue->getType() != getTypeFromExprNode(cgcontext, currArg->type)->getPointerTo())
+                                loadValue = mycast(var, getTypeFromExprNode(cgcontext, currArg->type)->getPointerTo(), cgcontext);
                         }
                         else {
                             loadValue = mycast(loadValue, getTypeFromExprNode(cgcontext, currArg->type), cgcontext);
@@ -589,7 +591,8 @@ llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
                     }
                     if (argType != loadValue->getType()) {
                         if (currArg->parameterType == ParameterType::Out || currArg->parameterType == ParameterType::Var) {
-                            loadValue = mycast(var, getTypeFromExprNode(cgcontext, currArg->type)->getPointerTo(), cgcontext);
+                            if (loadValue->getType() != getTypeFromExprNode(cgcontext, currArg->type)->getPointerTo())
+                                loadValue = mycast(var, getTypeFromExprNode(cgcontext, currArg->type)->getPointerTo(), cgcontext);
                         }
                         else {
                             loadValue = mycast(loadValue, getTypeFromExprNode(cgcontext, currArg->type), cgcontext);
@@ -612,7 +615,8 @@ llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
                     }
                     if (argType != loadValue->getType()) {
                         if (currArg->parameterType == ParameterType::Out || currArg->parameterType == ParameterType::Var) {
-                            loadValue = mycast(var, getTypeFromExprNode(cgcontext, currArg->type)->getPointerTo(), cgcontext);
+                            if (loadValue->getType() != getTypeFromExprNode(cgcontext, currArg->type)->getPointerTo())
+                                loadValue = mycast(var, getTypeFromExprNode(cgcontext, currArg->type)->getPointerTo(), cgcontext);
                         }
                         else {
                             loadValue = mycast(loadValue, getTypeFromExprNode(cgcontext, currArg->type), cgcontext);
@@ -929,6 +933,7 @@ llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgcontext) {
             if (constructorFunc != nullptr)
             {
                 auto p = cgcontext.builder->CreateLoad(newVar);
+                structConstructorFunc->print(llvm::errs());
                 newVar->print(llvm::errs());
                 cgcontext.builder->CreateCall(structConstructorFunc, {p});
             }

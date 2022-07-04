@@ -50,7 +50,8 @@ module matrix4x4f
             let this.data := result;
         end multiplyMatrix;
 
-        public method rotate(Matrix4 this)(in float angle, in integer x, in integer y, in integer z)
+
+        public method rotate(Matrix4 this)(in float angle, in float x, in float y, in float z)
             // create 4x4 matrix rotation by x
             variable-float c := cos(angle);
             variable-float s := sin(angle);
@@ -78,8 +79,51 @@ module matrix4x4f
             call this.multiplyMatrix(temp);
             delete temp;
         end rotate;
+
+        // translate
+        public method translate(Matrix4 this)(in float x, in float y, in float z)
+            variable-array[16] float temp;
+            let temp[0] := 1.0f;
+            let temp[1] := 0.0f;
+            let temp[2] := 0.0f;
+            let temp[3] := 0.0f;
+            let temp[4] := 0.0f;
+            let temp[5] := 1.0f;
+            let temp[6] := 0.0f;
+            let temp[7] := 0.0f;
+            let temp[8] := 0.0f;
+            let temp[9] := 0.0f;
+            let temp[10] := 1.0f;
+            let temp[11] := 0.0f;
+            let temp[12] := x;
+            let temp[13] := y;
+            let temp[14] := z;
+            let temp[15] := 1.0f;
+            call this.multiplyMatrix(temp);
+            delete temp;
+        end translate;
+
+
+        // perspective
+        public method perspective(Matrix4 this)(in float fov, in float aspect, in float near, in float far)
+            variable-float f := 1.0f / tan(fov / 2.0f);
+            let this.data[0] := f / aspect;
+            let this.data[1] := 0.0f;
+            let this.data[2] := 0.0f;
+            let this.data[3] := 0.0f;
+            let this.data[4] := 0.0f;
+            let this.data[5] := f;
+            let this.data[6] := 0.0f;
+            let this.data[7] := 0.0f;
+            let this.data[8] := 0.0f;
+            let this.data[9] := 0.0f;
+            let this.data[10] := (far + near) / (near - far);
+            let this.data[11] := -1.0f;
+            let this.data[12] := 0.0f;
+            let this.data[13] := 0.0f;
+            let this.data[14] := (2.0f * far * near) / (near - far);
+            let this.data[15] := 0.0f;
+        end perspective;
     end Matrix4;
-
-
 start
 end matrix4x4f.

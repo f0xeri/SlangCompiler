@@ -81,25 +81,49 @@ bool Parser::parseImports()
         consume(TokenType::Import);
         if (!expect(TokenType::Identifier)) return false;
         std::string moduleName = token.data;
+        //std::transform(moduleName.begin(), moduleName.end(), moduleName.begin(),[](unsigned char c){ return std::tolower(c); });
+        bool needToCompile = true;
+        if (std::find(globalImportedModuleNames.begin(), globalImportedModuleNames.end(), moduleName) != globalImportedModuleNames.end())
+        {
+            // we already compiled this module, so we don't need to do it again
+            needToCompile = false;
+        }
         advance();
 
-        Lexer lexer(moduleName + ".sl");
-        lexer.tokenize();
-        Parser* parser = new Parser(lexer.tokens);
-        parser->parse();
-        if (parser->hasError)
+        if (needToCompile)
         {
-            llvm::errs() << "[ERROR] Compilation failed.\n";
-            exit(-1);
-        }
-        CodeGenContext codeGenContext(parser->mainModuleNode, false, parser->currentScope->symbols);
-        codeGenContext.generateCode(parser->mainModuleNode);
-        if (DEBUG) codeGenContext.mModule->print(llvm::dbgs(), nullptr);
-        std::error_code EC;
-        auto outFileStream = llvm::raw_fd_ostream(moduleName + ".ll", EC, sys::fs::OF_None);
-        codeGenContext.mModule->print(outFileStream, nullptr);
+            //llvm::errs() << "[INFO] Compiling module \"" << moduleName << "\"...\n";
+            Lexer lexer(moduleName + ".sl");
+            lexer.tokenize();
+            Parser* parser = new Parser(lexer.tokens);
+            parser->parse();
+            if (parser->hasError)
+            {
+                llvm::errs() << "[ERROR] Compilation failed.\n";
+                exit(-1);
+            }
+            CodeGenContext codeGenContext(parser->mainModuleNode, false, parser->currentScope->symbols);
+            codeGenContext.generateCode(parser->mainModuleNode);
+            if (DEBUG) codeGenContext.mModule->print(llvm::dbgs(), nullptr);
+            std::error_code EC;
+            auto outFileStream = llvm::raw_fd_ostream(moduleName + ".ll", EC, sys::fs::OF_None);
+            codeGenContext.mModule->print(outFileStream, nullptr);
 
-        importedModules->push_back(parser);
+            importedModules->push_back(parser);
+            globalImportedModules.push_back(parser);
+            globalImportedModuleNames.push_back(moduleName);
+        }
+        else
+        {
+            for (auto &module : globalImportedModules)
+            {
+                if (module->mainModuleNode->name->value == moduleName)
+                {
+                    importedModules->push_back(module);
+                    break;
+                }
+            }
+        }
 
         advance();
     }
@@ -120,7 +144,7 @@ bool Parser::parseModuleDecl()
         else return false;
         advance();
     }
-
+    llvm::errs() << "[INFO] Compiling module \"" << mainModuleNode->name->value << "\"...\n";
     return ret;
 }
 

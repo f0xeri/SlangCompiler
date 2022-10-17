@@ -452,5 +452,7 @@ public:
     ExprNode* parsePrimary();
 };
 
+static std::vector<std::string> globalImportedModuleNames;
+static std::vector<Parser*> globalImportedModules;
 
 #endif //SLANGPARSER_PARSER_HPP

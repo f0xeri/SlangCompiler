@@ -1,4 +1,4 @@
-module gl
+module glew
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~extern~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     public extern function glewInit(): integer
@@ -161,4 +161,4 @@ module gl
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~interface~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 start
-end gl.
+end glew.

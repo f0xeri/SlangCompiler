@@ -6,7 +6,7 @@ module GLTexture
         private field-array[0] character data;
         public field-integer texture;
         public method load(Texture this)(in array[] character filename)
-            //call stbi_set_flip_vertically_on_load(true);
+            call stbi_set_flip_vertically_on_load(true);
             variable-integer width;
             variable-integer height;
             variable-integer channels;

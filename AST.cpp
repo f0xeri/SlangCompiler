@@ -933,8 +933,8 @@ llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgcontext) {
             if (constructorFunc != nullptr)
             {
                 auto p = cgcontext.builder->CreateLoad(newVar);
-                structConstructorFunc->print(llvm::errs());
-                newVar->print(llvm::errs());
+                if (DEBUG) structConstructorFunc->print(llvm::errs());
+                if (DEBUG) newVar->print(llvm::errs());
                 cgcontext.builder->CreateCall(structConstructorFunc, {p});
             }
 
@@ -971,7 +971,7 @@ llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgcontext) {
             if (constructorFunc != nullptr)
             {
                 auto p = cgcontext.builder->CreateLoad(newVar);
-                newVar->print(llvm::errs());
+                if (DEBUG) newVar->print(llvm::errs());
                 cgcontext.builder->CreateCall(constructorFunc, {p});
             }
         }
@@ -1458,6 +1458,7 @@ llvm::Value *MethodDecNode::codegen(CodeGenContext &cgcontext) {
 
 llvm::Value *TypeDecStatementNode::codegen(CodeGenContext &cgcontext) {
     if (name->value == "Object") return nullptr;
+    if (cgcontext.allocatedClasses[name->value] != nullptr) return nullptr;
     cgcontext.allocatedClasses[name->value] = StructType::create(*cgcontext.context, name->value);
     cgcontext.allocatedClasses[name->value]->setName(name->value);
     std::vector<Type*> dataTypes;

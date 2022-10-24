@@ -428,6 +428,7 @@ public:
     BlockExprNode* parseElseBlock();
     AssignExprNode* parseAssignStatement();
     OutputStatementNode* parseOutputStatement();
+    InputStatementNode* parseInputStatement();
     ReturnStatementNode* parseReturnStatement();
     WhileStatementNode* parseWhileStatement();
     ExternFuncDecStatementNode* parseExternFuncDecl();

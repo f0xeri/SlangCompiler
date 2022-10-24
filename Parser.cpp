@@ -160,6 +160,7 @@ BlockExprNode* Parser::parseBlock(VariableExprNode *name) {
         if (token.type == TokenType::If) statements->push_back(parseIfStatement());
         else if (token.type == TokenType::Variable) statements->push_back(parseVariableDecl());
         else if (token.type == TokenType::Output) statements->push_back(parseOutputStatement());
+        else if (token.type == TokenType::Input) statements->push_back(parseInputStatement());
         else if (token.type == TokenType::Return) statements->push_back(parseReturnStatement());
         else if (token.type == TokenType::Let) statements->push_back(parseAssignStatement());
         else if (token.type == TokenType::While) statements->push_back(parseWhileStatement());
@@ -1284,6 +1285,7 @@ IfStatementNode *Parser::parseIfStatement() {
             if (token.type == TokenType::If) statements->push_back(parseIfStatement());
             else if (token.type == TokenType::Variable) statements->push_back(parseVariableDecl());
             else if (token.type == TokenType::Output) statements->push_back(parseOutputStatement());
+            else if (token.type == TokenType::Input) statements->push_back(parseInputStatement());
             else if (token.type == TokenType::Return) statements->push_back(parseReturnStatement());
             else if (token.type == TokenType::Let) statements->push_back(parseAssignStatement());
             else if (token.type == TokenType::While) statements->push_back(parseWhileStatement());
@@ -1322,6 +1324,7 @@ ElseIfStatementNode *Parser::parseElseIfBlock() {
         if (token.type == TokenType::If) statements->push_back(parseIfStatement());
         else if (token.type == TokenType::Variable) statements->push_back(parseVariableDecl());
         else if (token.type == TokenType::Output) statements->push_back(parseOutputStatement());
+        else if (token.type == TokenType::Input) statements->push_back(parseInputStatement());
         else if (token.type == TokenType::Return) statements->push_back(parseReturnStatement());
         else if (token.type == TokenType::Let) statements->push_back(parseAssignStatement());
         else if (token.type == TokenType::While) statements->push_back(parseWhileStatement());
@@ -1347,6 +1350,7 @@ BlockExprNode *Parser::parseElseBlock() {
         if (token.type == TokenType::If) statements->push_back(parseIfStatement());
         else if (token.type == TokenType::Variable) statements->push_back(parseVariableDecl());
         else if (token.type == TokenType::Output) statements->push_back(parseOutputStatement());
+        else if (token.type == TokenType::Input) statements->push_back(parseInputStatement());
         else if (token.type == TokenType::Return) statements->push_back(parseReturnStatement());
         else if (token.type == TokenType::Let) statements->push_back(parseAssignStatement());
         else if (token.type == TokenType::While) statements->push_back(parseWhileStatement());
@@ -1373,6 +1377,20 @@ OutputStatementNode *Parser::parseOutputStatement() {
         return new OutputStatementNode(dynamic_cast<IndexExprNode *>(expr));
     }*/
     return new OutputStatementNode(expr);
+}
+
+InputStatementNode *Parser::parseInputStatement() {
+    consume(TokenType::Input);
+    auto expr = parseExpression();
+    /*if (dynamic_cast<VariableExprNode *>(expr) != nullptr)
+    {
+        return new OutputStatementNode(dynamic_cast<VariableExprNode *>(expr));
+    }
+    else if (dynamic_cast<IndexExprNode *>(expr) != nullptr)
+    {
+        return new OutputStatementNode(dynamic_cast<IndexExprNode *>(expr));
+    }*/
+    return new InputStatementNode(expr);
 }
 
 AssignExprNode *Parser::parseAssignStatement() {

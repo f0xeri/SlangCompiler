@@ -335,6 +335,14 @@ public:
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
+class InputStatementNode : public StatementNode {
+public:
+    ExprNode *expr;
+
+    explicit InputStatementNode(ExprNode *expr): expr(expr) {}
+    virtual llvm::Value *codegen(CodeGenContext &cgcontext);
+};
+
 class VarDecStatementNode : public DeclarationNode {
 public:
     std::string type;
@@ -581,6 +589,15 @@ public:
         return printfFunc;
     }
 
+    Function* scanfFunction() {
+        vector<Type*> scanfArgs;
+        scanfArgs.push_back(Type::getInt8PtrTy(*context));
+        FunctionType* scanfType = FunctionType::get(Type::getInt32Ty(*context), scanfArgs, true);
+        Function *scanfFunc = Function::Create(scanfType, Function::ExternalLinkage, Twine("scanf"), mModule);
+        scanfFunc->setCallingConv(CallingConv::C);
+        return scanfFunc;
+    }
+
     Function* GC_InitFunction() {
         vector<Type*> args;
         FunctionType* type = FunctionType::get(Type::getVoidTy(*context), args, false);
@@ -618,6 +635,7 @@ public:
     void generateCode(ModuleStatementNode *mainModule)
     {
         printfFunction();
+        scanfFunction();
         llvmTrap();
         GC_InitFunction();
         GC_MallocFunction();

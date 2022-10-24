@@ -303,6 +303,14 @@ module StdString
             return this.length;
         end len;
 
+        public method readInput(String this)(in integer size): array[] character
+            variable-array[size + 1] character newCharArray;
+            let this.arrayOfChars := newCharArray;
+            input this.arrayOfChars;
+            let this.length := strlen(this.arrayOfChars);
+            return this.arrayOfChars;
+        end readInput;
+
         public method toString(String this)(): array[] character
             return this.arrayOfChars;
         end toString;

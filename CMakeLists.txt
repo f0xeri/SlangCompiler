@@ -28,6 +28,6 @@ add_executable(slangc main.cpp Lexer.hpp Lexer.cpp TokenType.hpp Logger.hpp Pars
 target_link_libraries(slangc PRIVATE ${llvm_libs})
 
 #DEBUG
-target_compile_definitions(slangc PRIVATE DEBUG=1)
+#target_compile_definitions(slangc PRIVATE DEBUG=1)
 #RELEASE
-#target_compile_definitions(slangc PRIVATE DEBUG=0)
+target_compile_definitions(slangc PRIVATE DEBUG=0)

@@ -22,6 +22,11 @@ module main
 
     end ABC;
 
+    public procedure foo(in integer a, out Time time)()
+        output a;
+        output time.int;
+    end foo;
+
     public function first(in integer a, in integer ra): integer
         let ra := (globalint + (ra - a) + (1 + 4) * 2) * -10;
         return ra;
@@ -79,5 +84,7 @@ start
     variable-Time time;
     output time.int;
     output time.r;
+    output "~~~~~~~~~~~~~";
     variable-ABC abc;
+    call foo(5, time);
 end main.

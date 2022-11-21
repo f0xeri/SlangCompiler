@@ -284,7 +284,7 @@ public:
 class FuncParamDecStatementNode : public DeclarationNode {
 public:
     ParameterType parameterType;
-    ExprNode * type;
+    ExprNode *type;
     ExprNode *expr;
 
     FuncParamDecStatementNode(ExprNode* type, VariableExprNode *name, ParameterType parameterType): type(type), DeclarationNode(name), parameterType(parameterType), expr(nullptr) {}

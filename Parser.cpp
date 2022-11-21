@@ -148,9 +148,14 @@ bool Parser::parseModuleDecl()
     return ret;
 }
 
-BlockExprNode* Parser::parseBlock(VariableExprNode *name) {
+BlockExprNode* Parser::parseBlock(VariableExprNode *name, std::vector<FuncParamDecStatementNode*> *argsToInsert) {
     Scope *scope = new Scope(currentScope);
     currentScope = scope;
+    if (argsToInsert != nullptr) {
+        for (auto &arg : *argsToInsert) {
+            currentScope->insert(arg);
+        }
+    }
     bool blockEnd = false;
     auto *statements = new std::vector<StatementNode*>();
     auto *block = new BlockExprNode(statements);
@@ -831,7 +836,16 @@ StatementNode* Parser::parseVarOrCall() {
                     return nullptr;
                 }
             }
-            type = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(dynamic_cast<VarDecStatementNode*>(var)->type));
+
+            if (dynamic_cast<VarDecStatementNode*>(var) != nullptr)
+                type = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(dynamic_cast<VarDecStatementNode*>(var)->type));
+            else if (dynamic_cast<FuncParamDecStatementNode*>(var) != nullptr) {
+                auto funcParamVar = dynamic_cast<FuncParamDecStatementNode*>(var);
+                auto typeString = dynamic_cast<VariableExprNode*>(funcParamVar->type)->value;
+                type = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(typeString));
+            }
+
+
             if (type != nullptr) dotClass = true;
         }
         advance();
@@ -1220,6 +1234,7 @@ DeclarationNode *Parser::parseFunctionDecl() {
     std::string name = consume(TokenType::Identifier).data;
     ExprNode* type;
     auto params = parseFuncParameters();
+
     if (isFunction)
     {
         advance();
@@ -1251,7 +1266,7 @@ DeclarationNode *Parser::parseFunctionDecl() {
     }
 
     currentScope->insert(function);
-    block = parseBlock(new VariableExprNode(name));
+    block = parseBlock(new VariableExprNode(name), params);
     if (dynamic_cast<ExternFuncDecStatementNode*>(function)) dynamic_cast<ExternFuncDecStatementNode*>(function)->block = block;
     else if (dynamic_cast<FuncDecStatementNode*>(function)) dynamic_cast<FuncDecStatementNode*>(function)->block = block;
 

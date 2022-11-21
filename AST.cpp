@@ -845,24 +845,24 @@ llvm::Value *OutputStatementNode::codegen(CodeGenContext &cgcontext) {
     std::vector<Value *> printArgs;
     Value *formatStr;
     if (value->getType()->isIntegerTy() && value->getType()->getIntegerBitWidth() == 32) {
-        formatStr = cgcontext.builder->CreateGlobalStringPtr("%d\n");
+        formatStr = cgcontext.builder->CreateGlobalStringPtr("%d");
     }
     else if (value->getType()->isIntegerTy() && value->getType()->getIntegerBitWidth() == 8) {
-        formatStr = cgcontext.builder->CreateGlobalStringPtr("%c\n");
+        formatStr = cgcontext.builder->CreateGlobalStringPtr("%c");
     }
     else if (value->getType()->isIntegerTy() && value->getType()->getIntegerBitWidth() == 1) {
         value = cgcontext.builder->CreateIntCast(value, Type::getInt32Ty(*cgcontext.context), false);
-        formatStr = cgcontext.builder->CreateGlobalStringPtr("%d\n");
+        formatStr = cgcontext.builder->CreateGlobalStringPtr("%d");
     }
     else if (value->getType()->isDoubleTy()) {
-        formatStr = cgcontext.builder->CreateGlobalStringPtr("%f\n");
+        formatStr = cgcontext.builder->CreateGlobalStringPtr("%f");
     }
     else if (value->getType()->isFloatTy()) {
         value = cgcontext.builder->CreateFPExt(value, Type::getDoubleTy(*cgcontext.context));
-        formatStr = cgcontext.builder->CreateGlobalStringPtr("%f\n");
+        formatStr = cgcontext.builder->CreateGlobalStringPtr("%f");
     }
     else if (value->getType()->isPointerTy()) {
-        formatStr = cgcontext.builder->CreateGlobalStringPtr("%s\n");
+        formatStr = cgcontext.builder->CreateGlobalStringPtr("%s");
     }
     printArgs.push_back(formatStr);
     printArgs.push_back(value);

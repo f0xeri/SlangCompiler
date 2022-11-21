@@ -82,6 +82,8 @@ module StdMath
     end signbit;
     public extern function fabs(in real x): real
     end fabs;
+    public extern function abs(in integer x): integer
+    end abs;
 start
     output sin(5.0);
     // create test for every function

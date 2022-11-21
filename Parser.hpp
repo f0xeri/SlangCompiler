@@ -415,7 +415,7 @@ public:
     ModuleStatementNode *mainModuleNode;
     bool parseImports();
     bool parseModuleDecl();
-    BlockExprNode* parseBlock(VariableExprNode *name);
+    BlockExprNode* parseBlock(VariableExprNode *name, std::vector<FuncParamDecStatementNode*> *argsToInsert = nullptr);
     bool parseVisibilityOperator();
     DeclarationNode* parseVariableDecl(bool isGlobal = false);
     bool parseStatement();

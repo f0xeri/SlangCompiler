@@ -214,7 +214,7 @@ DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, 
     bool isPrivate = false;
     bool isArray = false;
     Token tok = consume(TokenType::VisibilityType);
-    if (token.data == "private") isPrivate = true;
+    if (tok.data == "private") isPrivate = true;
     consume(TokenType::Field);
     consume(TokenType::Minus);
     tok = consume(TokenType::Identifier);
@@ -354,7 +354,7 @@ MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std
     bool isPrivate = false;
     BlockExprNode *block = nullptr;
     Token tok = consume(TokenType::VisibilityType);
-    if (token.data == "private") isPrivate = true;
+    if (tok.data == "private") isPrivate = true;
     consume(TokenType::Method);
     tok = consume(TokenType::Identifier);
     auto shortName = tok.data;
@@ -450,12 +450,15 @@ MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std
 }
 
 bool Parser::parseTypeDecl() {
+    tokensIterator--;
+    token = *tokensIterator;
     TypeDecStatementNode *typeNode;
     auto *fields = new std::vector<DeclarationNode*>();
     auto *methods = new std::vector<MethodDecNode*>();
     std::string name;
     TypeDecStatementNode *parent;
     bool isPrivate = token.data == "private";
+    advance();
     bool isExtern = false;
     advance();
     if (token.type == TokenType::Extern)
@@ -468,6 +471,7 @@ bool Parser::parseTypeDecl() {
     if (token.type == TokenType::Identifier)
     {
         name = token.data;
+        currentParsingTypeName = name;
         advance();
         if (token.type == TokenType::Inherits)
         {
@@ -619,6 +623,7 @@ bool Parser::parseTypeDecl() {
         typeNode->methods->clear();
         typeNode->fields->clear();
     }
+    currentParsingTypeName = "";
     return true;
 }
 
@@ -846,14 +851,50 @@ StatementNode* Parser::parseVarOrCall() {
             }
 
 
-            if (type != nullptr) dotClass = true;
+            if (type != nullptr)
+            {
+                if (type->isPrivate && !type->name->value.starts_with(mainModuleNode->name->value + "."))
+                {
+                    llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Cannot access private type " << type->name->value << ".\n";
+                    hasError = true;
+                }
+                dotClass = true;
+            }
         }
         advance();
         expect(TokenType::Identifier);
         if (dotModule)
         {
             if (moduleP->currentScope->lookup(name + "." + token.data) != nullptr)
+            {
                 name += "." + token.data;
+
+                auto var = moduleP->currentScope->lookup(name);
+                // check is private
+                if (dynamic_cast<VarDecStatementNode*>(var) != nullptr)
+                {
+                    if (dynamic_cast<VarDecStatementNode*>(var)->isPrivate && moduleP->mainModuleNode->name->value != mainModuleNode->name->value)
+                    {
+                        llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Cannot access private variable " << name << ".\n";
+                        hasError = true;
+                    }
+                }
+                else if (dynamic_cast<FuncDecStatementNode*>(var) != nullptr) {
+                    if (dynamic_cast<FuncDecStatementNode*>(var)->isPrivate && moduleP->mainModuleNode->name->value != mainModuleNode->name->value)
+                    {
+                        llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Cannot access private function " << name << ".\n";
+                        hasError = true;
+                    }
+                }
+                else if (dynamic_cast<ExternFuncDecStatementNode*>(var) != nullptr)
+                {
+                    if (dynamic_cast<ExternFuncDecStatementNode*>(var)->isPrivate && moduleP->mainModuleNode->name->value != mainModuleNode->name->value)
+                    {
+                        llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Cannot access private extern function " << name << ".\n";
+                        hasError = true;
+                    }
+                }
+            }
             else
             {
                 llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") " + name + "." + token.data + " is not declared.\n";
@@ -868,7 +909,16 @@ StatementNode* Parser::parseVarOrCall() {
                 {
                     name += "." + token.data;
                     fieldExists = true;
-                    if (dynamic_cast<FieldVarDecNode*>(field) != nullptr) fieldIndex = dynamic_cast<FieldVarDecNode*>(field)->index;
+                    if (dynamic_cast<FieldVarDecNode*>(field) != nullptr)
+                    {
+                        auto f = dynamic_cast<FieldVarDecNode*>(field);
+                        fieldIndex = f->index;
+                        if (f->isPrivate && type->name->value != currentParsingTypeName)
+                        {
+                            llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Field " + name + " is private member of class " + type->name->value + ".\n";
+                            hasError = true;
+                        }
+                    }
                     else if (dynamic_cast<FieldArrayVarDecNode*>(field)) {
                         fieldIndex = dynamic_cast<FieldArrayVarDecNode*>(field)->index;
                         fieldArray = dynamic_cast<FieldArrayVarDecNode*>(field);
@@ -883,6 +933,11 @@ StatementNode* Parser::parseVarOrCall() {
                 {
                     //name = type->name->value + "." + token.data;
                     methodName = type->name->value + "." + token.data;
+                    if (method->isPrivate && type->name->value != currentParsingTypeName)
+                    {
+                        llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Method " + methodName + " is private method of class " + type->name->value + ".\n";
+                        hasError = true;
+                    }
                     methodExists = true;
                     break;
                 }
@@ -1149,6 +1204,11 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
                         llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Unknown type \"" << type << "\".\n";
                         hasError = true;
                     }
+                    if (typeStatement->isPrivate && !typeStatement->name->value.starts_with(mainModuleNode->name->value + "."))
+                    {
+                        llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Cannot access private type " << typeStatement->name->value << ".\n";
+                        hasError = true;
+                    }
                     tokensIterator--;
                     token = *tokensIterator;
                 }
@@ -1186,6 +1246,17 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
     else
     {
         type = parseTypeName(type);
+        auto typeStatement = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(type));
+        if (typeStatement == nullptr)
+        {
+            llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Unknown type \"" << type << "\".\n";
+            hasError = true;
+        }
+        if (typeStatement->isPrivate && !typeStatement->name->value.starts_with(mainModuleNode->name->value + "."))
+        {
+            llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Cannot access private type " << typeStatement->name->value << ".\n";
+            hasError = true;
+        }
         name = consume(TokenType::Identifier).data;
     }
     if (token.type == TokenType::Assign)

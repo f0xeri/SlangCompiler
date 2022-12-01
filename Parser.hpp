@@ -17,6 +17,8 @@ public:
     std::vector<Token>::iterator tokensIterator;
     Scope* currentScope;
 
+    std::string currentParsingTypeName;
+
     std::vector<Parser*>* importedModules;
 
     Parser(std::vector<Token> &tokens)

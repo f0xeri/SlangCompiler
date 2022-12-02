@@ -1519,7 +1519,12 @@ CallExprNode *Parser::parseCall() {
     consume(TokenType::Call);
     advance();
     auto callExpr = parseVarOrCall();
-    if (dynamic_cast<CallExprNode *>(callExpr) == nullptr)
+    if (callExpr == nullptr)
+    {
+        hasError = true;
+        return nullptr;
+    }
+    else if (dynamic_cast<CallExprNode *>(callExpr) == nullptr)
     {
         llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") " << dynamic_cast<VariableExprNode *>(callExpr)->value << " is not a function.\n";
         hasError = true;

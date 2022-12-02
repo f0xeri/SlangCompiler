@@ -1,7 +1,7 @@
 import classes2;
 module main
     public class A inherits Object
-        public field-array[8] character str := "public A string";
+        public field-array[11] character str := "public A string";
         public field-integer i := 1;
         private field-integer ip := 11;
         public method p1(A a)()
@@ -23,6 +23,7 @@ start
     call a.p1();
     output a.i;
     //output a.ip;
+
 
     variable-B b;
     call b.p1();

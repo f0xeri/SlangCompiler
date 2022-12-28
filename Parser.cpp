@@ -267,7 +267,7 @@ DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, 
     }
     else
     {
-        if (type == thisClassName || currentScope->lookup(type) || oneOfDefaultTypes(type))
+        if (type == thisClassName || currentScope->lookup(type) || currentScope->lookup(mainModuleNode->name->value + "." + type) || oneOfDefaultTypes(type))
         {
             tok = consume(TokenType::Identifier);
             name = tok.data;
@@ -299,7 +299,12 @@ DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, 
                     }
                     else
                     {
-                        // object fields
+                        // TODO: object fields
+                        if (!currentScope->lookup(type) && currentScope->lookup(mainModuleNode->name->value + "." + type)) {
+                            type = mainModuleNode->name->value + "." + type;
+                        }
+                        field = new FieldVarDecNode(thisClassName, new VariableExprNode(name), isPrivate, type, nullptr, index);
+                        if (DEBUG) llvm::outs() << "parsed field " << type << " " << name << "\n";
                     }
                 }
                 if (init)
@@ -471,7 +476,7 @@ bool Parser::parseTypeDecl() {
     if (token.type == TokenType::Identifier)
     {
         name = token.data;
-        currentParsingTypeName = name;
+        currentParsingTypeName = mainModuleNode->name->value + "." + name;
         advance();
         if (token.type == TokenType::Inherits)
         {
@@ -1462,20 +1467,14 @@ OutputStatementNode *Parser::parseOutputStatement() {
     {
         return new OutputStatementNode(dynamic_cast<IndexExprNode *>(expr));
     }*/
+    expect(TokenType::Semicolon);
     return new OutputStatementNode(expr);
 }
 
 InputStatementNode *Parser::parseInputStatement() {
     consume(TokenType::Input);
     auto expr = parseExpression();
-    /*if (dynamic_cast<VariableExprNode *>(expr) != nullptr)
-    {
-        return new OutputStatementNode(dynamic_cast<VariableExprNode *>(expr));
-    }
-    else if (dynamic_cast<IndexExprNode *>(expr) != nullptr)
-    {
-        return new OutputStatementNode(dynamic_cast<IndexExprNode *>(expr));
-    }*/
+    expect(TokenType::Semicolon);
     return new InputStatementNode(expr);
 }
 
@@ -1496,6 +1495,7 @@ AssignExprNode *Parser::parseAssignStatement() {
     {
         return new AssignExprNode(dynamic_cast<IndexExprNode *>(varName), expr);
     }
+    expect(TokenType::Semicolon);
     return nullptr;
 }
 
@@ -1529,12 +1529,14 @@ CallExprNode *Parser::parseCall() {
         llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") " << dynamic_cast<VariableExprNode *>(callExpr)->value << " is not a function.\n";
         hasError = true;
     }
+    expect(TokenType::Semicolon);
     return dynamic_cast<CallExprNode *>(callExpr);
 }
 
 DeleteExprNode *Parser::parseDelete() {
     consume(TokenType::Delete);
     auto varExpr = parseExpression();
+    expect(TokenType::Semicolon);
     return new DeleteExprNode(varExpr);
 }
 

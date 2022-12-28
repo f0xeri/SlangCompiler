@@ -18,12 +18,15 @@ module main
             output "private B class\n";
         end p2;
     end B;
+
+    private class C inherits Object
+        public field-A aobj;
+    end C;
 start
     variable-A a;
     call a.p1();
     output a.i;
     //output a.ip;
-
 
     variable-B b;
     call b.p1();
@@ -42,4 +45,11 @@ start
 
     output classes2.globalInt;
     //output classes2.globalPrivateInt;
+
+    variable-C c;
+    variable-A a4 := c.aobj;
+    output "~~~~\n";
+    call a4.p1();
+    output a4.i;
+
 end main.

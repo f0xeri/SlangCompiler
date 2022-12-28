@@ -166,8 +166,8 @@ static Value* mycast(Value* value, Type* type, CodeGenContext& cgcontext) {
     } else if (type == Type::getInt8PtrTy(*cgcontext.context)) {
         value = cgcontext.builder->CreateBitCast(value, type);
     }
-    else
-        llvm::errs() << "[ERROR] Cannot cast this value.\n";
+    //else
+        //llvm::errs() << "[ERROR] Cannot cast this value.\n";
     return value;
 }
 
@@ -822,9 +822,17 @@ llvm::Value *AssignExprNode::codegen(CodeGenContext &cgcontext) {
             }
         }
     }
-
+    // what is that?
     if (assignData->getType() != var->getType()->getPointerElementType()) {
         assignData = mycast(assignData, var->getType()->getPointerElementType(), cgcontext);
+    }
+
+    if (var->getType()->isPointerTy()) {
+        if (var->getType()->getPointerElementType()->isPointerTy()) {
+            if (assignData->getType() == var->getType()->getPointerElementType()->getPointerElementType()) {
+                var = cgcontext.builder->CreateLoad(var);
+            }
+        }
     }
     return new StoreInst(assignData, var, false, cgcontext.currentBlock());
 }
@@ -993,10 +1001,21 @@ llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgcontext) {
         if (expr != nullptr) {
             rightVal = expr->codegen(cgcontext);
             //new StoreInst(rightVal, newVar, false, cgcontext.currentBlock());
+
             if (rightVal->getType() != newVar->getType()->getPointerElementType()) {
                 rightVal = mycast(rightVal, newVar->getType()->getPointerElementType(), cgcontext);
             }
-            cgcontext.builder->CreateStore(rightVal, newVar);
+            auto newVarLoad = newVar;
+            if (newVar->getType()->isPointerTy()) {
+                if (newVar->getType()->getPointerElementType()->isPointerTy()) {
+                    if (rightVal->getType() == newVar->getType()->getPointerElementType()->getPointerElementType()) {
+                        newVarLoad = cgcontext.builder->CreateLoad(newVar);
+                        cgcontext.builder->CreateStore(rightVal, newVarLoad);
+                    }
+                }
+            }
+
+            cgcontext.builder->CreateStore(rightVal, newVarLoad);
         }
         if (cgcontext.allocatedClasses.contains(type))
         {

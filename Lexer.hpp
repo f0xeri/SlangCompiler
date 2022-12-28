@@ -24,7 +24,12 @@ public:
         if(result != tokensMap.end())
             return result->first;
         else
-            return "";
+            if (type == TokenType::Identifier)
+                return "identifier";
+            else if (type == TokenType::String)
+                return "string";
+            else
+                return "";
     }
 
     std::vector<Token> tokens;

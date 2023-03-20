@@ -26,12 +26,12 @@ public:
         tokensIterator = tokens.begin();
         token = *tokensIterator;
         currentScope = new Scope();
-        auto objectType = new TypeDecStatementNode(new VariableExprNode("Object"), false, nullptr, nullptr, false, nullptr);
+        auto objectType = new TypeDecStatementNode({}, new VariableExprNode({}, "Object"), false, nullptr, nullptr, false, nullptr);
         objectType->methods = new std::vector<MethodDecNode*>();
-        auto toStringType = new ArrayExprNode("character", nullptr, new std::vector<ExprNode*>());
+        auto toStringType = new ArrayExprNode({}, "character", nullptr, new std::vector<ExprNode*>());
         auto args = new std::vector<FuncParamDecStatementNode *>();
-        args->push_back(new FuncParamDecStatementNode(new VariableExprNode("Object"), new VariableExprNode("this"), ParameterType::Var));
-        objectType->methods->push_back(new MethodDecNode(toStringType, new VariableExprNode("Object.toString"), false, true, new VariableExprNode("this"), args, nullptr));
+        args->push_back(new FuncParamDecStatementNode({}, new VariableExprNode({}, "Object"), new VariableExprNode({}, "this"), ParameterType::Var));
+        objectType->methods->push_back(new MethodDecNode({}, toStringType, new VariableExprNode({}, "Object.toString"), false, true, new VariableExprNode({}, "this"), args, nullptr));
         currentScope->insert(objectType);
         importedModules = new std::vector<Parser*>();
         this->tokens = tokens;
@@ -125,40 +125,40 @@ public:
     }
 
 
-    FieldVarDecNode* initDefaultType(const std::string &typeName, bool isPrivate, const std::string &name, const std::string &type, TokenType dataType, const std::string &data, int index)
+    FieldVarDecNode* initDefaultType(SourceLoc loc, const std::string &typeName, bool isPrivate, const std::string &name, const std::string &type, TokenType dataType, const std::string &data, int index)
     {
         FieldVarDecNode *field = nullptr;
         if (type == "integer")
         {
             if (dataType == TokenType::Integer)
             {
-                field = new FieldVarDecNode(typeName, new VariableExprNode(name), isPrivate, type,new IntExprNode(std::stoi(token.data)), index);
+                field = new FieldVarDecNode(loc, typeName, new VariableExprNode(loc, name), isPrivate, type,new IntExprNode(loc, std::stoi(token.data)), index);
             }
             else
             {
-                field = new FieldVarDecNode(typeName, new VariableExprNode(name), isPrivate, type,new IntExprNode(0), index);
+                field = new FieldVarDecNode(loc, typeName, new VariableExprNode(loc, name), isPrivate, type,new IntExprNode(loc, 0), index);
             }
         }
         else if (type == "real")
         {
             if (dataType == TokenType::Real)
             {
-                field = new FieldVarDecNode(typeName, new VariableExprNode(name), isPrivate, type, new RealExprNode(std::stod(data)), index);
+                field = new FieldVarDecNode(loc, typeName, new VariableExprNode(loc, name), isPrivate, type, new RealExprNode(loc, std::stod(data)), index);
             }
             else
             {
-                field = new FieldVarDecNode(typeName, new VariableExprNode(name), isPrivate, type, new RealExprNode(0.0), index);
+                field = new FieldVarDecNode(loc, typeName, new VariableExprNode(loc, name), isPrivate, type, new RealExprNode(loc, 0.0), index);
             }
         }
         else if (type == "float")
         {
             if (dataType == TokenType::Float)
             {
-                field = new FieldVarDecNode(typeName, new VariableExprNode(name), isPrivate, type, new FloatExprNode(std::stod(data)), index);
+                field = new FieldVarDecNode(loc, typeName, new VariableExprNode(loc, name), isPrivate, type, new FloatExprNode(loc, std::stod(data)), index);
             }
             else
             {
-                field = new FieldVarDecNode(typeName, new VariableExprNode(name), isPrivate, type, new FloatExprNode(0.0f), index);
+                field = new FieldVarDecNode(loc, typeName, new VariableExprNode(loc, name), isPrivate, type, new FloatExprNode(loc, 0.0f), index);
             }
         }
         else if (type == "boolean")
@@ -166,11 +166,11 @@ public:
             if (dataType == TokenType::Boolean)
             {
                 bool bdata = data == "true";
-                field = new FieldVarDecNode(typeName, new VariableExprNode(name), isPrivate, type, new BooleanExprNode(bdata), index);
+                field = new FieldVarDecNode(loc, typeName, new VariableExprNode(loc, name), isPrivate, type, new BooleanExprNode(loc, bdata), index);
             }
             else
             {
-                field = new FieldVarDecNode(typeName, new VariableExprNode(name), isPrivate, type, new BooleanExprNode(false), index);
+                field = new FieldVarDecNode(loc, typeName, new VariableExprNode(loc, name), isPrivate, type, new BooleanExprNode(loc, false), index);
             }
         }
         else if (type == "character")
@@ -178,17 +178,17 @@ public:
             if (data.length() == 1)
             {
                 char chdata = data[0];
-                field = new FieldVarDecNode(typeName, new VariableExprNode(name), isPrivate, type, new CharExprNode(chdata), index);
+                field = new FieldVarDecNode(loc, typeName, new VariableExprNode(loc, name), isPrivate, type, new CharExprNode(loc, chdata), index);
             }
             else if (data.length() == 0)
             {
-                field = new FieldVarDecNode(typeName, new VariableExprNode(name), isPrivate, type, new CharExprNode(NULL), index);
+                field = new FieldVarDecNode(loc, typeName, new VariableExprNode(loc, name), isPrivate, type, new CharExprNode(loc, NULL), index);
             }
 
         }
         else if (type == "string")
         {
-            field = new FieldVarDecNode(typeName, new VariableExprNode(name), isPrivate, type, new StringExprNode(data), index);
+            field = new FieldVarDecNode(loc, typeName, new VariableExprNode(loc, name), isPrivate, type, new StringExprNode(loc, data), index);
         }
         return field;
     }
@@ -199,7 +199,7 @@ public:
         bool isArray = false;
         if (oneOfDefaultTypes(type))
         {
-            return new VariableExprNode(type);
+            return new VariableExprNode({}, type);
         }
         else if (type == "array")
         {
@@ -214,7 +214,7 @@ public:
                 size = nullptr;
             consume(TokenType::RBracket);
             std::string arrType = token.data;
-            ArrayExprNode* arrExpr = new ArrayExprNode(arrType, size, new std::vector<ExprNode*>());
+            ArrayExprNode* arrExpr = new ArrayExprNode({}, arrType, size, new std::vector<ExprNode*>());
             while (token.data == "array")
             {
                 advance();
@@ -241,7 +241,7 @@ public:
                         token = *tokensIterator;
                     }
                 }
-                arrExpr->values->push_back(new ArrayExprNode(arrType, size, nullptr));
+                arrExpr->values->push_back(new ArrayExprNode({}, arrType, size, nullptr));
             }
             expr = arrExpr;
         }
@@ -263,11 +263,11 @@ public:
                 }
                 else
                 {
-                    funcType = new VariableExprNode("");
+                    funcType = new VariableExprNode({}, "");
                 }
             }
-            else funcType = new VariableExprNode("");
-            auto result = new FuncExprNode(funcType, args, isFunction);
+            else funcType = new VariableExprNode({}, "");
+            auto result = new FuncExprNode({}, funcType, args, isFunction);
             expr = result;
         }
         else
@@ -321,7 +321,7 @@ public:
                     type = mainModuleNode->name->value + "." + type;
                 }
             }
-            expr = new VariableExprNode(type);
+            expr = new VariableExprNode({}, type);
             // arrays and objects
         }
         return expr;

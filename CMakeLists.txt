@@ -8,7 +8,7 @@ project(slangc)
 set(CMAKE_CXX_STANDARD 20)
 #DEBUG
 message("Building in DEBUG mode.")
-set(LLVM-debug_DIR "C:\\Program Files (x86)\\LLVM-debug\\lib\\cmake\\llvm")
+set(LLVM-debug_DIR "D:\\Program Files (x86)\\LLVM-debug\\lib\\cmake\\llvm")
 find_package(LLVM-debug REQUIRED CONFIG)
 #RELEASE
 #message("Building in RELEASE mode.")

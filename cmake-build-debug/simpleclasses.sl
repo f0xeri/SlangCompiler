@@ -1,4 +1,4 @@
-module main
+module simpleclasses
     public variable-integer globalint := 15;
     public class Time inherits Object
         public field-integer int := 2;
@@ -87,4 +87,4 @@ start
     output "~~~~~~~~~~~~~";
     variable-ABC abc;
     call foo(5, time);
-end main.
+end simpleclasses.

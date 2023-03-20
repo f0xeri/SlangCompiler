@@ -45,8 +45,14 @@
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/Pass.h>
 #include <llvm/Support/DynamicLibrary.h>
+#include <llvm/IR/DIBuilder.h>
 
 #include "TokenType.hpp"
+
+struct SourceLoc {
+    uint64_t line;
+    uint64_t col;
+};
 
 class CodeGenContext;
 
@@ -82,7 +88,8 @@ class ExprNode : public Node
 {
 public:
     bool isConst = false;
-    ExprNode(bool isConst): isConst(isConst) {}
+    SourceLoc loc{};
+    ExprNode(bool isConst, SourceLoc loc): isConst(isConst), loc(loc) {}
     virtual ~ExprNode() = default;
     E_TYPE _type = E_UNKNOWN;
     virtual llvm::Value *codegen(CodeGenContext &cgcontext) = 0;
@@ -91,6 +98,8 @@ public:
 class StatementNode : public Node
 {
 public:
+    SourceLoc loc{};
+    StatementNode(SourceLoc loc) : loc(loc) {}
     virtual ~StatementNode() = default;
     virtual llvm::Value *codegen(CodeGenContext &cgcontext) = 0;
 };
@@ -99,7 +108,7 @@ class IntExprNode : public ExprNode
 {
 public:
     int value;
-    explicit IntExprNode(int value): ExprNode(true), value(value) {
+    explicit IntExprNode(SourceLoc loc, int value): ExprNode(true, loc), value(value) {
         _type = E_INT;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
@@ -109,7 +118,7 @@ class RealExprNode : public ExprNode
 {
 public:
     double value;
-    explicit RealExprNode(double value): ExprNode(true), value(value) {
+    explicit RealExprNode(SourceLoc loc, double value): ExprNode(true, loc), value(value) {
         _type = E_REAL;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
@@ -119,7 +128,7 @@ class FloatExprNode : public ExprNode
 {
 public:
     double value;
-    explicit FloatExprNode(double value): ExprNode(true), value(value) {
+    explicit FloatExprNode(SourceLoc loc, double value): ExprNode(true, loc), value(value) {
         _type = E_FLOAT;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
@@ -129,7 +138,7 @@ class CharExprNode : public ExprNode
 {
 public:
     char value;
-    explicit CharExprNode(char value): ExprNode(true), value(value) {
+    explicit CharExprNode(SourceLoc loc, char value): ExprNode(true, loc), value(value) {
         _type = E_CHAR;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
@@ -139,7 +148,7 @@ class StringExprNode : public ExprNode
 {
 public:
     std::string value;
-    explicit StringExprNode(std::string value): ExprNode(true), value(std::move(value)) {
+    explicit StringExprNode(SourceLoc loc, std::string value): ExprNode(true, loc), value(std::move(value)) {
         _type = E_STRING;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
@@ -149,7 +158,7 @@ class NilExprNode : public ExprNode
 {
 public:
     ExprNode* type;
-    explicit NilExprNode(ExprNode* type = nullptr): ExprNode(true), type(type) {
+    explicit NilExprNode(SourceLoc loc, ExprNode* type = nullptr): ExprNode(true, loc), type(type) {
         _type = E_UNKNOWN;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
@@ -161,7 +170,7 @@ public:
     std::vector<ExprNode*> *values;
     std::string type;
     ExprNode* size;
-    explicit ArrayExprNode(const std::string &type, ExprNode* size, std::vector<ExprNode*> *values): type(type), size(size), values(values), ExprNode(false) {
+    explicit ArrayExprNode(SourceLoc loc, const std::string &type, ExprNode* size, std::vector<ExprNode*> *values): type(type), size(size), values(values), ExprNode(false, loc) {
         _type = E_ARRAY;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
@@ -171,7 +180,7 @@ class BooleanExprNode : public ExprNode
 {
 public:
     bool value;
-    explicit BooleanExprNode(bool value): ExprNode(true), value(value) {
+    explicit BooleanExprNode(SourceLoc loc, bool value): ExprNode(true, loc), value(value) {
         _type = E_BOOLEAN;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
@@ -184,7 +193,7 @@ public:
     bool dotModule = false;
     bool isPointer = false;
     int index = -1;
-    VariableExprNode(std::string name, E_TYPE type = E_UNKNOWN, bool dotModule = false, bool dotClass = false, int index = -1, bool isPointer = false): value(std::move(name)), ExprNode(false), dotModule(dotModule), dotClass(dotClass), index(index), isPointer(isPointer) {
+    VariableExprNode(SourceLoc loc, std::string name, E_TYPE type = E_UNKNOWN, bool dotModule = false, bool dotClass = false, int index = -1, bool isPointer = false): value(std::move(name)), ExprNode(false, loc), StatementNode(loc), dotModule(dotModule), dotClass(dotClass), index(index), isPointer(isPointer) {
         _type = type;
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
@@ -195,8 +204,8 @@ public:
     ExprNode *indexExpr;
     ExprNode *assign;
 public:
-    IndexExprNode(const std::string &name, ExprNode *expr, bool dotModule = false, bool dotClass = false, int index = -1, bool isPointer = false): VariableExprNode(name, E_UNKNOWN, dotModule, dotClass, index, isPointer), indexExpr(expr), assign(nullptr) {}
-    IndexExprNode(const std::string &name, ExprNode *expr, ExprNode *assign, bool dotModule = false, bool dotClass = false, int index = -1, bool isPointer = false): VariableExprNode(name, E_UNKNOWN, dotModule, dotClass, index, isPointer), indexExpr(expr), assign(assign) {}
+    IndexExprNode(SourceLoc loc, const std::string &name, ExprNode *expr, bool dotModule = false, bool dotClass = false, int index = -1, bool isPointer = false): VariableExprNode(loc, name, E_UNKNOWN, dotModule, dotClass, index, isPointer), indexExpr(expr), assign(nullptr) {}
+    IndexExprNode(SourceLoc loc, const std::string &name, ExprNode *expr, ExprNode *assign, bool dotModule = false, bool dotClass = false, int index = -1, bool isPointer = false): VariableExprNode(loc, name, E_UNKNOWN, dotModule, dotClass, index, isPointer), indexExpr(expr), assign(assign) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -205,8 +214,8 @@ public:
     std::vector<ExprNode*> *indexes;
     ExprNode *assign;
 public:
-    IndexesExprNode(const std::string &name, std::vector<ExprNode*> *indexes, bool dotModule = false, bool dotClass = false, int index = -1, bool isPointer = false): VariableExprNode(name, E_UNKNOWN, dotModule, dotClass, index, isPointer), indexes(indexes), assign(nullptr) {}
-    IndexesExprNode(const std::string &name, std::vector<ExprNode*> *indexes, ExprNode *assign, bool dotModule = false, bool dotClass = false, int index = -1, bool isPointer = false): VariableExprNode(name, E_UNKNOWN, dotModule, dotClass, index, isPointer), indexes(indexes), assign(assign) {}
+    IndexesExprNode(SourceLoc loc, const std::string &name, std::vector<ExprNode*> *indexes, bool dotModule = false, bool dotClass = false, int index = -1, bool isPointer = false): VariableExprNode(loc, name, E_UNKNOWN, dotModule, dotClass, index, isPointer), indexes(indexes), assign(nullptr) {}
+    IndexesExprNode(SourceLoc loc, const std::string &name, std::vector<ExprNode*> *indexes, ExprNode *assign, bool dotModule = false, bool dotClass = false, int index = -1, bool isPointer = false): VariableExprNode(loc, name, E_UNKNOWN, dotModule, dotClass, index, isPointer), indexes(indexes), assign(assign) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -215,7 +224,7 @@ public:
     TokenType op;
     ExprNode *right;
 
-    UnaryOperatorExprNode(TokenType op, ExprNode *right): right(right), ExprNode(false), op(op) {}
+    UnaryOperatorExprNode(SourceLoc loc, TokenType op, ExprNode *right): right(right), ExprNode(false, loc), op(op) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -224,7 +233,7 @@ public:
     TokenType op;
     ExprNode *left, *right;
 
-    OperatorExprNode(ExprNode *left, TokenType op, ExprNode *right): ExprNode(false), left(left), right(right), op(op) {}
+    OperatorExprNode(SourceLoc loc, ExprNode *left, TokenType op, ExprNode *right): ExprNode(false, loc), left(left), right(right), op(op) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -233,7 +242,7 @@ public:
     TokenType op;
     ExprNode *left, *right;
 
-    ConditionalExprNode(ExprNode *left, TokenType op, ExprNode *right): ExprNode(false), left(left), right(right), op(op) {}
+    ConditionalExprNode(SourceLoc loc, ExprNode *left, TokenType op, ExprNode *right): ExprNode(false, loc), left(left), right(right), op(op) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -242,14 +251,14 @@ public:
     VariableExprNode *name;
     std::vector<ExprNode*> *args;
 
-    CallExprNode(VariableExprNode *name, std::vector<ExprNode*> *args) : ExprNode(false), name(name), args(args) {}
+    CallExprNode(SourceLoc loc, VariableExprNode *name, std::vector<ExprNode*> *args) : ExprNode(false, loc), name(name), args(args), StatementNode(loc) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
 class DeleteExprNode : public ExprNode, public StatementNode {
 public:
     ExprNode* expr;
-    DeleteExprNode(ExprNode *expr) : ExprNode(false), expr(expr) {}
+    DeleteExprNode(SourceLoc loc, ExprNode *expr) : ExprNode(false, loc), expr(expr), StatementNode(loc) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -257,8 +266,8 @@ class BlockExprNode: public ExprNode {
 public:
     std::vector<StatementNode*> *statements;
 
-    BlockExprNode(): ExprNode(false), statements(new std::vector<StatementNode*>()) {}
-    BlockExprNode(std::vector<StatementNode*> *statements): ExprNode(false), statements(statements) {}
+    BlockExprNode(SourceLoc loc): ExprNode(false, loc), statements(new std::vector<StatementNode*>()) {}
+    BlockExprNode(SourceLoc loc, std::vector<StatementNode*> *statements): ExprNode(false, loc), statements(statements) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -267,7 +276,7 @@ public:
     VariableExprNode *left;
     ExprNode *right;
 
-    AssignExprNode(VariableExprNode *left, ExprNode *right): left(left), right(right) {}
+    AssignExprNode(SourceLoc loc, VariableExprNode *left, ExprNode *right): left(left), right(right), StatementNode(loc) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -277,7 +286,7 @@ public:
     virtual ~DeclarationNode() = default;
     VariableExprNode *name;
 
-    DeclarationNode(VariableExprNode *name) : name(name){};
+    DeclarationNode(SourceLoc loc, VariableExprNode *name) : name(name), StatementNode(loc) {};
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -287,8 +296,8 @@ public:
     ExprNode *type;
     ExprNode *expr;
 
-    FuncParamDecStatementNode(ExprNode* type, VariableExprNode *name, ParameterType parameterType): type(type), DeclarationNode(name), parameterType(parameterType), expr(nullptr) {}
-    FuncParamDecStatementNode(ExprNode* type, VariableExprNode *name, ParameterType parameterType, ExprNode *expr): type(type), DeclarationNode(name), parameterType(parameterType), expr(expr) {}
+    FuncParamDecStatementNode(SourceLoc loc, ExprNode* type, VariableExprNode *name, ParameterType parameterType): type(type), DeclarationNode(loc, name), parameterType(parameterType), expr(nullptr) {}
+    FuncParamDecStatementNode(SourceLoc loc, ExprNode* type, VariableExprNode *name, ParameterType parameterType, ExprNode *expr): type(type), DeclarationNode(loc, name), parameterType(parameterType), expr(expr) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -298,7 +307,7 @@ public:
     bool isFunction = true;
     std::vector<FuncParamDecStatementNode*> *args;
 
-    FuncExprNode(ExprNode* type, std::vector<FuncParamDecStatementNode*> *args, bool isFunction): ExprNode(false), type(type), args(args), isFunction(isFunction) {}
+    FuncExprNode(SourceLoc loc, ExprNode* type, std::vector<FuncParamDecStatementNode*> *args, bool isFunction): ExprNode(false, loc), type(type), args(args), isFunction(isFunction) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -307,7 +316,7 @@ public:
     VariableExprNode *type;
     ExprNode *expr;
 
-    CastExprNode(VariableExprNode *type, ExprNode *expr): ExprNode(false), type(type), expr(expr) {}
+    CastExprNode(SourceLoc loc, VariableExprNode *type, ExprNode *expr): ExprNode(false, loc), type(type), expr(expr) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -315,7 +324,7 @@ class ExprStatementNode : public StatementNode {
 public:
     ExprNode *expr;
 
-    explicit ExprStatementNode(ExprNode *expr): expr(expr) {}
+    explicit ExprStatementNode(SourceLoc loc, ExprNode *expr): expr(expr), StatementNode(loc) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -323,7 +332,7 @@ class ReturnStatementNode : public StatementNode {
 public:
     ExprNode *expr;
 
-    explicit ReturnStatementNode(ExprNode *expr): expr(expr) {}
+    explicit ReturnStatementNode(SourceLoc loc, ExprNode *expr): expr(expr), StatementNode(loc) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -331,7 +340,7 @@ class OutputStatementNode : public StatementNode {
 public:
     ExprNode *expr;
 
-    explicit OutputStatementNode(ExprNode *expr): expr(expr) {}
+    explicit OutputStatementNode(SourceLoc loc, ExprNode *expr): expr(expr), StatementNode(loc) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -339,7 +348,7 @@ class InputStatementNode : public StatementNode {
 public:
     ExprNode *expr;
 
-    explicit InputStatementNode(ExprNode *expr): expr(expr) {}
+    explicit InputStatementNode(SourceLoc loc, ExprNode *expr): expr(expr), StatementNode(loc) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -351,8 +360,8 @@ public:
     bool isPrivate = false;
     bool isExtern = false;
 
-    VarDecStatementNode(std::string type, VariableExprNode *name): type(std::move(type)), DeclarationNode(name), expr(nullptr) {}
-    VarDecStatementNode(std::string type, VariableExprNode *name, ExprNode *expr, bool isGlobal = false, bool isPrivate = false, bool isExtern = false): type(std::move(type)), DeclarationNode(name), expr(expr), isGlobal(isGlobal), isPrivate(isPrivate), isExtern(isExtern) {}
+    VarDecStatementNode(SourceLoc loc, std::string type, VariableExprNode *name): type(std::move(type)), DeclarationNode(loc, name), expr(nullptr) {}
+    VarDecStatementNode(SourceLoc loc, std::string type, VariableExprNode *name, ExprNode *expr, bool isGlobal = false, bool isPrivate = false, bool isExtern = false): type(std::move(type)), DeclarationNode(loc, name), expr(expr), isGlobal(isGlobal), isPrivate(isPrivate), isExtern(isExtern) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -366,7 +375,7 @@ public:
     bool isExtern = false;
     ExprNode* expr;
 
-    FuncPointerStatementNode(ExprNode*  type, VariableExprNode *name, bool isFunction, bool isGlobal, std::vector<FuncParamDecStatementNode*> *args, ExprNode* expr, bool isPrivate = false, bool isExtern = false): type(type), DeclarationNode(name), isFunction(isFunction), isGlobal(isGlobal), args(args), expr(expr), isPrivate(isPrivate), isExtern(isExtern) {}
+    FuncPointerStatementNode(SourceLoc loc, ExprNode*  type, VariableExprNode *name, bool isFunction, bool isGlobal, std::vector<FuncParamDecStatementNode*> *args, ExprNode* expr, bool isPrivate = false, bool isExtern = false): type(type), DeclarationNode(loc, name), isFunction(isFunction), isGlobal(isGlobal), args(args), expr(expr), isPrivate(isPrivate), isExtern(isExtern) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -382,7 +391,7 @@ public:
     ArrayExprNode* expr;
     int indicesCount = 1;
     bool isExtern = false;
-    ArrayDecStatementNode(VariableExprNode *name, ArrayExprNode *expr, bool isGlobal, int indicesCount = 1, bool isPrivate = false, bool isExtern = false) : DeclarationNode(name), expr(expr), isGlobal(isGlobal), indicesCount(indicesCount), isPrivate(isPrivate), isExtern(isExtern) {}
+    ArrayDecStatementNode(SourceLoc loc, VariableExprNode *name, ArrayExprNode *expr, bool isGlobal, int indicesCount = 1, bool isPrivate = false, bool isExtern = false) : DeclarationNode(loc, name), expr(expr), isGlobal(isGlobal), indicesCount(indicesCount), isPrivate(isPrivate), isExtern(isExtern) {}
 
     /*ArrayDecStatementNode(std::string type, VariableExprNode *value, ExprNode *size): type(std::move(type)), DeclarationNode(value), init(new std::vector<ExprNode*>()), size(size), isString(false) {}
     ArrayDecStatementNode(std::string type, VariableExprNode *value, std::vector<ExprNode*> *init): type(std::move(type)), DeclarationNode(value), init(init), size(new IntExprNode(init->size())), isString(false) {}
@@ -403,7 +412,7 @@ public:
     bool isPrivate = false;
     bool isFunction = false;
 
-    FuncDecStatementNode(ExprNode*  type, VariableExprNode *name, bool isPrivate, bool isFunction, std::vector<FuncParamDecStatementNode*> *args, BlockExprNode *block): type(type), DeclarationNode(name), isPrivate(isPrivate), isFunction(isFunction), args(args), block(block) {}
+    FuncDecStatementNode(SourceLoc loc, ExprNode*  type, VariableExprNode *name, bool isPrivate, bool isFunction, std::vector<FuncParamDecStatementNode*> *args, BlockExprNode *block): type(type), DeclarationNode(loc, name), isPrivate(isPrivate), isFunction(isFunction), args(args), block(block) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -415,8 +424,8 @@ public:
     ExprNode *expr;
     bool isPrivate;
     int index;
-    FieldVarDecNode(const std::string &typeName, VariableExprNode *name, bool isPrivate, std::string type, int index): typeName(typeName), DeclarationNode(name), type(std::move(type)), expr(nullptr), isPrivate(isPrivate), index(index) {};
-    FieldVarDecNode(const std::string &typeName, VariableExprNode *name, bool isPrivate, std::string type, ExprNode *expr, int index): typeName(typeName),  DeclarationNode(name), type(std::move(type)), isPrivate(isPrivate), expr(expr), index(index) {};
+    FieldVarDecNode(SourceLoc loc, const std::string &typeName, VariableExprNode *name, bool isPrivate, std::string type, int index): typeName(typeName), DeclarationNode(loc, name), type(std::move(type)), expr(nullptr), isPrivate(isPrivate), index(index) {};
+    FieldVarDecNode(SourceLoc loc, const std::string &typeName, VariableExprNode *name, bool isPrivate, std::string type, ExprNode *expr, int index): typeName(typeName),  DeclarationNode(loc, name), type(std::move(type)), isPrivate(isPrivate), expr(expr), index(index) {};
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -427,7 +436,7 @@ public:
     bool isPrivate;
     ArrayDecStatementNode *var;
     int index;
-    FieldArrayVarDecNode(const std::string &typeName, VariableExprNode *name, bool isPrivate, ArrayDecStatementNode *var, int index): typeName(typeName),  DeclarationNode(name), isPrivate(isPrivate), var(var), index(index) {};
+    FieldArrayVarDecNode(SourceLoc loc, const std::string &typeName, VariableExprNode *name, bool isPrivate, ArrayDecStatementNode *var, int index): typeName(typeName),  DeclarationNode(loc, name), isPrivate(isPrivate), var(var), index(index) {};
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -440,8 +449,8 @@ public:
     BlockExprNode *block = nullptr;
     bool isPrivate = false;
     bool isFunction = false;
-    MethodDecNode(ExprNode* type, VariableExprNode *name, bool isPrivate, bool isFunction, VariableExprNode *thisName, std::vector<FuncParamDecStatementNode*> *args, BlockExprNode *block):
-            type(type), DeclarationNode(name), isPrivate(isPrivate), isFunction(isFunction), thisName(thisName), args(args), block(block) {};
+    MethodDecNode(SourceLoc loc, ExprNode* type, VariableExprNode *name, bool isPrivate, bool isFunction, VariableExprNode *thisName, std::vector<FuncParamDecStatementNode*> *args, BlockExprNode *block):
+            type(type), DeclarationNode(loc, name), isPrivate(isPrivate), isFunction(isFunction), thisName(thisName), args(args), block(block) {};
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -453,8 +462,8 @@ public:
     TypeDecStatementNode *parentType = nullptr;
     bool isExtern;
     bool isPrivate = false;
-    TypeDecStatementNode(VariableExprNode *name, bool isPrivate, std::vector<DeclarationNode*> *fields, std::vector<MethodDecNode*> *methods, bool isExtern, TypeDecStatementNode *parentType = nullptr):
-                         DeclarationNode(name), isPrivate(isPrivate), fields(fields), methods(methods), isExtern(isExtern), parentType(parentType) {};
+    TypeDecStatementNode(SourceLoc loc, VariableExprNode *name, bool isPrivate, std::vector<DeclarationNode*> *fields, std::vector<MethodDecNode*> *methods, bool isExtern, TypeDecStatementNode *parentType = nullptr):
+                         DeclarationNode(loc, name), isPrivate(isPrivate), fields(fields), methods(methods), isExtern(isExtern), parentType(parentType) {};
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -465,7 +474,7 @@ public:
     BlockExprNode *block = nullptr;
     bool isPrivate = false;
     bool isFunction = false;
-    ExternFuncDecStatementNode(ExprNode*  type, VariableExprNode *name, bool isPrivate, bool isFunction, std::vector<FuncParamDecStatementNode*> *args, BlockExprNode *block): type(type), DeclarationNode(name), isPrivate(isPrivate), isFunction(isFunction), args(args), block(block) {
+    ExternFuncDecStatementNode(SourceLoc loc, ExprNode*  type, VariableExprNode *name, bool isPrivate, bool isFunction, std::vector<FuncParamDecStatementNode*> *args, BlockExprNode *block): type(type), DeclarationNode(loc, name), isPrivate(isPrivate), isFunction(isFunction), args(args), block(block) {
     }
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
@@ -475,7 +484,8 @@ public:
     ExprNode *condExpr;
     BlockExprNode *trueBlock;
 
-    ElseIfStatementNode(ExprNode *condExpr, BlockExprNode *trueBlock): condExpr(condExpr), trueBlock(trueBlock) {}
+    ElseIfStatementNode(SourceLoc loc, ExprNode *condExpr, BlockExprNode *trueBlock): condExpr(condExpr), trueBlock(trueBlock),
+                                                                                      StatementNode(loc) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -486,9 +496,12 @@ public:
     BlockExprNode *falseBlock;
     std::vector<ElseIfStatementNode*> *elseifNodes = nullptr;
 
-    IfStatementNode(ExprNode *condExpr, BlockExprNode *trueBlock): condExpr(condExpr), trueBlock(trueBlock), falseBlock(new BlockExprNode()) {}
-    IfStatementNode(ExprNode *condExpr, BlockExprNode *trueBlock, BlockExprNode *falseBlock): condExpr(condExpr), trueBlock(trueBlock), falseBlock(falseBlock) {}
-    IfStatementNode(ExprNode *condExpr, BlockExprNode *trueBlock, std::vector<ElseIfStatementNode*> *elseifNodes, BlockExprNode *falseBlock): condExpr(condExpr), trueBlock(trueBlock), elseifNodes(elseifNodes), falseBlock(falseBlock) {}
+    IfStatementNode(SourceLoc loc, ExprNode *condExpr, BlockExprNode *trueBlock): condExpr(condExpr), trueBlock(trueBlock), falseBlock(new BlockExprNode(loc)),
+                                                                                  StatementNode(loc) {}
+    IfStatementNode(SourceLoc loc, ExprNode *condExpr, BlockExprNode *trueBlock, BlockExprNode *falseBlock): condExpr(condExpr), trueBlock(trueBlock), falseBlock(falseBlock),
+                                                                                                             StatementNode(loc) {}
+    IfStatementNode(SourceLoc loc, ExprNode *condExpr, BlockExprNode *trueBlock, std::vector<ElseIfStatementNode*> *elseifNodes, BlockExprNode *falseBlock): condExpr(condExpr), trueBlock(trueBlock), elseifNodes(elseifNodes), falseBlock(falseBlock),
+                                                                                                                                                             StatementNode(loc) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -499,7 +512,7 @@ public:
     ExprNode *loopExpr;
     BlockExprNode *block;
 
-    ForStatementNode(ExprNode *initExpr, ExprNode *condExpr, ExprNode *loopExpr, BlockExprNode *block): initExpr(initExpr), condExpr(condExpr), loopExpr(loopExpr), block(block) {}
+    ForStatementNode(SourceLoc loc, ExprNode *initExpr, ExprNode *condExpr, ExprNode *loopExpr, BlockExprNode *block): initExpr(initExpr), condExpr(condExpr), loopExpr(loopExpr), block(block), StatementNode(loc) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -508,7 +521,7 @@ public:
     ExprNode *whileExpr;
     BlockExprNode *block;
 
-    WhileStatementNode(ExprNode *whileExpr, BlockExprNode *block): whileExpr(whileExpr), block(block) {}
+    WhileStatementNode(SourceLoc loc, ExprNode *whileExpr, BlockExprNode *block): whileExpr(whileExpr), block(block), StatementNode(loc) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -518,7 +531,7 @@ public:
     VariableExprNode *name;
     BlockExprNode *block;
 
-    ModuleStatementNode(VariableExprNode *name, BlockExprNode *block): name(name), block(block) {}
+    ModuleStatementNode(SourceLoc loc, VariableExprNode *name, BlockExprNode *block): name(name), block(block), StatementNode(loc) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -528,13 +541,83 @@ public:
     VariableExprNode *name;
     BlockExprNode *block;
 
-    ImportStatementNode(VariableExprNode *name, BlockExprNode *block): name(name), block(block) {}
+    ImportStatementNode(SourceLoc loc, VariableExprNode *name, BlockExprNode *block): name(name), block(block), StatementNode(loc) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
 using namespace llvm;
 using namespace std;
 
+struct DebugInfo {
+    DICompileUnit* compileUnit;
+    DIType* integerType = nullptr;
+    DIType* realType = nullptr;
+    DIType* floatType = nullptr;
+    DIType* characterType = nullptr;
+    DIType* booleanType = nullptr;
+    std::vector<DIScope*> lexicalBlocks;
+    std::map<std::string, DICompositeType*> dbgClasses;
+
+    DIType *getIntegerTy(DIBuilder *debugBuilder) {
+        if (integerType) return integerType;
+        integerType = debugBuilder->createBasicType("integer", 32, dwarf::DW_ATE_signed);
+        return integerType;
+    };
+    DIType *getRealTy(DIBuilder *debugBuilder) {
+        if (realType) return realType;
+        realType = debugBuilder->createBasicType("real", 64, dwarf::DW_ATE_float);
+        return realType;
+    };
+    DIType *getFloatType(DIBuilder *debugBuilder) {
+        if (floatType) return floatType;
+        floatType = debugBuilder->createBasicType("float", 32, dwarf::DW_ATE_float);
+        return floatType;
+    };
+    DIType *getCharacterType(DIBuilder *debugBuilder) {
+        if (characterType) return characterType;
+        characterType = debugBuilder->createBasicType("character", 8, dwarf::DW_ATE_signed_char);
+        return characterType;
+    };
+    DIType *getBooleanType(DIBuilder *debugBuilder) {
+        if (booleanType) return booleanType;
+        booleanType = debugBuilder->createBasicType("boolean", 1, dwarf::DW_ATE_boolean);
+        return booleanType;
+    };
+
+    DISubroutineType* CreateFunctionType(DIBuilder *debugBuilder, const std::vector<Metadata*>& retAndArgTypes) {
+        DITypeRefArray params = debugBuilder->getOrCreateTypeArray(makeArrayRef(retAndArgTypes));
+        DISubroutineType* dbgFuncType = debugBuilder->createSubroutineType(params);
+        return dbgFuncType;
+    };
+
+    void emitLocation(IRBuilder<> *irBuilder, ExprNode *AST) {
+        if (!AST)
+            return irBuilder->SetCurrentDebugLocation(DebugLoc());
+        DIScope *Scope;
+        if (lexicalBlocks.empty())
+            Scope = compileUnit;
+        else
+            Scope = lexicalBlocks.back();
+        irBuilder->SetCurrentDebugLocation(
+                DILocation::get(Scope->getContext(), AST->loc.line, AST->loc.col, Scope));
+    };
+
+    void emitLocation(IRBuilder<> *irBuilder, StatementNode *AST) {
+        if (!AST)
+            return irBuilder->SetCurrentDebugLocation(DebugLoc());
+        DIScope *Scope;
+        if (lexicalBlocks.empty())
+            Scope = compileUnit;
+        else
+            Scope = lexicalBlocks.back();
+        irBuilder->SetCurrentDebugLocation(
+                DILocation::get(Scope->getContext(), AST->loc.line, AST->loc.col, Scope));
+    };
+
+    void emitLocation(IRBuilder<> *irBuilder) {
+        irBuilder->SetCurrentDebugLocation(DebugLoc());
+    };
+};
 
 class CodeGenBlock {
 public:
@@ -544,7 +627,6 @@ public:
 };
 
 class CodeGenContext {
-
     std::map <std::string, llvm::Value*> globalVariables;
     llvm::Function* mMainFunction;
 public:
@@ -552,8 +634,10 @@ public:
     std::unique_ptr<llvm::IRBuilder<>> builder;
     std::unique_ptr<llvm::DataLayout> dataLayout;
 
-    std::unique_ptr<std::vector<std::pair<std::string, DeclarationNode*>>> symbols;
+    std::unique_ptr<llvm::DIBuilder> debugBuilder;
 
+    std::unique_ptr<std::vector<std::pair<std::string, DeclarationNode*>>> symbols;
+    DebugInfo dbgInfo;
     llvm::Module* mModule;
     std::vector<CodeGenBlock*> blocks;
     std::map<std::string, StructType *> allocatedClasses;
@@ -572,13 +656,20 @@ public:
         builder = std::make_unique<llvm::IRBuilder<>>(*context);
         mModule = new Module(moduleStatement->name->value, *context);
         mModule->setTargetTriple("x86_64-w64-windows-gnu");
+        mModule->addModuleFlag(Module::Warning, "Debug Info Version", DEBUG_METADATA_VERSION);
         dataLayout = std::make_unique<llvm::DataLayout>(mModule);
         this->isMainModule = isMainModule;
         moduleName = moduleStatement->name->value;
         this->symbols = std::make_unique<std::vector<std::pair<std::string, DeclarationNode*>>>(symbols);
+        debugBuilder = std::make_unique<DIBuilder>(*mModule);
+        dbgInfo.compileUnit = debugBuilder->createCompileUnit(dwarf::DW_LANG_C, debugBuilder->createFile(moduleName + ".sl", ""), "Slangc", false, "", 0);
+        dbgInfo.getIntegerTy(debugBuilder.get());
+        dbgInfo.getRealTy(debugBuilder.get());
+        dbgInfo.getFloatType(debugBuilder.get());
+        dbgInfo.getCharacterType(debugBuilder.get());
+        dbgInfo.getBooleanType(debugBuilder.get());
     }
     ~CodeGenContext() = default;
-
 
     Function* printfFunction() {
         vector<Type*> printfArgs;
@@ -654,7 +745,19 @@ public:
             BasicBlock *entry = BasicBlock::Create(*context, "entry", mMainFunction);
             builder->SetInsertPoint(entry);
 
+            unsigned LineNo = mainModule->block->loc.line;
+            unsigned ScopeLine = LineNo;
+            DIFile* unit = debugBuilder->createFile(dbgInfo.compileUnit->getFilename(), dbgInfo.compileUnit->getDirectory());
+            llvm::DISubprogram *DbgFunc = debugBuilder->createFunction(
+                    dbgInfo.compileUnit, "main", "main", unit, LineNo,
+                    dbgInfo.CreateFunctionType(debugBuilder.get(), {dbgInfo.getIntegerTy(debugBuilder.get())}), ScopeLine,
+                    llvm::DISubprogram::FlagPrivate,
+                    llvm::DISubprogram::SPFlagDefinition);
+            mMainFunction->setSubprogram(DbgFunc);
+
             pushBlock(entry);
+            dbgInfo.lexicalBlocks.push_back(DbgFunc);
+            dbgInfo.emitLocation(builder.get(), mainModule->block);
             builder->CreateCall(mModule->getFunction("GC_init"), {});
             for (auto decl : *mainModule->block->statements)
             {
@@ -662,7 +765,9 @@ public:
             }
             auto var = builder->CreateRet(ConstantInt::get(*context, APInt(32, 0)));
             popBlock();
+            dbgInfo.lexicalBlocks.pop_back();
         }
+        debugBuilder->finalize();
     }
 
     std::map <std::string, llvm::Value*>& locals() {

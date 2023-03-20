@@ -132,10 +132,11 @@ bool Parser::parseImports()
 
 bool Parser::parseModuleDecl()
 {
+    SourceLoc loc{token.stringNumber, token.symbolNumber};
     bool ret = false;
     consume(TokenType::Module);
     if (!expect(TokenType::Identifier)) return false;
-    mainModuleNode = new ModuleStatementNode(new VariableExprNode(token.data), new BlockExprNode());
+    mainModuleNode = new ModuleStatementNode(loc, new VariableExprNode(loc, token.data), new BlockExprNode(loc));
     advance();
     while (token.type != TokenType::Start)
     {
@@ -158,7 +159,9 @@ BlockExprNode* Parser::parseBlock(VariableExprNode *name, std::vector<FuncParamD
     }
     bool blockEnd = false;
     auto *statements = new std::vector<StatementNode*>();
-    auto *block = new BlockExprNode(statements);
+    SourceLoc loc{token.stringNumber, token.symbolNumber};
+    auto *block = new BlockExprNode(loc, statements);
+
     while (!blockEnd)
     {
         advance();
@@ -213,6 +216,7 @@ DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, 
     std::string type;
     bool isPrivate = false;
     bool isArray = false;
+    SourceLoc loc{token.stringNumber, token.symbolNumber};
     Token tok = consume(TokenType::VisibilityType);
     if (tok.data == "private") isPrivate = true;
     consume(TokenType::Field);
@@ -231,7 +235,7 @@ DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, 
         size = parseExpression();
         consume(TokenType::RBracket);
         std::string arrType = token.data;
-        ArrayExprNode *arrExpr = new ArrayExprNode(arrType, size, new std::vector<ExprNode *>());
+        ArrayExprNode *arrExpr = new ArrayExprNode(loc, arrType, size, new std::vector<ExprNode *>());
         int indicesCount = 1;
         while (token.data == "array")
         {
@@ -257,13 +261,13 @@ DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, 
                     token = *tokensIterator;
                 }
             }
-            arrExpr->values->push_back(new ArrayExprNode(arrType, size, nullptr));
+            arrExpr->values->push_back(new ArrayExprNode(loc, arrType, size, nullptr));
         }
         expr = arrExpr;
         advance();
         name = consume(TokenType::Identifier).data;
         constructorRequired = true;
-        field = new FieldArrayVarDecNode(thisClassName, new VariableExprNode(name), isPrivate, new ArrayDecStatementNode(nullptr, arrExpr, isPrivate, indicesCount), index);
+        field = new FieldArrayVarDecNode(loc, thisClassName, new VariableExprNode(loc, name), isPrivate, new ArrayDecStatementNode(loc, nullptr, arrExpr, isPrivate, indicesCount), index);
     }
     else
     {
@@ -284,7 +288,7 @@ DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, 
                 if (init) {
                     advance();
                     expr = parseExpression();
-                    field = new FieldVarDecNode(thisClassName, new VariableExprNode(name), isPrivate, type, expr, index);
+                    field = new FieldVarDecNode(loc, thisClassName, new VariableExprNode(loc, name), isPrivate, type, expr, index);
                     constructorRequired = true;
                     if (DEBUG) llvm::outs() << "parsed field " << type << " " << name << "\n";
                 }
@@ -294,7 +298,7 @@ DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, 
                     std::string data = init ? token.data : "";
                     if (oneOfDefaultTypes(type))
                     {
-                        field = initDefaultType(thisClassName, isPrivate, name, type, dataType, data, index);
+                        field = initDefaultType(loc, thisClassName, isPrivate, name, type, dataType, data, index);
                         if (DEBUG) llvm::outs() << "parsed field " << type << " " << name << " - " << data << "\n";
                     }
                     else
@@ -303,7 +307,7 @@ DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, 
                         if (!currentScope->lookup(type) && currentScope->lookup(mainModuleNode->name->value + "." + type)) {
                             type = mainModuleNode->name->value + "." + type;
                         }
-                        field = new FieldVarDecNode(thisClassName, new VariableExprNode(name), isPrivate, type, nullptr, index);
+                        field = new FieldVarDecNode(loc, thisClassName, new VariableExprNode(loc, name), isPrivate, type, nullptr, index);
                         if (DEBUG) llvm::outs() << "parsed field " << type << " " << name << "\n";
                     }
                 }
@@ -325,6 +329,7 @@ std::vector<FuncParamDecStatementNode*> *Parser::parseFuncParameters(bool named)
     consume(TokenType::LParen);
     while (token.type != TokenType::RParen)
     {
+        SourceLoc loc{token.stringNumber, token.symbolNumber};
         std::string name;
         ExprNode* typeNode;
         ParameterType parameterType{};
@@ -337,7 +342,8 @@ std::vector<FuncParamDecStatementNode*> *Parser::parseFuncParameters(bool named)
         if (named) {
             name = consume(TokenType::Identifier).data;
         }
-        params->push_back(new FuncParamDecStatementNode(typeNode, new VariableExprNode(name), parameterType));
+        auto funcParam = new FuncParamDecStatementNode(loc, typeNode, new VariableExprNode(loc, name), parameterType);
+        params->push_back(funcParam);
         //advance();
         if (token.type != TokenType::Comma)
         {
@@ -350,7 +356,7 @@ std::vector<FuncParamDecStatementNode*> *Parser::parseFuncParameters(bool named)
 
 MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std::string &thisClassName) {
     auto scope = new Scope(currentScope);
-
+    SourceLoc methodLoc {token.stringNumber, token.symbolNumber};
     MethodDecNode *method = nullptr;
     bool isFunction = false;
     std::string name;
@@ -358,6 +364,7 @@ MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std
     std::string thisName;
     bool isPrivate = false;
     BlockExprNode *block = nullptr;
+    SourceLoc loc{token.stringNumber, token.symbolNumber};
     Token tok = consume(TokenType::VisibilityType);
     if (tok.data == "private") isPrivate = true;
     consume(TokenType::Method);
@@ -371,14 +378,15 @@ MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std
         llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") \"this\" should be \"" << thisClassName + "\", not \"" << tok.data << "\".\n";
         hasError = true;
     }
+    loc = {token.stringNumber, token.symbolNumber};
     tok = consume(TokenType::Identifier);
     thisName = tok.data;
-    scope->insert(new VarDecStatementNode(mainModuleNode->name->value + "." + thisClassName, new VariableExprNode(thisName)));
+    scope->insert(new VarDecStatementNode(loc, mainModuleNode->name->value + "." + thisClassName, new VariableExprNode(loc, thisName)));
     currentScope = scope;
     consume(TokenType::RParen);
     auto params = new std::vector<FuncParamDecStatementNode *>();
     params = parseFuncParameters();
-    params->insert(params->begin(), new FuncParamDecStatementNode(new VariableExprNode(mainModuleNode->name->value + "." + thisClassName), new VariableExprNode(thisName), ParameterType::Out));
+    params->insert(params->begin(), new FuncParamDecStatementNode(loc, new VariableExprNode(loc, mainModuleNode->name->value + "." + thisClassName), new VariableExprNode(loc, thisName), ParameterType::Out));
     advance();
     if (token.type == TokenType::Colon)
     {
@@ -389,7 +397,7 @@ MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std
     }
     else
     {
-        type = new VariableExprNode("");
+        type = new VariableExprNode({}, "");
         isFunction = false;
     }
 
@@ -441,7 +449,8 @@ MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std
     // parse statements
     tokensIterator--;
     token = *tokensIterator;
-    block = parseBlock(new VariableExprNode(shortName));
+    loc = {token.stringNumber, token.symbolNumber};
+    block = parseBlock(new VariableExprNode(loc, shortName));
 
     if (token.type != TokenType::Semicolon)
     {
@@ -449,7 +458,7 @@ MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std
         hasError = true;
     }
     currentScope = scope->parent;
-    method = new MethodDecNode(type, new VariableExprNode(name), isPrivate, isFunction, new VariableExprNode(thisName), params, block);
+    method = new MethodDecNode(methodLoc, type, new VariableExprNode(methodLoc, name), isPrivate, isFunction, new VariableExprNode(methodLoc, thisName), params, block);
     if (DEBUG) llvm::outs() << "parsed method of class " << thisClassName << " " << type << " " << name << "\n";
     return method;
 }
@@ -458,6 +467,7 @@ bool Parser::parseTypeDecl() {
     tokensIterator--;
     token = *tokensIterator;
     TypeDecStatementNode *typeNode;
+    SourceLoc typeLoc{token.stringNumber, token.symbolNumber};
     auto *fields = new std::vector<DeclarationNode*>();
     auto *methods = new std::vector<MethodDecNode*>();
     std::string name;
@@ -498,44 +508,57 @@ bool Parser::parseTypeDecl() {
                         {
                             for (auto &method : *parent->methods)
                             {
-                                auto newName = new VariableExprNode(mainModuleNode->name->value + "." + name + method->name->value.substr(method->name->value.rfind('.')));
+                                auto newName = new VariableExprNode(method->loc, mainModuleNode->name->value + "." + name + method->name->value.substr(method->name->value.rfind('.')));
                                 auto args = new std::vector<FuncParamDecStatementNode*>();
                                 if (method->args != nullptr)
                                 {
+                                    // TODO: why we are pushing only 0 arg
                                     if (method->args != nullptr && !method->args->empty())
                                     {
-                                        args->push_back(new FuncParamDecStatementNode(new VariableExprNode(mainModuleNode->name->value + "." + name),
-                                                                                      new VariableExprNode(method->args->at(0)->name->value),
+                                        for (auto & arg : *method->args) {
+                                            args->push_back(new FuncParamDecStatementNode(arg->loc, new VariableExprNode(arg->loc, mainModuleNode->name->value + "." + name),
+                                                                                          new VariableExprNode(arg->loc, arg->name->value),
+                                                                                          arg->parameterType,
+                                                                                          arg->expr));
+                                        }
+                                        /*args->push_back(new FuncParamDecStatementNode(method->args->at(0)->loc, new VariableExprNode(method->args->at(0)->loc, mainModuleNode->name->value + "." + name),
+                                                                                      new VariableExprNode(method->args->at(0)->loc, method->args->at(0)->name->value),
                                                                                       method->args->at(0)->parameterType,
-                                                                                      method->args->at(0)->expr));
+                                                                                      method->args->at(0)->expr));*/
                                     }
                                 }
                                 auto newStatements = new std::vector<StatementNode*>();
-                                if (method->name->value == method->name->value + "._DefaultConstructor_")
+                                if (method->name->value == parent->name->value + "._DefaultConstructor_")
                                 {
                                     for (auto &statement : *method->block->statements)
                                     {
                                         if (dynamic_cast<FieldVarDecNode*>(statement) != nullptr)
                                         {
                                             auto pFieldVar = dynamic_cast<FieldVarDecNode*>(statement);
-                                            auto fieldVarDec = new FieldVarDecNode(name, new VariableExprNode(pFieldVar->name->value), pFieldVar->isPrivate, pFieldVar->type, pFieldVar->expr, pFieldVar->index);
+                                            auto fieldVarDec = new FieldVarDecNode(statement->loc, name, new VariableExprNode(statement->loc, pFieldVar->name->value), pFieldVar->isPrivate, pFieldVar->type, pFieldVar->expr, pFieldVar->index);
                                             newStatements->push_back(fieldVarDec);
                                         }
                                         else if (dynamic_cast<FieldArrayVarDecNode*>(statement) != nullptr)
                                         {
                                             auto pFieldArrVar = dynamic_cast<FieldArrayVarDecNode*>(statement);
-                                            auto fieldArrVarDec = new FieldArrayVarDecNode(name, new VariableExprNode(pFieldArrVar->name->value), pFieldArrVar->isPrivate, pFieldArrVar->var, pFieldArrVar->index);
+                                            auto fieldArrVarDec = new FieldArrayVarDecNode(statement->loc, name, new VariableExprNode(statement->loc, pFieldArrVar->name->value), pFieldArrVar->isPrivate, pFieldArrVar->var, pFieldArrVar->index);
                                             newStatements->push_back(fieldArrVarDec);
                                         }
                                     }
+                                } else {
+                                    if (method->block != nullptr) {
+                                        for (auto &statement : *method->block->statements) {
+                                            newStatements->push_back(statement);
+                                        }
+                                    }
                                 }
-                                auto methodDecNode = new MethodDecNode(method->type, newName, method->isPrivate, method->isFunction, new VariableExprNode(method->thisName->value), args, new BlockExprNode(newStatements));
+                                auto methodDecNode = new MethodDecNode(method->loc, method->type, newName, method->isPrivate, method->isFunction, new VariableExprNode(method->loc, method->thisName->value), args, new BlockExprNode(method->loc, newStatements));
                                 methods->push_back(methodDecNode);
                             }
                         }
                     }
                     // insert before methods parsing
-                    typeNode = new TypeDecStatementNode(new VariableExprNode(mainModuleNode->name->value + "." + name), isPrivate, fields, methods, isExtern, parent);
+                    typeNode = new TypeDecStatementNode(typeLoc, new VariableExprNode(typeLoc, mainModuleNode->name->value + "." + name), isPrivate, fields, methods, isExtern, parent);
                     currentScope->insert(typeNode);
 
                     Scope *scope = new Scope(currentScope);
@@ -597,8 +620,8 @@ bool Parser::parseTypeDecl() {
                                 constructorStatements->push_back(field);
                             }
                         }
-                        auto constructor = new MethodDecNode(new VariableExprNode(constructorType), new VariableExprNode(mainModuleNode->name->value + "." + constructorName), constructorIsPrivate, false, new VariableExprNode(name),
-                                                   nullptr, new BlockExprNode(constructorStatements));
+                        auto constructor = new MethodDecNode(typeLoc, new VariableExprNode(typeLoc, constructorType), new VariableExprNode(typeLoc, mainModuleNode->name->value + "." + constructorName), constructorIsPrivate, false, new VariableExprNode(typeLoc, name),
+                                                   nullptr, new BlockExprNode(typeLoc, constructorStatements));
                         methods->push_back(constructor);
                     }
 
@@ -606,7 +629,7 @@ bool Parser::parseTypeDecl() {
                     if (token.type == TokenType::Identifier && token.data == name && advance().type == TokenType::Semicolon)
                     {
                         currentScope = scope->parent;
-                        typeNode = new TypeDecStatementNode(new VariableExprNode(mainModuleNode->name->value + "." + name), isPrivate, fields, methods, isExtern, parent);
+                        typeNode = new TypeDecStatementNode(typeLoc, new VariableExprNode(typeLoc, mainModuleNode->name->value + "." + name), isPrivate, fields, methods, isExtern, parent);
                         // already inserted
                         //currentScope->insert(typeNode);
                     }
@@ -644,11 +667,11 @@ ExprNode *Parser::parseStrInterpolation() {
 
 ExprNode *Parser::parseOr() {
     auto result = parseAnd();
-
     while (true)
     {
+        SourceLoc loc{token.stringNumber, token.symbolNumber};
         if (match(TokenType::Or)) {
-            result = new OperatorExprNode(result, TokenType::Or, parseAnd());
+            result = new OperatorExprNode(loc, result, TokenType::Or, parseAnd());
             continue;
         }
         break;
@@ -662,8 +685,9 @@ ExprNode *Parser::parseAnd() {
 
     while (true)
     {
+        SourceLoc loc{token.stringNumber, token.symbolNumber};
         if (match(TokenType::And)) {
-            result = new OperatorExprNode(result, TokenType::And, parseEquality());
+            result = new OperatorExprNode(loc, result, TokenType::And, parseEquality());
             continue;
         }
         break;
@@ -677,12 +701,13 @@ ExprNode *Parser::parseEquality() {
 
     while (true)
     {
+        SourceLoc loc{token.stringNumber, token.symbolNumber};
         if (match(TokenType::Equal)) {
-            result = new OperatorExprNode(result, TokenType::Equal, parseConditional());
+            result = new OperatorExprNode(loc, result, TokenType::Equal, parseConditional());
             continue;
         }
         if (match(TokenType::NotEqual)) {
-            result = new OperatorExprNode(result, TokenType::NotEqual, parseConditional());
+            result = new OperatorExprNode(loc, result, TokenType::NotEqual, parseConditional());
             continue;
         }
         break;
@@ -696,20 +721,21 @@ ExprNode *Parser::parseConditional() {
 
     while (true)
     {
+        SourceLoc loc{token.stringNumber, token.symbolNumber};
         if (match(TokenType::Less)) {
-            result = new OperatorExprNode(result, TokenType::Less, parseAddSub());
+            result = new OperatorExprNode(loc, result, TokenType::Less, parseAddSub());
             continue;
         }
         if (match(TokenType::LessOrEqual)) {
-            result = new OperatorExprNode(result, TokenType::LessOrEqual, parseAddSub());
+            result = new OperatorExprNode(loc, result, TokenType::LessOrEqual, parseAddSub());
             continue;
         }
         if (match(TokenType::Greater)) {
-            result = new OperatorExprNode(result, TokenType::Greater, parseAddSub());
+            result = new OperatorExprNode(loc, result, TokenType::Greater, parseAddSub());
             continue;
         }
         if (match(TokenType::GreaterOrEqual)) {
-            result = new OperatorExprNode(result, TokenType::GreaterOrEqual, parseAddSub());
+            result = new OperatorExprNode(loc, result, TokenType::GreaterOrEqual, parseAddSub());
             continue;
         }
         break;
@@ -723,12 +749,13 @@ ExprNode *Parser::parseAddSub() {
 
     while (true)
     {
+        SourceLoc loc{token.stringNumber, token.symbolNumber};
         if (match(TokenType::Plus)) {
-            result = new OperatorExprNode(result, TokenType::Plus, parseMulDiv());
+            result = new OperatorExprNode(loc, result, TokenType::Plus, parseMulDiv());
             continue;
         }
         if (match(TokenType::Minus)) {
-            result = new OperatorExprNode(result, TokenType::Minus, parseMulDiv());
+            result = new OperatorExprNode(loc, result, TokenType::Minus, parseMulDiv());
         }
         break;
     }
@@ -741,15 +768,16 @@ ExprNode *Parser::parseMulDiv() {
 
     while (true)
     {
+        SourceLoc loc{token.stringNumber, token.symbolNumber};
         if (match(TokenType::Multiplication)) {
-            result = new OperatorExprNode(result, TokenType::Multiplication, parseUnary());
+            result = new OperatorExprNode(loc, result, TokenType::Multiplication, parseUnary());
             continue;
         }
         if (match(TokenType::Division)) {
-            result = new OperatorExprNode(result, TokenType::Division, parseUnary());
+            result = new OperatorExprNode(loc, result, TokenType::Division, parseUnary());
         }
         if (match(TokenType::Remainder)) {
-            result = new OperatorExprNode(result, TokenType::Remainder, parseUnary());
+            result = new OperatorExprNode(loc, result, TokenType::Remainder, parseUnary());
         }
         break;
     }
@@ -758,29 +786,30 @@ ExprNode *Parser::parseMulDiv() {
 }
 
 ExprNode *Parser::parseUnary() {
-    return match(TokenType::Minus) ? new UnaryOperatorExprNode(TokenType::Minus, parsePrimary()) : parsePrimary();
+    SourceLoc loc{token.stringNumber, token.symbolNumber};
+    return match(TokenType::Minus) ? new UnaryOperatorExprNode(loc, TokenType::Minus, parsePrimary()) : parsePrimary();
 }
 
 ExprNode *Parser::parsePrimary() {
-
+    SourceLoc loc{token.stringNumber, token.symbolNumber};
     Token tok = token;
     advance();
-    if (tok.type == TokenType::Boolean) return new BooleanExprNode(tok.data == "true");
+    if (tok.type == TokenType::Boolean) return new BooleanExprNode(loc, tok.data == "true");
     if (tok.type == TokenType::Nil)
-        return new NilExprNode();
+        return new NilExprNode(loc);
     else if (tok.type == TokenType::String)
     {
-        if (tok.data.size() == 1) return new CharExprNode(tok.data[0]);
-        else return new StringExprNode(tok.data);
+        if (tok.data.size() == 1) return new CharExprNode(loc, tok.data[0]);
+        else return new StringExprNode(loc, tok.data);
     }
     else if (tok.type == TokenType::Identifier)
     {
         // vars, funcs, arrays, fields
         return reinterpret_cast<ExprNode *>(parseVarOrCall());
     }
-    else if (tok.type == TokenType::Integer) return new IntExprNode(std::stoi(tok.data));
-    else if (tok.type == TokenType::Real) return new RealExprNode(std::stod(tok.data));
-    else if (tok.type == TokenType::Float) return new FloatExprNode(std::stof(tok.data));
+    else if (tok.type == TokenType::Integer) return new IntExprNode(loc, std::stoi(tok.data));
+    else if (tok.type == TokenType::Real) return new RealExprNode(loc, std::stod(tok.data));
+    else if (tok.type == TokenType::Float) return new FloatExprNode(loc, std::stof(tok.data));
     else if (tok.type == TokenType::LParen)
     {
         auto result = parseExpression();
@@ -796,6 +825,7 @@ ExprNode *Parser::parsePrimary() {
 StatementNode* Parser::parseVarOrCall() {
     tokensIterator--;
     token = *tokensIterator;
+    SourceLoc loc{token.stringNumber, token.symbolNumber};
     Token tok = token;
     std::string name = tok.data;
     advance();
@@ -1024,9 +1054,9 @@ StatementNode* Parser::parseVarOrCall() {
             advance();
             //varExpr = new IndexesExprNode(name, indexes, dotModule, dotClass, fieldIndex, true);
             if (indexes->size() == 1)
-                varExpr = new IndexExprNode(name, indexes->at(0), dotModule, dotClass, fieldIndex, true);
+                varExpr = new IndexExprNode(loc, name, indexes->at(0), dotModule, dotClass, fieldIndex, true);
             else
-                varExpr = new IndexesExprNode(name, indexes, dotModule, dotClass, fieldIndex, true);
+                varExpr = new IndexesExprNode(loc, name, indexes, dotModule, dotClass, fieldIndex, true);
             //varExpr = new IndexExprNode(name, index, dotModule, dotClass, fieldIndex, true);
         }
         else
@@ -1034,14 +1064,14 @@ StatementNode* Parser::parseVarOrCall() {
             //varExpr = new IndexExprNode(name, index, dotModule, dotClass, fieldIndex, true);
             //return new IndexesExprNode(name, indexes, dotModule, dotClass, fieldIndex);
             if (indexes->size() == 1)
-                return new IndexExprNode(name, indexes->at(0), dotModule, dotClass, fieldIndex);
+                return new IndexExprNode(loc, name, indexes->at(0), dotModule, dotClass, fieldIndex);
             else
-                return new IndexesExprNode(name, indexes, dotModule, dotClass, fieldIndex);
+                return new IndexesExprNode(loc, name, indexes, dotModule, dotClass, fieldIndex);
 
         }
     }
     if (token.type != TokenType::LParen) {
-        return new VariableExprNode(name, E_UNKNOWN, dotModule, dotClass, fieldIndex);
+        return new VariableExprNode(loc, name, E_UNKNOWN, dotModule, dotClass, fieldIndex);
     }
     if (!dotModule && currentScope->lookup(mainModuleNode->name->value + "." + name) != nullptr)
         name = mainModuleNode->name->value + "." + name;
@@ -1120,14 +1150,14 @@ StatementNode* Parser::parseVarOrCall() {
         }
         else
         {
-            params->insert(params->begin(), new VariableExprNode(name, E_UNKNOWN, dotModule, dotClass));
+            params->insert(params->begin(), new VariableExprNode(loc, name, E_UNKNOWN, dotModule, dotClass));
         }
-        return new CallExprNode(new VariableExprNode(methodName), params);
+        return new CallExprNode(loc, new VariableExprNode(loc, methodName), params);
     }
     else
     {
 
-        return new CallExprNode(new VariableExprNode(name, E_UNKNOWN, dotModule, dotClass), params);
+        return new CallExprNode(loc, new VariableExprNode(loc, name, E_UNKNOWN, dotModule, dotClass), params);
     }
     return nullptr;
 }
@@ -1137,6 +1167,7 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
     std::string name;
     bool isPrivate = false;
     bool isExtern = false;
+    SourceLoc loc{token.stringNumber, token.symbolNumber};
     if (isGlobal)
     {
         tokensIterator--;
@@ -1188,7 +1219,7 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
             tokensIterator--;
             token = *tokensIterator;
         }
-        ArrayExprNode* arrExpr = new ArrayExprNode(arrType, size, new std::vector<ExprNode*>());
+        ArrayExprNode* arrExpr = new ArrayExprNode(loc, arrType, size, new std::vector<ExprNode*>());
         while (token.data == "array")
         {
             indicesCount++;
@@ -1218,7 +1249,7 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
                     token = *tokensIterator;
                 }
             }
-            arrExpr->values->push_back(new ArrayExprNode(arrType, size, nullptr));
+            arrExpr->values->push_back(new ArrayExprNode(loc, arrType, size, nullptr));
         }
         expr = arrExpr;
         advance();
@@ -1241,10 +1272,10 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
             }
             else
             {
-                funcType = new VariableExprNode("");
+                funcType = new VariableExprNode(loc, "");
             }
         }
-        else funcType = new VariableExprNode("");
+        else funcType = new VariableExprNode(loc, "");
         advance();
         name = consume(TokenType::Identifier).data;
     }
@@ -1277,13 +1308,13 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
     }
     if (isGlobal && !isExtern) name = mainModuleNode->name->value + "." + name;
     if (isArray) {
-        result = new ArrayDecStatementNode(new VariableExprNode(name), dynamic_cast<ArrayExprNode*>(expr), isGlobal, indicesCount, isPrivate, isExtern);
+        result = new ArrayDecStatementNode(loc, new VariableExprNode(loc, name), dynamic_cast<ArrayExprNode*>(expr), isGlobal, indicesCount, isPrivate, isExtern);
     }
     else if (isFuncPointer) {
-        result = new FuncPointerStatementNode(funcType, new VariableExprNode(name), isFunction, isGlobal, args, expr, isPrivate, isExtern);
+        result = new FuncPointerStatementNode(loc, funcType, new VariableExprNode(loc, name), isFunction, isGlobal, args, expr, isPrivate, isExtern);
     }
     else {
-        result = new VarDecStatementNode(type, new VariableExprNode(name), expr, isGlobal, isPrivate, isExtern);
+        result = new VarDecStatementNode(loc, type, new VariableExprNode(loc, name), expr, isGlobal, isPrivate, isExtern);
     }
     //if (isGlobal)
         //currentScope->insert(result);
@@ -1294,6 +1325,7 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
 DeclarationNode *Parser::parseFunctionDecl() {
     tokensIterator--;
     token = *tokensIterator;
+    SourceLoc loc{token.stringNumber, token.symbolNumber};
     bool isPrivate = false;
     if (token.data == "private") isPrivate = true;
     bool isExtern = false;
@@ -1322,27 +1354,27 @@ DeclarationNode *Parser::parseFunctionDecl() {
         }
         else
         {
-            type = new VariableExprNode("");
+            type = new VariableExprNode({}, "");
         }
     }
-    else type = new VariableExprNode("");
+    else type = new VariableExprNode({}, "");
     VariableExprNode *funcName = nullptr;
     if (isExtern) {
-        funcName = new VariableExprNode(name);
+        funcName = new VariableExprNode(loc, name);
     } else {
-        funcName = new VariableExprNode(mainModuleNode->name->value + "." + name);
+        funcName = new VariableExprNode(loc, mainModuleNode->name->value + "." + name);
     }
     DeclarationNode* function = nullptr;
     BlockExprNode* block = nullptr;
     if (isExtern)
     {
-        function = new ExternFuncDecStatementNode(type, funcName, isPrivate, isFunction, params, block);
+        function = new ExternFuncDecStatementNode(loc, type, funcName, isPrivate, isFunction, params, block);
     } else {
-        function = new FuncDecStatementNode(type, funcName, isPrivate, isFunction, params, block);
+        function = new FuncDecStatementNode(loc, type, funcName, isPrivate, isFunction, params, block);
     }
 
     currentScope->insert(function);
-    block = parseBlock(new VariableExprNode(name), params);
+    block = parseBlock(new VariableExprNode(loc, name), params);
     if (dynamic_cast<ExternFuncDecStatementNode*>(function)) dynamic_cast<ExternFuncDecStatementNode*>(function)->block = block;
     else if (dynamic_cast<FuncDecStatementNode*>(function)) dynamic_cast<FuncDecStatementNode*>(function)->block = block;
 
@@ -1365,11 +1397,13 @@ IfStatementNode *Parser::parseIfStatement() {
     tokensIterator--;
     token = *tokensIterator;
 
+    SourceLoc loc{token.stringNumber, token.symbolNumber};
     if (token.type != TokenType::Else && token.type != TokenType::Elseif)
     {
+
         bool blockEnd = false;
         auto *statements = new std::vector<StatementNode*>();
-        auto *block = new BlockExprNode(statements);
+        auto *block = new BlockExprNode(loc, statements);
         while (!blockEnd)
         {
             advance();
@@ -1387,7 +1421,7 @@ IfStatementNode *Parser::parseIfStatement() {
                 blockEnd = true;
             }
         }
-        trueBlock = new BlockExprNode(statements);
+        trueBlock = new BlockExprNode(loc, statements);
     }
     if (token.type == TokenType::Elseif) elseifNodes->push_back(parseElseIfBlock());
     if (token.type == TokenType::Else) falseBlock = parseElseBlock();
@@ -1395,7 +1429,7 @@ IfStatementNode *Parser::parseIfStatement() {
     consume(TokenType::End);
     consume(TokenType::If);
     expect(TokenType::Semicolon);
-    return new IfStatementNode(expr, trueBlock, elseifNodes, falseBlock);
+    return new IfStatementNode(loc, expr, trueBlock, elseifNodes, falseBlock);
 }
 
 ElseIfStatementNode *Parser::parseElseIfBlock() {
@@ -1408,7 +1442,7 @@ ElseIfStatementNode *Parser::parseElseIfBlock() {
     ElseIfStatementNode *block = nullptr;
     tokensIterator--;
     token = *tokensIterator;
-
+    SourceLoc loc{token.stringNumber, token.symbolNumber};
     while (!blockEnd)
     {
         advance();
@@ -1426,15 +1460,16 @@ ElseIfStatementNode *Parser::parseElseIfBlock() {
             blockEnd = true;
         }
     }
-    block = new ElseIfStatementNode(expr, new BlockExprNode(statements));
+    block = new ElseIfStatementNode(loc, expr, new BlockExprNode(loc, statements));
     return block;
 }
 
 BlockExprNode *Parser::parseElseBlock() {
+    SourceLoc loc{token.stringNumber, token.symbolNumber};
     BlockExprNode *falseBlock = nullptr;
     bool blockEnd = false;
     auto *statements = new std::vector<StatementNode*>();
-    auto *block = new BlockExprNode(statements);
+    auto *block = new BlockExprNode(loc, statements);
     while (!blockEnd)
     {
         advance();
@@ -1452,11 +1487,12 @@ BlockExprNode *Parser::parseElseBlock() {
             blockEnd = true;
         }
     }
-    falseBlock = new BlockExprNode(statements);
+    falseBlock = new BlockExprNode(loc, statements);
     return falseBlock;
 }
 
 OutputStatementNode *Parser::parseOutputStatement() {
+    SourceLoc loc{token.stringNumber, token.symbolNumber};
     consume(TokenType::Output);
     auto expr = parseExpression();
     /*if (dynamic_cast<VariableExprNode *>(expr) != nullptr)
@@ -1468,17 +1504,19 @@ OutputStatementNode *Parser::parseOutputStatement() {
         return new OutputStatementNode(dynamic_cast<IndexExprNode *>(expr));
     }*/
     expect(TokenType::Semicolon);
-    return new OutputStatementNode(expr);
+    return new OutputStatementNode(loc, expr);
 }
 
 InputStatementNode *Parser::parseInputStatement() {
+    SourceLoc loc{token.stringNumber, token.symbolNumber};
     consume(TokenType::Input);
     auto expr = parseExpression();
     expect(TokenType::Semicolon);
-    return new InputStatementNode(expr);
+    return new InputStatementNode(loc, expr);
 }
 
 AssignExprNode *Parser::parseAssignStatement() {
+    SourceLoc loc{token.stringNumber, token.symbolNumber};
     consume(TokenType::Let);
     advance();
     auto varName = parseVarOrCall();
@@ -1489,30 +1527,32 @@ AssignExprNode *Parser::parseAssignStatement() {
     auto expr = parseExpression();
     if (dynamic_cast<VariableExprNode *>(varName) != nullptr)
     {
-        return new AssignExprNode(dynamic_cast<VariableExprNode *>(varName), expr);
+        return new AssignExprNode(loc, dynamic_cast<VariableExprNode *>(varName), expr);
     }
     else if (dynamic_cast<IndexExprNode *>(varName) != nullptr)
     {
-        return new AssignExprNode(dynamic_cast<IndexExprNode *>(varName), expr);
+        return new AssignExprNode(loc, dynamic_cast<IndexExprNode *>(varName), expr);
     }
     expect(TokenType::Semicolon);
     return nullptr;
 }
 
 ReturnStatementNode *Parser::parseReturnStatement() {
+    SourceLoc loc{token.stringNumber, token.symbolNumber};
     consume(TokenType::Return);
     auto expr = parseExpression();
     expect(TokenType::Semicolon);
-    return new ReturnStatementNode(expr);
+    return new ReturnStatementNode(loc, expr);
 }
 
 WhileStatementNode *Parser::parseWhileStatement() {
+    SourceLoc loc{token.stringNumber, token.symbolNumber};
     consume(TokenType::While);
     auto expr = parseExpression();
     expect(TokenType::Repeat);
-    BlockExprNode* block = parseBlock(new VariableExprNode("while"));
+    BlockExprNode* block = parseBlock(new VariableExprNode(loc, "while"));
     expect(TokenType::Semicolon);
-    return new WhileStatementNode(expr, block);
+    return new WhileStatementNode(loc, expr, block);
 }
 
 CallExprNode *Parser::parseCall() {
@@ -1534,10 +1574,11 @@ CallExprNode *Parser::parseCall() {
 }
 
 DeleteExprNode *Parser::parseDelete() {
+    SourceLoc loc{token.stringNumber, token.symbolNumber};
     consume(TokenType::Delete);
     auto varExpr = parseExpression();
     expect(TokenType::Semicolon);
-    return new DeleteExprNode(varExpr);
+    return new DeleteExprNode(loc, varExpr);
 }
 
 ExternFuncDecStatementNode *Parser::parseExternFuncDecl() {

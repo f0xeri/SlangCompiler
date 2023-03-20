@@ -205,6 +205,7 @@ start
         call matrix.translate(-0.5f, -0.5f, -0.5f);
         call matrix.rotate(time, 0, 1, 0);
         call matrix.rotate(time, 0, 0, 1);
+	call matrix.rotate(time, 1, 0, 0);
 
         call texture.bind();
         call __glewUseProgram(shaderProgram);

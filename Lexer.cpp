@@ -82,6 +82,7 @@ Lexer::Lexer(const std::string &path) {
     std::ifstream file(path);
     if (!file.is_open()) {
         //LOG(ERROR) << "Failed to open " + path;
+        std::cout << "[ERROR] Failed to open " + path + "\n";
         exit(1);
     } else {
         std::stringstream buffer;

@@ -1388,11 +1388,25 @@ llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
         // TODO Set Dereferenceable attribute for ref params
         //function->addAttribute(paramID, Attribute::Dereferenceable);
     }
+
+    //DIFile* unit = cgcontext.debugBuilder->createFile(cgcontext.dbgInfo.compileUnit->getFilename(), cgcontext.dbgInfo.compileUnit->getDirectory());
+    /*llvm::DISubprogram *dbgFunc = cgcontext.debugBuilder->createFunction(
+            cgcontext.dbgInfo.compileUnit, name->value, name->value + nameAddition, unit, loc.line,
+            cgcontext.dbgInfo.CreateFunctionType(cgcontext.debugBuilder.get(), {}), loc.line,
+            llvm::DISubprogram::FlagPrivate,
+            llvm::DISubprogram::SPFlagDefinition);
+    function->setSubprogram(dbgFunc);
+    cgcontext.dbgInfo.lexicalBlocks.push_back(dbgFunc);
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get());*/
+    // TODO: debug
+
     if (block != nullptr) {
         BasicBlock *bb = BasicBlock::Create(*cgcontext.context, cgcontext.moduleName + retTypeName + name->value + "Entry",
                                             function, 0);
         cgcontext.pushBlock(bb);
         cgcontext.builder->SetInsertPoint(bb);
+        //cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), block);
+
         Function::arg_iterator argsValues = function->arg_begin();
         for (auto it = args->begin(); it != args->end(); it++, argsValues++) {
             if ((*it)->parameterType == ParameterType::Out || (*it)->parameterType == ParameterType::Var) {
@@ -1436,6 +1450,7 @@ llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
         }
 
         cgcontext.popBlock();
+        //cgcontext.dbgInfo.lexicalBlocks.pop_back();
     }
     //cgcontext.builder->SetInsertPoint(cgcontext.currentBlock());
     return nullptr;
@@ -1503,7 +1518,7 @@ llvm::Value *FieldArrayVarDecNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *MethodDecNode::codegen(CodeGenContext &cgcontext) {
-    auto funcDec = new FuncDecStatementNode(type, name, isPrivate, isFunction, args, block);
+    auto funcDec = new FuncDecStatementNode(loc, type, name, isPrivate, isFunction, args, block);
     auto ret = funcDec->codegen(cgcontext);
     return ret;
 }
@@ -1541,6 +1556,9 @@ llvm::Value *TypeDecStatementNode::codegen(CodeGenContext &cgcontext) {
     }
     cgcontext.allocatedClasses[name->value]->setBody(dataTypes);
 
+    //DIFile* unit = cgcontext.debugBuilder->createFile(cgcontext.dbgInfo.compileUnit->getFilename(), cgcontext.dbgInfo.compileUnit->getDirectory());
+    //auto dbgClass = cgcontext.debugBuilder->createClassType(cgcontext.dbgInfo.compileUnit, name->value, unit, loc.line, 8, 8, 0, DIType::FlagZero, nullptr, {});
+    //cgcontext.dbgInfo.dbgClasses[name->value] = dbgClass;
     // create default constructor
     if (!fields->empty())
     {

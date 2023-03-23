@@ -49,6 +49,54 @@ static Type *ptrToTypeOf(CodeGenContext &cgcontext, const std::string &var) {
     return type;
 }
 
+static DIType *dbgTypeOf(CodeGenContext &cgcontext, const std::string &var) {
+    DIType *type = nullptr;
+    if (var == "integer")
+        type = cgcontext.dbgInfo.getIntegerTy();
+    else if (var == "character")
+        type = cgcontext.dbgInfo.getCharacterType();
+    else if (var == "real")
+        type = cgcontext.dbgInfo.getRealTy();
+    else if (var == "float")
+        type = cgcontext.dbgInfo.getFloatType();
+    else if (var == "boolean")
+        type = cgcontext.dbgInfo.getBooleanType();
+    else if (var.empty())
+        // ????
+        //type = Type::getVoidTy(*cgcontext.context);
+        type = type;
+    else
+    {
+        if (cgcontext.dbgInfo.dbgClasses.contains(var))
+            type = cgcontext.dbgInfo.dbgClasses[var];
+    }
+    return type;
+}
+
+static DIType *dbgPrToTypeOf(CodeGenContext &cgcontext, const std::string &var) {
+    DIType *type = nullptr;
+    if (var == "integer")
+        type = cgcontext.dbgInfo.createPointerType(cgcontext.dbgInfo.getIntegerTy(), var);
+    else if (var == "character")
+        type = cgcontext.dbgInfo.createPointerType(cgcontext.dbgInfo.getCharacterType(), var);
+    else if (var == "real")
+        type = cgcontext.dbgInfo.createPointerType(cgcontext.dbgInfo.getRealTy(), var);
+    else if (var == "float")
+        type = cgcontext.dbgInfo.createPointerType(cgcontext.dbgInfo.getFloatType(), var);
+    else if (var == "boolean")
+        type = cgcontext.dbgInfo.createPointerType(cgcontext.dbgInfo.getBooleanType(), var);
+    else if (var.empty())
+        // ????
+        //type = Type::getVoidTy(*cgcontext.context);
+        type = type;
+    else
+    {
+        if (cgcontext.dbgInfo.dbgClasses.contains(var))
+            type = cgcontext.dbgInfo.createPointerType(cgcontext.dbgInfo.dbgClasses[var], var);
+    }
+    return type;
+}
+
 // array size is not calculating here!!!
 Type* getTypeFromExprNode(CodeGenContext &cgcontext, ExprNode* node, ParameterType paramType = ParameterType::In)
 {
@@ -124,6 +172,48 @@ Type* getTypeFromExprNode(CodeGenContext &cgcontext, ExprNode* node, ParameterTy
     return retType;
 }
 
+DIType* getDbgTypeFromExprNode(CodeGenContext &cgcontext, ExprNode* node, ParameterType paramType = ParameterType::In)
+{
+    DIType *retType = nullptr;
+    std::string retTypeName;
+    if (dynamic_cast<VariableExprNode*>(node) != nullptr)
+    {
+        if (paramType == ParameterType::In)
+            retType = dbgTypeOf(cgcontext, dynamic_cast<VariableExprNode*>(node)->value);
+        else
+            retType = dbgPrToTypeOf(cgcontext, dynamic_cast<VariableExprNode*>(node)->value);
+        retTypeName = dynamic_cast<VariableExprNode*>(node)->value;
+    }
+    else if (dynamic_cast<ArrayExprNode*>(node) != nullptr)
+    {
+        auto exprNode = dynamic_cast<ArrayExprNode*>(node);
+        auto arrExpr = exprNode;
+
+        //auto size = exprNode->size->codegen(cgcontext);
+        //auto arraySize = size;
+        auto indicesCount = 1;
+        if (arrExpr->type == "array")
+        {
+            for (auto &slice : *arrExpr->values)
+            {
+                auto castedSlice = dynamic_cast<ArrayExprNode*>(slice);
+                //auto sliceSize = castedSlice->size->codegen(cgcontext);
+                //auto newArraySize = BinaryOperator::Create(Instruction::Mul, sliceSize, arraySize, "", cgcontext.currentBlock());
+                //arraySize = newArraySize;
+                arrExpr = castedSlice;
+                indicesCount++;
+            }
+        }
+
+        retType = dbgPrToTypeOf(cgcontext, arrExpr->type);
+        for (int i = 1; i < indicesCount; i++) {
+            retType = cgcontext.dbgInfo.createPointerType(retType, "array");
+        }
+        retTypeName = arrExpr->type + "Array";
+    }
+    return retType;
+}
+
 static Value* mycast(Value* value, Type* type, CodeGenContext& cgcontext) {
     if (type == value->getType())
         return value;
@@ -172,26 +262,32 @@ static Value* mycast(Value* value, Type* type, CodeGenContext& cgcontext) {
 }
 
 llvm::Value *IntExprNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     return ConstantInt::get(Type::getInt32Ty(*cgcontext.context), value, true);
 }
 
 llvm::Value *RealExprNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     return ConstantFP::get(Type::getDoubleTy(*cgcontext.context), value);
 }
 
 llvm::Value *FloatExprNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     return ConstantFP::get(Type::getFloatTy(*cgcontext.context), value);
 }
 
 llvm::Value *CharExprNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     return ConstantInt::get(Type::getInt8Ty(*cgcontext.context), value, true);
 }
 
 llvm::Value *StringExprNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     return cgcontext.builder->CreateGlobalStringPtr(value);
 }
 
 llvm::Value *NilExprNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     if (type == nullptr) return nullptr;
     Type *retType = getTypeFromExprNode(cgcontext, type);
     llvm::Value* nil = nullptr;
@@ -220,12 +316,14 @@ llvm::Value *FuncExprNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *BooleanExprNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     return ConstantInt::get(Type::getInt1Ty(*cgcontext.context), value, false);
 }
 
 llvm::Value *VariableExprNode::codegen(CodeGenContext &cgcontext) {
     Value *val = nullptr;
     Type *type = nullptr;
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), (ExprNode*)this);
     // check is it function pointer
     //if (cgcontext.isFuncPointerAssignment)
     {
@@ -383,6 +481,7 @@ llvm::Value *VariableExprNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *UnaryOperatorExprNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     auto val = right->codegen(cgcontext);
     if (val->getType()->isIntegerTy())
         return BinaryOperator::CreateNeg(right->codegen(cgcontext), "", cgcontext.currentBlock());
@@ -392,6 +491,7 @@ llvm::Value *UnaryOperatorExprNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *OperatorExprNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     Value* leftVal = left->codegen(cgcontext);
     Value* rightVal = right->codegen(cgcontext);
     bool castNeeded = true;
@@ -502,6 +602,7 @@ llvm::Value *ConditionalExprNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), (ExprNode*)this);
     std::vector<Value*> argsRef;
     std::string nameAddition;
     llvm::raw_string_ostream nameAdditionStream(nameAddition);
@@ -663,6 +764,7 @@ llvm::Value *CallExprNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *DeleteExprNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     auto var = expr->codegen(cgcontext);
     // GC_
     //auto call = cgcontext.builder->CreateCall(cgcontext.mModule->getFunction("GC_free"), {var});
@@ -700,6 +802,7 @@ llvm::Value* calcIndex(IndexesExprNode* expr, CodeGenContext &cgcontext) {
 }
 
 llvm::Value *AssignExprNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     auto assignData = right->codegen(cgcontext);
     Value* var;
     Type *type = nullptr;
@@ -846,9 +949,11 @@ llvm::Value *ExprStatementNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *ReturnStatementNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     return cgcontext.builder->CreateRet(expr->codegen(cgcontext));
 }
 llvm::Value *OutputStatementNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     Value *value = expr->codegen(cgcontext);
     std::vector<Value *> printArgs;
     Value *formatStr;
@@ -879,6 +984,7 @@ llvm::Value *OutputStatementNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *InputStatementNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     Value *value = expr->codegen(cgcontext);
     std::vector<Value *> printArgs;
     Value *formatStr;
@@ -916,8 +1022,10 @@ llvm::Value *DeclarationNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     Value* newVar = nullptr;
     Value* rightVal = nullptr;
+    DIType* debugType = nullptr;
     if (isGlobal)
     {
         if (cgcontext.allocatedClasses.contains(type)) {
@@ -992,12 +1100,15 @@ llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgcontext) {
             auto malloc = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, structType, llvm::ConstantInt::get(llvm::Type::getInt32Ty(*cgcontext.context), cgcontext.mModule->getDataLayout().getTypeAllocSize(structType)), nullptr, cgcontext.mModule->getFunction("malloc"), "");
             cgcontext.builder->Insert(malloc);
             cgcontext.builder->CreateStore(malloc, newVar);
+            debugType = dbgPrToTypeOf(cgcontext, type);
         }
         else {
             newVar = cgcontext.builder->CreateAlloca(typeOf(cgcontext, type), 0, nullptr, name->value);
+            debugType = dbgTypeOf(cgcontext, type);
         }
         cgcontext.locals()[name->value] = newVar;
         cgcontext.localsExprs()[name->value] = this;
+
         if (expr != nullptr) {
             rightVal = expr->codegen(cgcontext);
             //new StoreInst(rightVal, newVar, false, cgcontext.currentBlock());
@@ -1027,6 +1138,11 @@ llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgcontext) {
                 cgcontext.builder->CreateCall(constructorFunc, {p});
             }
         }
+
+        DIFile* unit = cgcontext.debugBuilder->createFile(cgcontext.dbgInfo.compileUnit->getFilename(), cgcontext.dbgInfo.compileUnit->getDirectory());
+        auto funcScope = cgcontext.dbgInfo.lexicalBlocks.back();
+        auto dbg = cgcontext.debugBuilder->createAutoVariable(funcScope, name->value, unit, loc.line, debugType);
+        cgcontext.debugBuilder->insertDeclare(newVar, dbg, cgcontext.debugBuilder->createExpression(), DILocation::get(funcScope->getContext(), loc.line, 0, funcScope), cgcontext.builder->GetInsertBlock());
     }
 
     return newVar;
@@ -1119,6 +1235,7 @@ void generateMallocLoopsRecursive(CodeGenContext &cgcontext, int i, int indicesC
 }
 
 llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     auto exprNode = dynamic_cast<ArrayExprNode*>(expr);
     auto arrExpr = exprNode;
     if (isGlobal)
@@ -1285,6 +1402,7 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *IndexExprNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), (ExprNode*)this);
     Value* var;
     Type *type = nullptr;
     // check local variables
@@ -1349,6 +1467,7 @@ std::string getParameterTypeName(ParameterType type)
 }
 
 llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     if (dynamic_cast<ExternFuncDecStatementNode*>(this) != nullptr) {
         return dynamic_cast<ExternFuncDecStatementNode*>(this)->codegen(cgcontext);
     }
@@ -1376,8 +1495,10 @@ llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
         i++;
     }
     Type *retType = getTypeFromExprNode(cgcontext, type);
+    DIType *dbgRetType = getDbgTypeFromExprNode(cgcontext, type);
     if (retType->isStructTy()) {
         retType = retType->getPointerTo();
+        dbgRetType = getDbgTypeFromExprNode(cgcontext, type, ParameterType::Out);
     }
     std::string retTypeName;
 
@@ -1389,15 +1510,15 @@ llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
         //function->addAttribute(paramID, Attribute::Dereferenceable);
     }
 
-    //DIFile* unit = cgcontext.debugBuilder->createFile(cgcontext.dbgInfo.compileUnit->getFilename(), cgcontext.dbgInfo.compileUnit->getDirectory());
-    /*llvm::DISubprogram *dbgFunc = cgcontext.debugBuilder->createFunction(
-            cgcontext.dbgInfo.compileUnit, name->value, name->value + nameAddition, unit, loc.line,
-            cgcontext.dbgInfo.CreateFunctionType(cgcontext.debugBuilder.get(), {}), loc.line,
+    DIFile* unit = cgcontext.debugBuilder->createFile(cgcontext.dbgInfo.compileUnit->getFilename(), cgcontext.dbgInfo.compileUnit->getDirectory());
+    llvm::DISubprogram *dbgFunc = cgcontext.debugBuilder->createFunction(
+            cgcontext.dbgInfo.compileUnit, name->value, name->value, unit, loc.line,
+            cgcontext.dbgInfo.CreateFunctionType({dbgRetType}), loc.line,
             llvm::DISubprogram::FlagPrivate,
             llvm::DISubprogram::SPFlagDefinition);
-    function->setSubprogram(dbgFunc);
+
     cgcontext.dbgInfo.lexicalBlocks.push_back(dbgFunc);
-    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get());*/
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get());
     // TODO: debug
 
     if (block != nullptr) {
@@ -1405,9 +1526,10 @@ llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
                                             function, 0);
         cgcontext.pushBlock(bb);
         cgcontext.builder->SetInsertPoint(bb);
-        //cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), block);
+        cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), block);
 
         Function::arg_iterator argsValues = function->arg_begin();
+        int i = 1;
         for (auto it = args->begin(); it != args->end(); it++, argsValues++) {
             if ((*it)->parameterType == ParameterType::Out || (*it)->parameterType == ParameterType::Var) {
                 auto var = new AllocaInst(getTypeFromExprNode(cgcontext, (*it)->type)->getPointerTo(), 0, nullptr, (*it)->name->value, bb);
@@ -1416,6 +1538,7 @@ llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
                 Value *argumentValue = &(*argsValues);
                 argumentValue->setName(getParameterTypeName((*it)->parameterType) + (*it)->name->value);
                 StoreInst *inst = new StoreInst(argumentValue, cgcontext.locals()[(*it)->name->value], false, bb);
+
             } else {
                 auto var = new AllocaInst(getTypeFromExprNode(cgcontext, (*it)->type), 0, nullptr, (*it)->name->value, bb);
                 cgcontext.locals()[(*it)->name->value] = var;
@@ -1424,6 +1547,11 @@ llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
                 argumentValue->setName(getParameterTypeName((*it)->parameterType) + (*it)->name->value);
                 StoreInst *inst = new StoreInst(argumentValue, cgcontext.locals()[(*it)->name->value], false, bb);
             }
+            DILocalVariable *D = cgcontext.debugBuilder->createParameterVariable(dbgFunc, (*it)->name->value, i, unit, loc.line, getDbgTypeFromExprNode(cgcontext, (*it)->type, (*it)->parameterType), true);
+            cgcontext.debugBuilder->insertDeclare(cgcontext.locals()[(*it)->name->value], D, cgcontext.debugBuilder->createExpression(),
+                                                  DILocation::get(dbgFunc->getContext(), loc.line, 0, dbgFunc),
+                                                  cgcontext.builder->GetInsertBlock());
+            i++;
         }
 
         bool isRet = false;
@@ -1450,19 +1578,26 @@ llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
         }
 
         cgcontext.popBlock();
-        //cgcontext.dbgInfo.lexicalBlocks.pop_back();
+        cgcontext.dbgInfo.lexicalBlocks.pop_back();
     }
+
+    // function declarations can't have debug info, so...
+    if (!function->isDeclaration())
+        function->setSubprogram(dbgFunc);
+
     //cgcontext.builder->SetInsertPoint(cgcontext.currentBlock());
     return nullptr;
 }
 
 llvm::Value *FieldVarDecNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     auto elementPtr = cgcontext.builder->CreateStructGEP(cgcontext.allocatedClasses[cgcontext.moduleName + "." + typeName], cgcontext.currentTypeLoad, index);
     auto assignData = expr->codegen(cgcontext);
     return cgcontext.builder->CreateStore(assignData, elementPtr);
 }
 
 llvm::Value *FieldArrayVarDecNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     auto elementPtr = cgcontext.builder->CreateStructGEP(cgcontext.allocatedClasses[cgcontext.moduleName + "." + typeName], cgcontext.currentTypeLoad, index);
     auto arrDec = this->var;
     auto exprNode = dynamic_cast<ArrayExprNode*>(arrDec->expr);
@@ -1518,20 +1653,24 @@ llvm::Value *FieldArrayVarDecNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *MethodDecNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     auto funcDec = new FuncDecStatementNode(loc, type, name, isPrivate, isFunction, args, block);
     auto ret = funcDec->codegen(cgcontext);
     return ret;
 }
 
 llvm::Value *TypeDecStatementNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     if (name->value == "Object") return nullptr;
     if (cgcontext.allocatedClasses[name->value] != nullptr) return nullptr;
     cgcontext.allocatedClasses[name->value] = StructType::create(*cgcontext.context, name->value);
     cgcontext.allocatedClasses[name->value]->setName(name->value);
     std::vector<Type*> dataTypes;
+    std::vector<DIType*> dbgDataTypes;
     for (auto field : *fields)
     {
         Type* type;
+        DIType *dbgType;
         if (dynamic_cast<FieldArrayVarDecNode*>(field))
         {
             auto exprNode = dynamic_cast<FieldArrayVarDecNode*>(field)->var;
@@ -1545,20 +1684,46 @@ llvm::Value *TypeDecStatementNode::codegen(CodeGenContext &cgcontext) {
                 }
             }
             type = ptrToTypeOf(cgcontext, arrExpr->type);
+            dbgType = dbgPrToTypeOf(cgcontext, arrExpr->type);
             for (int i = 1; i < exprNode->indicesCount; i++) {
                 type = type->getPointerTo();
+                dbgType = cgcontext.dbgInfo.createPointerType(dbgType, "array");
             }
         }
         else
+        {
+            auto typeNode = dynamic_cast<FieldVarDecNode*>(field)->type;
+            /*if (cgcontext.allocatedClasses.contains(typeNode)) {
+                type = ptrToTypeOf(cgcontext, dynamic_cast<FieldVarDecNode*>(field)->type);
+                dbgType = dbgPrToTypeOf(cgcontext, dynamic_cast<FieldVarDecNode*>(field)->type);
+            }
+            else {
+                type = typeOf(cgcontext, dynamic_cast<FieldVarDecNode*>(field)->type);
+                dbgType = dbgTypeOf(cgcontext, dynamic_cast<FieldVarDecNode*>(field)->type);
+            }*/
             type = typeOf(cgcontext, dynamic_cast<FieldVarDecNode*>(field)->type);
+            dbgType = dbgTypeOf(cgcontext, dynamic_cast<FieldVarDecNode*>(field)->type);
+        }
         dataTypes.push_back(type);
+        dbgDataTypes.push_back(dbgType);
         // ... array, class, string
     }
     cgcontext.allocatedClasses[name->value]->setBody(dataTypes);
 
-    //DIFile* unit = cgcontext.debugBuilder->createFile(cgcontext.dbgInfo.compileUnit->getFilename(), cgcontext.dbgInfo.compileUnit->getDirectory());
-    //auto dbgClass = cgcontext.debugBuilder->createClassType(cgcontext.dbgInfo.compileUnit, name->value, unit, loc.line, 8, 8, 0, DIType::FlagZero, nullptr, {});
-    //cgcontext.dbgInfo.dbgClasses[name->value] = dbgClass;
+    DIFile* unit = cgcontext.debugBuilder->createFile(cgcontext.dbgInfo.compileUnit->getFilename(), cgcontext.dbgInfo.compileUnit->getDirectory());
+    // converting vector of types to type that createClassType function requires to be "elements"
+    std::vector<DIDerivedType*> membersDbg;
+    int offset = 0;
+    for (int i = 0; i < fields->size(); i++) {
+        auto memberDbg = cgcontext.debugBuilder->createMemberType(cgcontext.dbgInfo.compileUnit, fields->at(i)->name->value, unit, fields->at(i)->loc.line, dbgDataTypes[i]->getSizeInBits(), dbgDataTypes[i]->getAlignInBits(), offset, DINode::DIFlags::FlagPublic, dbgDataTypes[i]);
+        membersDbg.push_back(memberDbg);
+        offset += dbgDataTypes[i]->getSizeInBits();
+    }
+    ArrayRef<Metadata*> elements(reinterpret_cast<Metadata *const *>(membersDbg.data()), membersDbg.size());
+    auto dbgDataTypesArray = cgcontext.debugBuilder->getOrCreateArray(elements);
+    auto dbgClass = cgcontext.debugBuilder->createClassType(cgcontext.dbgInfo.compileUnit, name->value, unit, loc.line, offset, offset, 0, DIType::FlagZero, nullptr, dbgDataTypesArray);
+    cgcontext.dbgInfo.dbgClasses[name->value] = dbgClass;
+
     // create default constructor
     if (!fields->empty())
     {
@@ -1611,6 +1776,7 @@ llvm::Value *TypeDecStatementNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *ExternFuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     std::vector<llvm::Type*> argTypes;
     std::vector<int> refParams;
     int i = 1;
@@ -1651,6 +1817,7 @@ llvm::Value *ElseIfStatementNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *IfStatementNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     Function *TheFunction = cgcontext.builder->GetInsertBlock()->getParent();
     BasicBlock* ifTrue = BasicBlock::Create(*cgcontext.context, "", TheFunction, 0);
     BasicBlock* ifFalse = BasicBlock::Create(*cgcontext.context, "", TheFunction, 0);
@@ -1719,6 +1886,7 @@ llvm::Value *ForStatementNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *WhileStatementNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     Function *TheFunction = cgcontext.builder->GetInsertBlock()->getParent();
     BasicBlock* whileIter = BasicBlock::Create(*cgcontext.context, "", TheFunction, 0);
     BasicBlock* whileEnd = BasicBlock::Create(*cgcontext.context, "", TheFunction, 0);
@@ -1760,6 +1928,7 @@ llvm::Value *WhileStatementNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *FuncPointerStatementNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     std::vector<llvm::Type*> argTypes;
     std::vector<int> refParams;
     llvm::Value* rightVal = nullptr;
@@ -1849,6 +2018,7 @@ llvm::Value *ImportStatementNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *IndexesExprNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), (ExprNode*)this);
     Value* var;
     Type *type = nullptr;
     // check local variables

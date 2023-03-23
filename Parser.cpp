@@ -281,6 +281,8 @@ DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, 
                 hasError = true; // error field already exists
             }
 
+            //if (!oneOfDefaultTypes(type)) constructorRequired = true;
+
             if (token.type == TokenType::Assign || token.type == TokenType::Semicolon)
             {
                 bool init = token.type == TokenType::Assign;
@@ -515,16 +517,22 @@ bool Parser::parseTypeDecl() {
                                     // TODO: why we are pushing only 0 arg
                                     if (method->args != nullptr && !method->args->empty())
                                     {
-                                        for (auto & arg : *method->args) {
-                                            args->push_back(new FuncParamDecStatementNode(arg->loc, new VariableExprNode(arg->loc, mainModuleNode->name->value + "." + name),
-                                                                                          new VariableExprNode(arg->loc, arg->name->value),
-                                                                                          arg->parameterType,
-                                                                                          arg->expr));
-                                        }
-                                        /*args->push_back(new FuncParamDecStatementNode(method->args->at(0)->loc, new VariableExprNode(method->args->at(0)->loc, mainModuleNode->name->value + "." + name),
+                                        // first arg (this) should have type of current class, not parent
+                                        args->push_back(new FuncParamDecStatementNode(method->args->at(0)->loc, new VariableExprNode(method->args->at(0)->loc, mainModuleNode->name->value + "." + name),
                                                                                       new VariableExprNode(method->args->at(0)->loc, method->args->at(0)->name->value),
                                                                                       method->args->at(0)->parameterType,
-                                                                                      method->args->at(0)->expr));*/
+                                                                                      method->args->at(0)->expr));
+
+                                        // just copy other args (if exists)
+                                        if (method->args->size() > 1) {
+                                            for (int i = 1; i < method->args->size(); i++) {
+                                                auto arg = method->args->at(i);
+                                                args->push_back(new FuncParamDecStatementNode(arg->loc, arg->type,
+                                                                                              new VariableExprNode(arg->loc, arg->name->value),
+                                                                                              arg->parameterType,
+                                                                                              arg->expr));
+                                            }
+                                        }
                                     }
                                 }
                                 auto newStatements = new std::vector<StatementNode*>();

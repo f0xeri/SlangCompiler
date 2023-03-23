@@ -1,17 +1,24 @@
 import classes2;
-module main
+module classes
     public class A inherits Object
-        public field-array[11] character str := "public A string";
+        // something goes wrong with debug info, when we have an array as field
+        //public field-array[11] character str := "public A string";
         public field-integer i := 1;
         private field-integer ip := 11;
-        public method p1(A a)()
+        public method p1(A a)(in integer i2, in float f)
             output "A class\n";
+            output i2;
+            output f;
+            output "\n\n";
         end p1;
     end A;
 
     private class B inherits A
-        public method p1(B b)()
+        public method p1(B b)(in integer i2, in float f)
             output "B class\n";
+            output i2;
+            output f;
+            output "\n\n";
         end p1;
 
         private method p2(B b)()
@@ -22,14 +29,22 @@ module main
     private class C inherits Object
         public field-A aobj;
     end C;
+
+    private function printHello(in array[] character word): integer
+        output "Hello, ";
+	    output word;
+	    return 111;
+    end printHello;
+
 start
+    variable-integer i := 0;
     variable-A a;
-    call a.p1();
+    call a.p1(1, 1.1f);
     output a.i;
     //output a.ip;
 
     variable-B b;
-    call b.p1();
+    call b.p1(2, 2.2f);
     output b.i;
     //call b.p2();
 
@@ -49,7 +64,10 @@ start
     variable-C c;
     variable-A a4 := c.aobj;
     output "~~~~\n";
-    call a4.p1();
+    call a4.p1(3, 3.3f);
     output a4.i;
 
-end main.
+    let i := printHello("test");
+    output i;
+
+end classes.

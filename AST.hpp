@@ -81,6 +81,8 @@ enum ParameterType
 class Node
 {
 public:
+    SourceLoc loc{};
+    Node(SourceLoc loc) : loc(loc) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext) = 0;
 };
 
@@ -88,8 +90,7 @@ class ExprNode : public Node
 {
 public:
     bool isConst = false;
-    SourceLoc loc{};
-    ExprNode(bool isConst, SourceLoc loc): isConst(isConst), loc(loc) {}
+    ExprNode(bool isConst, SourceLoc loc): isConst(isConst), Node(loc) {}
     virtual ~ExprNode() = default;
     E_TYPE _type = E_UNKNOWN;
     virtual llvm::Value *codegen(CodeGenContext &cgcontext) = 0;
@@ -98,8 +99,7 @@ public:
 class StatementNode : public Node
 {
 public:
-    SourceLoc loc{};
-    StatementNode(SourceLoc loc) : loc(loc) {}
+    StatementNode(SourceLoc loc) : Node(loc) {}
     virtual ~StatementNode() = default;
     virtual llvm::Value *codegen(CodeGenContext &cgcontext) = 0;
 };
@@ -255,10 +255,10 @@ public:
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
-class DeleteExprNode : public ExprNode, public StatementNode {
+class DeleteExprNode : public StatementNode {
 public:
     ExprNode* expr;
-    DeleteExprNode(SourceLoc loc, ExprNode *expr) : ExprNode(false, loc), expr(expr), StatementNode(loc) {}
+    DeleteExprNode(SourceLoc loc, ExprNode *expr) : expr(expr), StatementNode(loc) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 
@@ -557,52 +557,51 @@ struct DebugInfo {
     DIType* booleanType = nullptr;
     std::vector<DIScope*> lexicalBlocks;
     std::map<std::string, DICompositeType*> dbgClasses;
+    DIBuilder *debugBuilder;
 
-    DIType *getIntegerTy(DIBuilder *debugBuilder) {
+    DIType *getIntegerTy() {
         if (integerType) return integerType;
         integerType = debugBuilder->createBasicType("integer", 32, dwarf::DW_ATE_signed);
         return integerType;
     };
-    DIType *getRealTy(DIBuilder *debugBuilder) {
+    DIType *getRealTy() {
         if (realType) return realType;
         realType = debugBuilder->createBasicType("real", 64, dwarf::DW_ATE_float);
         return realType;
     };
-    DIType *getFloatType(DIBuilder *debugBuilder) {
+    DIType *getFloatType() {
         if (floatType) return floatType;
         floatType = debugBuilder->createBasicType("float", 32, dwarf::DW_ATE_float);
         return floatType;
     };
-    DIType *getCharacterType(DIBuilder *debugBuilder) {
+    DIType *getCharacterType() {
         if (characterType) return characterType;
         characterType = debugBuilder->createBasicType("character", 8, dwarf::DW_ATE_signed_char);
         return characterType;
     };
-    DIType *getBooleanType(DIBuilder *debugBuilder) {
+    DIType *getBooleanType() {
         if (booleanType) return booleanType;
         booleanType = debugBuilder->createBasicType("boolean", 1, dwarf::DW_ATE_boolean);
         return booleanType;
     };
 
-    DISubroutineType* CreateFunctionType(DIBuilder *debugBuilder, const std::vector<Metadata*>& retAndArgTypes) {
+    DIType *getVoidType() {
+        if (booleanType) return booleanType;
+
+        return booleanType;
+    };
+
+    DISubroutineType* CreateFunctionType(const std::vector<Metadata*>& retAndArgTypes) {
         DITypeRefArray params = debugBuilder->getOrCreateTypeArray(makeArrayRef(retAndArgTypes));
         DISubroutineType* dbgFuncType = debugBuilder->createSubroutineType(params);
         return dbgFuncType;
     };
 
-    void emitLocation(IRBuilder<> *irBuilder, ExprNode *AST) {
-        if (!AST)
-            return irBuilder->SetCurrentDebugLocation(DebugLoc());
-        DIScope *Scope;
-        if (lexicalBlocks.empty())
-            Scope = compileUnit;
-        else
-            Scope = lexicalBlocks.back();
-        irBuilder->SetCurrentDebugLocation(
-                DILocation::get(Scope->getContext(), AST->loc.line, AST->loc.col, Scope));
-    };
+    DIDerivedType* createPointerType(DIType* type, const std::string& typeName) {
+        return debugBuilder->createPointerType(type, type->getSizeInBits(), 0, None, typeName);
+    }
 
-    void emitLocation(IRBuilder<> *irBuilder, StatementNode *AST) {
+    void emitLocation(IRBuilder<> *irBuilder, Node *AST) {
         if (!AST)
             return irBuilder->SetCurrentDebugLocation(DebugLoc());
         DIScope *Scope;
@@ -663,11 +662,12 @@ public:
         this->symbols = std::make_unique<std::vector<std::pair<std::string, DeclarationNode*>>>(symbols);
         debugBuilder = std::make_unique<DIBuilder>(*mModule);
         dbgInfo.compileUnit = debugBuilder->createCompileUnit(dwarf::DW_LANG_C, debugBuilder->createFile(moduleName + ".sl", ""), "Slangc", false, "", 0);
-        dbgInfo.getIntegerTy(debugBuilder.get());
-        dbgInfo.getRealTy(debugBuilder.get());
-        dbgInfo.getFloatType(debugBuilder.get());
-        dbgInfo.getCharacterType(debugBuilder.get());
-        dbgInfo.getBooleanType(debugBuilder.get());
+        dbgInfo.debugBuilder = debugBuilder.get();
+        dbgInfo.getIntegerTy();
+        dbgInfo.getRealTy();
+        dbgInfo.getFloatType();
+        dbgInfo.getCharacterType();
+        dbgInfo.getBooleanType();
     }
     ~CodeGenContext() = default;
 
@@ -750,7 +750,7 @@ public:
             DIFile* unit = debugBuilder->createFile(dbgInfo.compileUnit->getFilename(), dbgInfo.compileUnit->getDirectory());
             llvm::DISubprogram *DbgFunc = debugBuilder->createFunction(
                     dbgInfo.compileUnit, "main", "main", unit, LineNo,
-                    dbgInfo.CreateFunctionType(debugBuilder.get(), {dbgInfo.getIntegerTy(debugBuilder.get())}), ScopeLine,
+                    dbgInfo.CreateFunctionType({dbgInfo.getIntegerTy()}), ScopeLine,
                     llvm::DISubprogram::FlagPrivate,
                     llvm::DISubprogram::SPFlagDefinition);
             mMainFunction->setSubprogram(DbgFunc);

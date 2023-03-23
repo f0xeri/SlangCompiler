@@ -1097,9 +1097,13 @@ llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgcontext) {
             newVar = cgcontext.builder->CreateAlloca(ptrToTypeOf(cgcontext, type), 0, nullptr, name->value);
             llvm::Type* int64type = llvm::Type::getInt32Ty(*cgcontext.context);
             auto structType = typeOf(cgcontext, type);
-            auto malloc = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, structType, llvm::ConstantInt::get(llvm::Type::getInt32Ty(*cgcontext.context), cgcontext.mModule->getDataLayout().getTypeAllocSize(structType)), nullptr, cgcontext.mModule->getFunction("malloc"), "");
-            cgcontext.builder->Insert(malloc);
-            cgcontext.builder->CreateStore(malloc, newVar);
+            // we should not malloc if we want to assign other pointer
+            // TODO: recheck this
+            if (expr == nullptr) {
+                auto malloc = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, structType, llvm::ConstantInt::get(llvm::Type::getInt32Ty(*cgcontext.context), cgcontext.mModule->getDataLayout().getTypeAllocSize(structType)), nullptr, cgcontext.mModule->getFunction("malloc"), "");
+                cgcontext.builder->Insert(malloc);
+                cgcontext.builder->CreateStore(malloc, newVar);
+            }
             debugType = dbgPrToTypeOf(cgcontext, type);
         }
         else {
@@ -1128,7 +1132,9 @@ llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgcontext) {
 
             cgcontext.builder->CreateStore(rightVal, newVarLoad);
         }
-        if (cgcontext.allocatedClasses.contains(type))
+        // call constructor only if we are not assigning pointer, for example:
+        // variable-Type a := otherTypeObj; // in this case we should not call constructor after assigning
+        if (cgcontext.allocatedClasses.contains(type) && expr == nullptr)
         {
             auto constructorFunc = cgcontext.mModule->getFunction(type + "._DefaultConstructor_");
             if (constructorFunc != nullptr)
@@ -1592,6 +1598,22 @@ llvm::Value *FuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
 llvm::Value *FieldVarDecNode::codegen(CodeGenContext &cgcontext) {
     cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     auto elementPtr = cgcontext.builder->CreateStructGEP(cgcontext.allocatedClasses[cgcontext.moduleName + "." + typeName], cgcontext.currentTypeLoad, index);
+    if (cgcontext.allocatedClasses.contains(type)) {
+        llvm::Type* int64type = llvm::Type::getInt32Ty(*cgcontext.context);
+        auto structType = typeOf(cgcontext, type);
+        auto malloc = CallInst::CreateMalloc(cgcontext.currentBlock(), int64type, structType, llvm::ConstantInt::get(llvm::Type::getInt32Ty(*cgcontext.context), cgcontext.mModule->getDataLayout().getTypeAllocSize(structType)), nullptr, cgcontext.mModule->getFunction("malloc"), "");
+        cgcontext.builder->Insert(malloc);
+        auto newVar = cgcontext.builder->CreateStore(malloc, elementPtr);
+        auto constructorFunc = cgcontext.mModule->getFunction(type + "._DefaultConstructor_");
+        if (constructorFunc != nullptr)
+        {
+            auto p = cgcontext.builder->CreateLoad(elementPtr);
+            if (DEBUG) elementPtr->print(llvm::errs());
+            cgcontext.builder->CreateCall(constructorFunc, {p});
+        }
+
+        return newVar;
+    }
     auto assignData = expr->codegen(cgcontext);
     return cgcontext.builder->CreateStore(assignData, elementPtr);
 }
@@ -1693,16 +1715,14 @@ llvm::Value *TypeDecStatementNode::codegen(CodeGenContext &cgcontext) {
         else
         {
             auto typeNode = dynamic_cast<FieldVarDecNode*>(field)->type;
-            /*if (cgcontext.allocatedClasses.contains(typeNode)) {
+            if (cgcontext.allocatedClasses.contains(typeNode)) {
                 type = ptrToTypeOf(cgcontext, dynamic_cast<FieldVarDecNode*>(field)->type);
                 dbgType = dbgPrToTypeOf(cgcontext, dynamic_cast<FieldVarDecNode*>(field)->type);
             }
             else {
                 type = typeOf(cgcontext, dynamic_cast<FieldVarDecNode*>(field)->type);
                 dbgType = dbgTypeOf(cgcontext, dynamic_cast<FieldVarDecNode*>(field)->type);
-            }*/
-            type = typeOf(cgcontext, dynamic_cast<FieldVarDecNode*>(field)->type);
-            dbgType = dbgTypeOf(cgcontext, dynamic_cast<FieldVarDecNode*>(field)->type);
+            }
         }
         dataTypes.push_back(type);
         dbgDataTypes.push_back(dbgType);

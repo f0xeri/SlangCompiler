@@ -281,7 +281,7 @@ DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, 
                 hasError = true; // error field already exists
             }
 
-            //if (!oneOfDefaultTypes(type)) constructorRequired = true;
+            if (!oneOfDefaultTypes(type)) constructorRequired = true;
 
             if (token.type == TokenType::Assign || token.type == TokenType::Semicolon)
             {

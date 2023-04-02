@@ -420,10 +420,12 @@ class FieldVarDecNode : public DeclarationNode
 {
 public:
     std::string typeName;
-    std::string type;
-    ExprNode *expr;
     bool isPrivate;
     int index;
+
+    std::string type;
+    ExprNode *expr;
+
     FieldVarDecNode(SourceLoc loc, const std::string &typeName, VariableExprNode *name, bool isPrivate, std::string type, int index): typeName(typeName), DeclarationNode(loc, name), type(std::move(type)), expr(nullptr), isPrivate(isPrivate), index(index) {};
     FieldVarDecNode(SourceLoc loc, const std::string &typeName, VariableExprNode *name, bool isPrivate, std::string type, ExprNode *expr, int index): typeName(typeName),  DeclarationNode(loc, name), type(std::move(type)), isPrivate(isPrivate), expr(expr), index(index) {};
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
@@ -434,8 +436,10 @@ class FieldArrayVarDecNode : public DeclarationNode
 public:
     std::string typeName;
     bool isPrivate;
-    ArrayDecStatementNode *var;
     int index;
+
+    ArrayDecStatementNode *var;
+
     FieldArrayVarDecNode(SourceLoc loc, const std::string &typeName, VariableExprNode *name, bool isPrivate, ArrayDecStatementNode *var, int index): typeName(typeName),  DeclarationNode(loc, name), isPrivate(isPrivate), var(var), index(index) {};
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };

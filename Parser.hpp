@@ -31,7 +31,11 @@ public:
         auto toStringType = new ArrayExprNode({}, "character", nullptr, new std::vector<ExprNode*>());
         auto args = new std::vector<FuncParamDecStatementNode *>();
         args->push_back(new FuncParamDecStatementNode({}, new VariableExprNode({}, "Object"), new VariableExprNode({}, "this"), ParameterType::Var));
-        objectType->methods->push_back(new MethodDecNode({}, toStringType, new VariableExprNode({}, "Object.toString"), false, true, new VariableExprNode({}, "this"), args, nullptr));
+        auto returnTypeName = new ReturnStatementNode({}, new StringExprNode({}, "Object"));
+        auto statements = new std::vector<StatementNode*>();
+        statements->push_back(returnTypeName);
+        auto toString = new MethodDecNode({}, toStringType, new VariableExprNode({}, "Object.toString"), false, true, new VariableExprNode({}, "this"), args, new BlockExprNode({}, statements));
+        objectType->methods->push_back(toString);
         currentScope->insert(objectType);
         importedModules = new std::vector<Parser*>();
         this->tokens = tokens;

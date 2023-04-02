@@ -1756,10 +1756,19 @@ llvm::Value *TypeDecStatementNode::codegen(CodeGenContext &cgcontext) {
                     std::vector<llvm::Type*> argTypes;
                     auto thisArg = ptrToTypeOf(cgcontext, name->value);
                     argTypes.push_back(thisArg);
+                    auto dbgThisArg = dbgPrToTypeOf(cgcontext, name->value);
                     FunctionType* type = FunctionType::get(Type::getVoidTy(*cgcontext.context), argTypes, false);
                     if (method->block != nullptr)
                     {
                         Function *constructorFunc = Function::Create(type, Function::ExternalLinkage, Twine(name->value + "._DefaultConstructor_"), cgcontext.mModule);
+                        llvm::DISubprogram *dbgFunc = cgcontext.debugBuilder->createFunction(
+                                cgcontext.dbgInfo.compileUnit, name->value + "._DefaultConstructor_", name->value + "._DefaultConstructor_", unit, loc.line,
+                                cgcontext.dbgInfo.CreateFunctionType({dbgThisArg}), loc.line,
+                                llvm::DISubprogram::FlagPrivate,
+                                llvm::DISubprogram::SPFlagDefinition);
+
+                        cgcontext.dbgInfo.lexicalBlocks.push_back(dbgFunc);
+                        cgcontext.dbgInfo.emitLocation(cgcontext.builder.get());
                         BasicBlock *bb = BasicBlock::Create(*cgcontext.context, name->value + "_DefaultConstructor_Entry", constructorFunc, nullptr);
                         cgcontext.pushBlock(bb);
                         cgcontext.builder->SetInsertPoint(bb);
@@ -1775,6 +1784,8 @@ llvm::Value *TypeDecStatementNode::codegen(CodeGenContext &cgcontext) {
                         }
                         cgcontext.builder->CreateRetVoid();
                         cgcontext.popBlock();
+                        cgcontext.dbgInfo.lexicalBlocks.pop_back();
+                        constructorFunc->setSubprogram(dbgFunc);
                     }
                     else
                     {

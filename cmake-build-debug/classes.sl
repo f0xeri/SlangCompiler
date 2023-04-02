@@ -2,7 +2,7 @@ import classes2;
 module classes
     public class A inherits Object
         // something goes wrong with debug info, when we have an array as field
-        //public field-array[11] character str := "public A string";
+        public field-array[11] character str := "test"; // inline init for array doesn't work
         public field-integer i := 1;
         private field-integer ip := 11;
         public method p1(A a)(in integer i2, in float f)
@@ -14,6 +14,8 @@ module classes
     end A;
 
     private class B inherits A
+        public field-float ff := 2.22f;
+        public field-array[11] character str2 := "test2";
         public method p1(B b)(in integer i2, in float f)
             output "B class\n";
             output i2;
@@ -46,6 +48,7 @@ start
     variable-B b;
     call b.p1(2, 2.2f);
     output b.i;
+    output b.ff;
     //call b.p2();
 
     variable-classes2.A2 a2;
@@ -63,6 +66,7 @@ start
 
     variable-C c;
     variable-A a4 := c.aobj;
+    let a4.i := 444;
     output "~~~~\n";
     call a4.p1(3, 3.3f);
     output a4.i;

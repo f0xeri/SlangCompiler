@@ -553,13 +553,18 @@ bool Parser::parseTypeDecl() {
                                             newStatements->push_back(fieldArrVarDec);
                                         }
                                     }
-                                } else {
+                                }
+                                else if (method->name->value == parent->name->value + ".toString") {
+                                    newStatements->push_back(new ReturnStatementNode(method->loc, new StringExprNode(method->loc, name)));
+                                }
+                                else {
                                     if (method->block != nullptr) {
                                         for (auto &statement : *method->block->statements) {
                                             newStatements->push_back(statement);
                                         }
                                     }
                                 }
+
                                 auto methodDecNode = new MethodDecNode(method->loc, method->type, newName, method->isPrivate, method->isFunction, new VariableExprNode(method->loc, method->thisName->value), args, new BlockExprNode(method->loc, newStatements));
                                 methods->push_back(methodDecNode);
                             }
@@ -612,25 +617,60 @@ bool Parser::parseTypeDecl() {
 
                     if (constructorRequired)
                     {
-                        std::string constructorName = name + "._DefaultConstructor_";
-                        std::string constructorType;
-                        bool constructorIsPrivate = false;
-                        auto *constructorStatements = new std::vector<StatementNode*>();
-                        //constructorStatements->push_back(new AssignExprNode());
-                        for (auto field : *fields)
+                        auto constructorExists = std::find_if(methods->begin(), methods->end(), [&name, this](MethodDecNode *method) {
+                            return method->name->value == mainModuleNode->name->value + "." + name + "._DefaultConstructor_";
+                        });
+                        if (constructorExists == methods->end())
                         {
-                            if (dynamic_cast<FieldVarDecNode*>(field) != nullptr)
+                            std::string constructorName = name + "._DefaultConstructor_";
+                            std::string constructorType;
+                            bool constructorIsPrivate = false;
+                            auto *constructorStatements = new std::vector<StatementNode*>();
+                            //constructorStatements->push_back(new AssignExprNode());
+                            for (auto field : *fields)
                             {
-                                constructorStatements->push_back(field);
+                                if (dynamic_cast<FieldVarDecNode*>(field) != nullptr || dynamic_cast<FieldArrayVarDecNode*>(field) != nullptr)
+                                {
+                                    constructorStatements->push_back(field);
+                                }
                             }
-                            else if (dynamic_cast<FieldArrayVarDecNode*>(field) != nullptr)
+                            auto constructor = new MethodDecNode(typeLoc, new VariableExprNode(typeLoc, constructorType), new VariableExprNode(typeLoc, mainModuleNode->name->value + "." + constructorName), constructorIsPrivate, false, new VariableExprNode(typeLoc, name),
+                                                                 nullptr, new BlockExprNode(typeLoc, constructorStatements));
+                            methods->push_back(constructor);
+                        }
+                        else {
+                            // check what fields are already added from parent and add only new ones
+                            auto constructor = *constructorExists;
+                            for (auto field : *fields)
                             {
-                                constructorStatements->push_back(field);
+                                if (dynamic_cast<FieldVarDecNode*>(field) != nullptr || dynamic_cast<FieldArrayVarDecNode*>(field) != nullptr)
+                                {
+                                    auto fieldExists = std::find_if(constructor->block->statements->begin(), constructor->block->statements->end(), [&field](StatementNode *statement) {
+                                        if (dynamic_cast<FieldVarDecNode*>(statement) != nullptr)
+                                        {
+                                            return field->name->value == dynamic_cast<FieldVarDecNode*>(statement)->name->value;
+                                        }
+                                        else if (dynamic_cast<FieldArrayVarDecNode*>(statement) != nullptr)
+                                        {
+                                            return field->name->value == dynamic_cast<FieldArrayVarDecNode*>(statement)->name->value;
+                                        }
+                                        return false;
+                                    });
+                                    if (fieldExists == constructor->block->statements->end())
+                                    {
+                                        if (dynamic_cast<FieldVarDecNode*>(field) != nullptr)
+                                        {
+                                            dynamic_cast<FieldVarDecNode*>(field)->index += parent->fields->size();
+                                        }
+                                        else if (dynamic_cast<FieldArrayVarDecNode*>(field) != nullptr)
+                                        {
+                                            dynamic_cast<FieldArrayVarDecNode*>(field)->index += parent->fields->size();
+                                        }
+                                        constructor->block->statements->push_back(field);
+                                    }
+                                }
                             }
                         }
-                        auto constructor = new MethodDecNode(typeLoc, new VariableExprNode(typeLoc, constructorType), new VariableExprNode(typeLoc, mainModuleNode->name->value + "." + constructorName), constructorIsPrivate, false, new VariableExprNode(typeLoc, name),
-                                                   nullptr, new BlockExprNode(typeLoc, constructorStatements));
-                        methods->push_back(constructor);
                     }
 
                     advance();

@@ -1,12 +1,19 @@
 module arrays
-start
-    variable-array[2] array[3] array[4] integer arr3d;
+    public class A inherits Object
+        public field-integer bbb := 1010;
+    end A;
 
+    public variable-array[2] array[3] array[4] integer arr3d;
+    public variable-integer a := 0;
+    public variable-A a1;
+start
+    variable-array[2] array[3] array[4] integer arr3d1;
     variable-integer i := 0;
     variable-integer j := 0;
     variable-integer k := 0;
     variable-integer counter := 1;
-
+    output a1.bbb;
+    output "\n";
     while i < 2 repeat
         while j < 3 repeat
             while k < 4 repeat

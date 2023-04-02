@@ -364,6 +364,10 @@ llvm::Value *VariableExprNode::codegen(CodeGenContext &cgcontext) {
                 // check type fields
                 auto typeVarName = value.substr(0, value.rfind('.'));
                 auto typeVar = cgcontext.localsLookup(typeVarName);
+                if (typeVar == nullptr)
+                {
+                    typeVar = cgcontext.globals().find(cgcontext.moduleName + "." + typeVarName)->second;
+                }
                 if (typeVar != nullptr)
                 {
                     Type* typeOfTypeVar = nullptr;
@@ -1081,6 +1085,15 @@ llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgcontext) {
         {
             FunctionType* funcType = FunctionType::get(Type::getVoidTy(*cgcontext.context), {}, false);
             Function *constructorFunc = Function::Create(funcType, Function::ExternalLinkage, Twine(name->value + "_constructor"), cgcontext.mModule);
+            DIFile* unit = cgcontext.debugBuilder->createFile(cgcontext.dbgInfo.compileUnit->getFilename(), cgcontext.dbgInfo.compileUnit->getDirectory());
+            llvm::DISubprogram *dbgConstructorFunc = cgcontext.debugBuilder->createFunction(
+                    cgcontext.dbgInfo.compileUnit, name->value + "_constructor", name->value + "._DefaultConstructor_", unit, loc.line,
+                    cgcontext.dbgInfo.CreateFunctionType({}), loc.line,
+                    llvm::DISubprogram::FlagPrivate,
+                    llvm::DISubprogram::SPFlagDefinition);
+
+            cgcontext.dbgInfo.lexicalBlocks.push_back(dbgConstructorFunc);
+            cgcontext.dbgInfo.emitLocation(cgcontext.builder.get());
             BasicBlock *bb = BasicBlock::Create(*cgcontext.context, name->value + "_constructorEntry", constructorFunc, nullptr);
             cgcontext.pushBlock(bb);
             cgcontext.builder->SetInsertPoint(bb);
@@ -1101,11 +1114,16 @@ llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgcontext) {
                 auto p = cgcontext.builder->CreateLoad(newVar);
                 if (DEBUG) structConstructorFunc->print(llvm::errs());
                 if (DEBUG) newVar->print(llvm::errs());
+
+                // add debugloc to createcall
+                cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
                 cgcontext.builder->CreateCall(structConstructorFunc, {p});
             }
 
             cgcontext.builder->CreateRetVoid();
             cgcontext.popBlock();
+            cgcontext.dbgInfo.lexicalBlocks.pop_back();
+            constructorFunc->setSubprogram(dbgConstructorFunc);
         }
     }
     else
@@ -1286,7 +1304,8 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
     }
 
     llvm::Type* int32type = llvm::Type::getInt32Ty(*cgcontext.context);
-
+    Function *constructorFunc = nullptr;
+    llvm::DISubprogram *dbgConstructorFunc = nullptr;
     if (isGlobal)
     {
         cgcontext.mModule->getOrInsertGlobal(name->value, finalType->getPointerTo());
@@ -1299,7 +1318,15 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
         cgcontext.globals()[name->value] = gVar;
 
         FunctionType* funcType = FunctionType::get(Type::getVoidTy(*cgcontext.context), {}, false);
-        Function *constructorFunc = Function::Create(funcType, Function::ExternalLinkage, Twine(name->value + "_constructor"), cgcontext.mModule);
+        constructorFunc = Function::Create(funcType, Function::ExternalLinkage, Twine(name->value + "_constructor"), cgcontext.mModule);
+        DIFile* unit = cgcontext.debugBuilder->createFile(cgcontext.dbgInfo.compileUnit->getFilename(), cgcontext.dbgInfo.compileUnit->getDirectory());
+        dbgConstructorFunc = cgcontext.debugBuilder->createFunction(
+                cgcontext.dbgInfo.compileUnit, name->value + "_constructor", name->value + "._constructor_", unit, loc.line,
+                cgcontext.dbgInfo.CreateFunctionType({}), loc.line,
+                llvm::DISubprogram::FlagPrivate,
+                llvm::DISubprogram::SPFlagDefinition);
+        cgcontext.dbgInfo.lexicalBlocks.push_back(dbgConstructorFunc);
+        cgcontext.dbgInfo.emitLocation(cgcontext.builder.get());
         BasicBlock *bb = BasicBlock::Create(*cgcontext.context, name->value + "_constructorEntry", constructorFunc, nullptr);
         cgcontext.pushBlock(bb);
         cgcontext.builder->SetInsertPoint(bb);
@@ -1348,68 +1375,14 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
         generateMallocLoopsRecursive(cgcontext, i, indicesCount, currentType, sizes, jvars, currentArr, var);
     }
 
-    /*for (int i = 1; i < indicesCount; i++)
-    {
-        auto j = cgcontext.builder->CreateAlloca(int32type, 0, nullptr, "j");
-        cgcontext.builder->CreateStore(ConstantInt::get(int32type, 0), j);
-        auto sz = sizes->at(i - 1)->codegen(cgcontext);
-        Function *TheFunction = cgcontext.builder->GetInsertBlock()->getParent();
-        BasicBlock* whileIter = BasicBlock::Create(*cgcontext.context, "", TheFunction, 0);
-        BasicBlock* whileEnd = BasicBlock::Create(*cgcontext.context, "", TheFunction, 0);
-        BasicBlock* whileCheck = BasicBlock::Create(*cgcontext.context, "", TheFunction, 0);
-        // Check condition satisfaction
-        BranchInst::Create(whileCheck, cgcontext.currentBlock());
-        cgcontext.pushBlock(whileCheck);
-        cgcontext.builder->SetInsertPoint(whileCheck);
-        // Whether break the loop
-        auto jvar = cgcontext.builder->CreateLoad(j);
-        auto cmpVal = cgcontext.builder->CreateICmp(ICmpInst::ICMP_SLT, jvar, sz, "j<sz");
-        BranchInst::Create(whileIter, whileEnd, cmpVal, cgcontext.currentBlock());
-        cgcontext.popBlock();
-        // Entering loop block
-        cgcontext.pushBlock(whileIter);
-        cgcontext.builder->SetInsertPoint(whileIter);
-
-        // Statements go here
-        currentType = currentType->getPointerElementType();
-
-        jvar = cgcontext.builder->CreateLoad(j);
-        //auto formatStr = cgcontext.builder->CreateGlobalStringPtr("%d\n");
-        //cgcontext.builder->CreateCall(cgcontext.mModule->getFunction("printf"), {formatStr, jvar});
-
-        auto allocSz = sizes->at(i)->codegen(cgcontext);
-        auto currentElementSize = ConstantInt::get(int32type, cgcontext.dataLayout->getTypeAllocSize(currentType));
-        allocSize = BinaryOperator::Create(Instruction::Mul, allocSz, currentElementSize, "", cgcontext.currentBlock());
-        // GC_malloc
-        currentArr = CallInst::CreateMalloc(cgcontext.currentBlock(), int32type, currentType, allocSize, nullptr, cgcontext.mModule->getFunction("malloc"), "");
-        // malloc
-        //auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int32type, type, allocSize, nullptr, nullptr, "");
-        cgcontext.builder->Insert(currentArr);
-        auto arrLoad = cgcontext.builder->CreateLoad(var);
-        jvar = cgcontext.builder->CreateLoad(j);
-        auto sext = cgcontext.builder->CreateSExt(jvar, llvm::Type::getInt64Ty(*cgcontext.context));
-        auto arrPtr = cgcontext.builder->CreateGEP(arrLoad, sext);
-        //cgcontext.builder->CreateStore(currentArr, arrPtr);
-        jvar = cgcontext.builder->CreateLoad(j);
-        auto add = cgcontext.builder->CreateAdd(jvar, ConstantInt::get(int32type, 1));
-        cgcontext.builder->CreateStore(add, j);
-
-        // Jump back to condition checking
-        BranchInst::Create(whileCheck, cgcontext.currentBlock());
-
-        cgcontext.popBlock();
-        // Return END
-        cgcontext.ret(whileEnd);
-        cgcontext.builder->SetInsertPoint(whileEnd);
-    }*/
-
-
     if (isGlobal)
     {
         //auto gVar = cgcontext.mModule->getNamedGlobal(name->value);
         //cgcontext.builder->CreateStore(arr, var);
         cgcontext.builder->CreateRetVoid();
         cgcontext.popBlock();
+        cgcontext.dbgInfo.lexicalBlocks.pop_back();
+        constructorFunc->setSubprogram(dbgConstructorFunc);
         return var;
     }
     else

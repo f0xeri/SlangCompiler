@@ -613,8 +613,7 @@ struct DebugInfo {
             Scope = compileUnit;
         else
             Scope = lexicalBlocks.back();
-        irBuilder->SetCurrentDebugLocation(
-                DILocation::get(Scope->getContext(), AST->loc.line, AST->loc.col, Scope));
+        irBuilder->SetCurrentDebugLocation(DILocation::get(Scope->getContext(), AST->loc.line, AST->loc.col, Scope));
     };
 
     void emitLocation(IRBuilder<> *irBuilder) {

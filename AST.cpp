@@ -796,8 +796,6 @@ std::vector<ExprNode*>* getSizesOfArray(DeclarationNode* expr) {
 }
 
 llvm::Value* calcIndex(IndexesExprNode* expr, CodeGenContext &cgcontext) {
-
-
     return nullptr;
 }
 
@@ -937,7 +935,8 @@ llvm::Value *AssignExprNode::codegen(CodeGenContext &cgcontext) {
             }
         }
     }
-    return new StoreInst(assignData, var, false, cgcontext.currentBlock());
+    auto ret = cgcontext.builder->CreateStore(assignData, var);
+    return ret;
 }
 
 llvm::Value *CastExprNode::codegen(CodeGenContext &cgcontext) {
@@ -1030,9 +1029,11 @@ llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgcontext) {
     {
         if (cgcontext.allocatedClasses.contains(type)) {
             cgcontext.mModule->getOrInsertGlobal(name->value, ptrToTypeOf(cgcontext, type));
+            debugType = dbgPrToTypeOf(cgcontext, type);
         }
         else {
             cgcontext.mModule->getOrInsertGlobal(name->value, typeOf(cgcontext, type));
+            debugType = dbgTypeOf(cgcontext, type);
         }
         //cgcontext.mModule->getOrInsertGlobal(name->value, typeOf(cgcontext, type));
         auto gVar = cgcontext.mModule->getNamedGlobal(name->value);
@@ -1058,7 +1059,23 @@ llvm::Value *VarDecStatementNode::codegen(CodeGenContext &cgcontext) {
         gVar->setAlignment(Align(8));
         cgcontext.globals()[name->value] = gVar;
         newVar = gVar;
+        // get name of variable (after last dot) in modern c++
+        std::string varName = name->value;
+        auto pos = varName.find_last_of('.');
+        if (pos != std::string::npos) {
+            varName = varName.substr(pos + 1);
+        }
 
+        auto dbgInfo = cgcontext.debugBuilder->createGlobalVariableExpression(
+                cgcontext.dbgInfo.compileUnit,
+                varName,
+                "",
+                cgcontext.dbgInfo.compileUnit->getFile(),
+                loc.line,
+                debugType,
+                isPrivate,
+                gVar);
+        gVar->addDebugInfo(dbgInfo);
         // we should call default constructor if global is pointer to struct
         if (cgcontext.allocatedClasses.contains(type))
         {
@@ -1735,9 +1752,9 @@ llvm::Value *TypeDecStatementNode::codegen(CodeGenContext &cgcontext) {
     std::vector<DIDerivedType*> membersDbg;
     int offset = 0;
     for (int i = 0; i < fields->size(); i++) {
-        auto memberDbg = cgcontext.debugBuilder->createMemberType(cgcontext.dbgInfo.compileUnit, fields->at(i)->name->value, unit, fields->at(i)->loc.line, dbgDataTypes[i]->getSizeInBits(), dbgDataTypes[i]->getAlignInBits(), offset, DINode::DIFlags::FlagPublic, dbgDataTypes[i]);
+        auto memberDbg = cgcontext.debugBuilder->createMemberType(cgcontext.dbgInfo.compileUnit, fields->at(i)->name->value, unit, fields->at(i)->loc.line, cgcontext.dataLayout->getTypeAllocSize(dataTypes[i]) * 8, 0, offset, DINode::DIFlags::FlagPublic, dbgDataTypes[i]);
         membersDbg.push_back(memberDbg);
-        offset += dbgDataTypes[i]->getSizeInBits();
+        offset += cgcontext.dataLayout->getTypeAllocSize(dataTypes[i]) * 8;
     }
     ArrayRef<Metadata*> elements(reinterpret_cast<Metadata *const *>(membersDbg.data()), membersDbg.size());
     auto dbgDataTypesArray = cgcontext.debugBuilder->getOrCreateArray(elements);

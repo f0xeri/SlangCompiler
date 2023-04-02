@@ -1,8 +1,11 @@
 import classes2;
 module classes
+    public variable-integer globalInt := 1;
+    private variable-float globalFloat := 99.9f;
     public class A inherits Object
         // something goes wrong with debug info, when we have an array as field
         public field-array[11] character str := "test"; // inline init for array doesn't work
+        public field-array[2] array[3] array[4] integer arr3d;
         public field-integer i := 1;
         private field-integer ip := 11;
         public method p1(A a)(in integer i2, in float f)
@@ -39,10 +42,11 @@ module classes
     end printHello;
 
 start
-    variable-integer i := 0;
+    //variable-integer i := 0;
     variable-A a;
     call a.p1(1, 1.1f);
     output a.i;
+    let a.str := "test";
     //output a.ip;
 
     variable-B b;
@@ -71,7 +75,44 @@ start
     call a4.p1(3, 3.3f);
     output a4.i;
 
-    let i := printHello("test");
-    output i;
+    //let i := printHello("test");
+    //output i;
+    output "\n";
+    variable-integer i := 0;
+    variable-integer j := 0;
+    variable-integer k := 0;
+    variable-integer counter := 1;
+
+    while i < 2 repeat
+        while j < 3 repeat
+            while k < 4 repeat
+                let a.arr3d[i][j][k] := counter;
+                let counter := counter + 1;
+                let k := k + 1;
+            end while;
+            let k := 0;
+            let j := j + 1;
+        end while;
+        let j := 0;
+        let i := i + 1;
+    end while;
+
+    let i := 0;
+    let j := 0;
+    let k := 0;
+    while i < 2 repeat
+        while j < 3 repeat
+            while k < 4 repeat
+                output a.arr3d[i][j][k];
+                let k := k + 1;
+            end while;
+            let k := 0;
+            let j := j + 1;
+            output "\n";
+        end while;
+        let j := 0;
+        let i := i + 1;
+        output "\n";
+    end while;
 
 end classes.

@@ -1279,6 +1279,7 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
     cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     auto exprNode = dynamic_cast<ArrayExprNode*>(expr);
     auto arrExpr = exprNode;
+    DIType *dbgType;
     if (isGlobal)
     {
         if (!exprNode->size->isConst) {
@@ -1298,9 +1299,11 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
         }
     }
     auto type = typeOf(cgcontext, arrExpr->type);
+    dbgType = dbgPrToTypeOf(cgcontext, arrExpr->type);
     auto finalType = type;
     for (int i = 1; i < this->indicesCount; i++) {
         finalType = finalType->getPointerTo();
+        dbgType = cgcontext.dbgInfo.createPointerType(dbgType, "array");
     }
 
     llvm::Type* int32type = llvm::Type::getInt32Ty(*cgcontext.context);
@@ -1377,8 +1380,23 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
 
     if (isGlobal)
     {
-        //auto gVar = cgcontext.mModule->getNamedGlobal(name->value);
-        //cgcontext.builder->CreateStore(arr, var);
+        auto gVar = cgcontext.mModule->getNamedGlobal(name->value);
+        // get var name after last dot
+        auto varName = name->value;
+        auto pos = varName.find_last_of('.');
+        if (pos != std::string::npos)
+            varName = varName.substr(pos + 1);
+
+        auto dbgInfo = cgcontext.debugBuilder->createGlobalVariableExpression(
+                cgcontext.dbgInfo.compileUnit,
+                varName,
+                "",
+                cgcontext.dbgInfo.compileUnit->getFile(),
+                loc.line,
+                dbgType,
+                isPrivate,
+                var);
+        gVar->addDebugInfo(dbgInfo);
         cgcontext.builder->CreateRetVoid();
         cgcontext.popBlock();
         cgcontext.dbgInfo.lexicalBlocks.pop_back();
@@ -1388,6 +1406,10 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
     else
     {
         auto lVar = cgcontext.locals()[name->value];
+        DIFile* unit = cgcontext.debugBuilder->createFile(cgcontext.dbgInfo.compileUnit->getFilename(), cgcontext.dbgInfo.compileUnit->getDirectory());
+        auto funcScope = cgcontext.dbgInfo.lexicalBlocks.back();
+        auto dbg = cgcontext.debugBuilder->createAutoVariable(funcScope, name->value, unit, loc.line, dbgType);
+        cgcontext.debugBuilder->insertDeclare(lVar, dbg, cgcontext.debugBuilder->createExpression(), DILocation::get(funcScope->getContext(), loc.line, 0, funcScope), cgcontext.builder->GetInsertBlock());
         //cgcontext.builder->CreateStore(arr, lVar);
         return var;
     }

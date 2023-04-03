@@ -78,6 +78,9 @@ start
     //let i := printHello("test");
     //output i;
     output "\n";
+    variable-array[2] array[3] array[4] integer arr3d2;
+    let arr3d2[0][0][0] := 1;
+    output arr3d2[0][0][0];
     variable-integer i := 0;
     variable-integer j := 0;
     variable-integer k := 0;

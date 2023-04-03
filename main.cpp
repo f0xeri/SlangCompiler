@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
         llvm::errs() << "[INFO] Linking...\n";
         for (const auto &name : filenames) filenamesString += name + ".ll ";
         std::string mingw64path = std::filesystem::current_path().string() + "\\mingw64\\";
-        std::string clangCall = mingw64path + "\\bin\\clang " + filenamesString + "-static-libgcc -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive -Wl,-Bdynamic -lgc-lib -lglew -lglfw3 -lopengl32 -lkernel32 -luser32 -lgdi32 -lws2_32 -lstb_image -DGLEW_STATIC -o " + mainFilename + ".exe";
+        std::string clangCall = mingw64path + "\\bin\\clang " + filenamesString + "-static-libgcc -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive -Wl,-Bdynamic -lgc-lib -lglew -lglfw3 -lopengl32 -lkernel32 -luser32 -lgdi32 -lws2_32 -lstb_image -DGLEW_STATIC -mno-stack-arg-probe -O0 -o " + mainFilename + ".exe";
         system(clangCall.c_str());
         //llvm::errs() << "[INFO] Done.\n";
     }

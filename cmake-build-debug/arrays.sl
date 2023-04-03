@@ -7,7 +7,6 @@ module arrays
     public variable-integer a := 0;
     public variable-A a1;
 start
-    variable-array[2] array[3] array[4] integer arr3d1;
     variable-integer i := 0;
     variable-integer j := 0;
     variable-integer k := 0;
@@ -45,4 +44,36 @@ start
         let i := i + 1;
         output "\n";
     end while;
+
+    // create 4x4 matrix
+    variable-array[4] array[4] integer matrix;
+    let i := 0;
+    let j := 0;
+    // fill it as a rotation matrix
+    while i < 4 repeat
+        while j < 4 repeat
+            if i == j then
+                let matrix[i][j] := 1;
+            else
+                let matrix[i][j] := 0;
+            end if;
+            let j := j + 1;
+        end while;
+        let j := 0;
+        let i := i + 1;
+    end while;
+
+    // pretty print the matrix
+    let i := 0;
+    let j := 0;
+    while i < 4 repeat
+        while j < 4 repeat
+            output matrix[i][j];
+            let j := j + 1;
+        end while;
+        let j := 0;
+        let i := i + 1;
+        output "\n";
+    end while;
 end arrays.
+

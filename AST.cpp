@@ -1973,7 +1973,6 @@ llvm::Value *IfStatementNode::codegen(CodeGenContext &cgcontext) {
         }
     }
     // JMP to END
-    // TODO: fix this, breaks when not every branch returns
     if (!isRetFalse)
         BranchInst::Create(ifEnd, cgcontext.currentBlock());
 

@@ -1471,7 +1471,7 @@ IfStatementNode *Parser::parseIfStatement() {
         }
         trueBlock = new BlockExprNode(loc, statements);
     }
-    if (token.type == TokenType::Elseif) elseifNodes->push_back(parseElseIfBlock());
+    while (token.type == TokenType::Elseif) elseifNodes->push_back(parseElseIfBlock());
     if (token.type == TokenType::Else) falseBlock = parseElseBlock();
     //advance();
     consume(TokenType::End);
@@ -1503,7 +1503,7 @@ ElseIfStatementNode *Parser::parseElseIfBlock() {
         else if (token.type == TokenType::While) statements->push_back(parseWhileStatement());
         else if (token.type == TokenType::Call) statements->push_back(parseCall());
         else if (token.type == TokenType::Delete) statements->push_back(parseDelete());
-        if (token.type == TokenType::Else)
+        if (token.type == TokenType::Else || token.type == TokenType::Elseif)
         {
             blockEnd = true;
         }

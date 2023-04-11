@@ -366,7 +366,9 @@ llvm::Value *VariableExprNode::codegen(CodeGenContext &cgcontext) {
                 auto typeVar = cgcontext.localsLookup(typeVarName);
                 if (typeVar == nullptr)
                 {
-                    typeVar = cgcontext.globals().find(cgcontext.moduleName + "." + typeVarName)->second;
+                    if (cgcontext.globals().contains(cgcontext.moduleName + "." + typeVarName))
+                        typeVar = cgcontext.globals().find(cgcontext.moduleName + "." + typeVarName)->second;
+
                 }
                 if (typeVar != nullptr)
                 {
@@ -1856,10 +1858,6 @@ llvm::Value *ExternFuncDecStatementNode::codegen(CodeGenContext &cgcontext) {
 }
 
 llvm::Value *ElseIfStatementNode::codegen(CodeGenContext &cgcontext) {
-    return nullptr;
-}
-
-llvm::Value *IfStatementNode::codegen(CodeGenContext &cgcontext) {
     cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
     Function *TheFunction = cgcontext.builder->GetInsertBlock()->getParent();
     BasicBlock* ifTrue = BasicBlock::Create(*cgcontext.context, "", TheFunction, 0);
@@ -1890,9 +1888,76 @@ llvm::Value *IfStatementNode::codegen(CodeGenContext &cgcontext) {
         BranchInst::Create(ifEnd, cgcontext.currentBlock());
     }
     cgcontext.popBlock();
+
+    return ifEnd;
+}
+
+llvm::Value *IfStatementNode::codegen(CodeGenContext &cgcontext) {
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), this);
+    Function *TheFunction = cgcontext.builder->GetInsertBlock()->getParent();
+    BasicBlock* ifTrue = BasicBlock::Create(*cgcontext.context, "", TheFunction, 0);
+    BasicBlock* ifFalse = BasicBlock::Create(*cgcontext.context, "", TheFunction, 0);
+    BasicBlock *ifEnd = BasicBlock::Create(*cgcontext.context, "", TheFunction, 0);
+    BranchInst::Create(ifTrue, ifFalse, condExpr->codegen(cgcontext), cgcontext.currentBlock());
+    // Entering IF
+    cgcontext.pushBlock(ifTrue);
+    cgcontext.builder->SetInsertPoint(ifTrue);
+    bool isRetTrue = false;
+    if (trueBlock != nullptr)
+    {
+        for (auto statement : *trueBlock->statements)
+        {
+            //if (isRetTrue) llvm::errs() << "[WARN] Code after return statement in block is unreachable.\n";
+            statement->codegen(cgcontext);
+            if (dynamic_cast<ReturnStatementNode*>(statement) != nullptr)
+            {
+                isRetTrue = true;
+                break;
+            }
+        }
+    }
+
+    // JMP to END
+    if (!isRetTrue)
+    {
+        BranchInst::Create(ifEnd, cgcontext.currentBlock());
+    }
+    cgcontext.popBlock();
+
     // Entering ELSE
     cgcontext.pushBlock(ifFalse);
     cgcontext.builder->SetInsertPoint(ifFalse);
+
+    for (auto &elseif : *elseifNodes) {
+        BasicBlock *elseIfTrue = BasicBlock::Create(*cgcontext.context, "", TheFunction, 0);
+        BasicBlock *elseIfFalse = BasicBlock::Create(*cgcontext.context, "", TheFunction, 0);
+        BranchInst::Create(elseIfTrue, elseIfFalse, elseif->condExpr->codegen(cgcontext), cgcontext.currentBlock());
+        cgcontext.pushBlock(elseIfTrue);
+        cgcontext.builder->SetInsertPoint(elseIfTrue);
+        bool isRetElseIfTrue = false;
+        if (elseif->trueBlock != nullptr)
+        {
+            for (auto statement : *elseif->trueBlock->statements)
+            {
+                //if (isRetElseIfTrue) llvm::errs() << "[WARN] Code after return statement in block is unreachable.\n";
+                statement->codegen(cgcontext);
+                if (dynamic_cast<ReturnStatementNode*>(statement) != nullptr)
+                {
+                    isRetElseIfTrue = true;
+                    break;
+                }
+            }
+        }
+
+        // JMP to END
+        if (!isRetElseIfTrue)
+            BranchInst::Create(ifEnd, cgcontext.currentBlock());
+
+        cgcontext.popBlock();
+        cgcontext.pushBlock(elseIfFalse);
+        cgcontext.builder->SetInsertPoint(elseIfFalse);
+        //cgcontext.popBlock();
+    }
     bool isRetFalse = false;
     if (falseBlock != nullptr)
     {
@@ -1908,18 +1973,19 @@ llvm::Value *IfStatementNode::codegen(CodeGenContext &cgcontext) {
         }
     }
     // JMP to END
+    // TODO: fix this, breaks when not every branch returns
     if (!isRetFalse)
-    {
-        if (ifEnd == nullptr) ifEnd = BasicBlock::Create(*cgcontext.context, "", TheFunction, 0);
         BranchInst::Create(ifEnd, cgcontext.currentBlock());
+
+    // TODO: fixes "Use still stuck around after Def is destroyed" error, probably that's wrong way to do it, but IR looks ok
+    for (auto &elseif : *elseifNodes) {
+        cgcontext.popBlock();
     }
     cgcontext.popBlock();
+
     // Return END
-    if (!isRetTrue || !isRetFalse)
-    {
-        cgcontext.ret(ifEnd);
-        cgcontext.builder->SetInsertPoint(ifEnd);
-    }
+    cgcontext.ret(ifEnd);
+    cgcontext.builder->SetInsertPoint(ifEnd);
 
     return ifEnd;
 }

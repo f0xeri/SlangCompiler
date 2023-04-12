@@ -1902,9 +1902,14 @@ llvm::Value *IfStatementNode::codegen(CodeGenContext &cgcontext) {
     // Entering IF
     cgcontext.pushBlock(ifTrue);
     cgcontext.builder->SetInsertPoint(ifTrue);
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), trueBlock);
     bool isRetTrue = false;
+    DIFile* unit = cgcontext.debugBuilder->createFile(cgcontext.dbgInfo.compileUnit->getFilename(), cgcontext.dbgInfo.compileUnit->getDirectory());
     if (trueBlock != nullptr)
     {
+        // create lexical block for true block
+        auto dbgLexicalBlock = cgcontext.debugBuilder->createLexicalBlock(cgcontext.dbgInfo.lexicalBlocks.back(), unit, trueBlock->loc.line, trueBlock->loc.col);
+        cgcontext.dbgInfo.lexicalBlocks.push_back(dbgLexicalBlock);
         for (auto statement : *trueBlock->statements)
         {
             //if (isRetTrue) llvm::errs() << "[WARN] Code after return statement in block is unreachable.\n";
@@ -1915,13 +1920,11 @@ llvm::Value *IfStatementNode::codegen(CodeGenContext &cgcontext) {
                 break;
             }
         }
+        cgcontext.dbgInfo.lexicalBlocks.pop_back();
     }
 
     // JMP to END
-    if (!isRetTrue)
-    {
-        BranchInst::Create(ifEnd, cgcontext.currentBlock());
-    }
+    if (!isRetTrue) BranchInst::Create(ifEnd, cgcontext.currentBlock());
     cgcontext.popBlock();
 
     // Entering ELSE
@@ -1934,9 +1937,13 @@ llvm::Value *IfStatementNode::codegen(CodeGenContext &cgcontext) {
         BranchInst::Create(elseIfTrue, elseIfFalse, elseif->condExpr->codegen(cgcontext), cgcontext.currentBlock());
         cgcontext.pushBlock(elseIfTrue);
         cgcontext.builder->SetInsertPoint(elseIfTrue);
+
+        cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), elseif);
         bool isRetElseIfTrue = false;
         if (elseif->trueBlock != nullptr)
         {
+            auto dbgLexicalBlock = cgcontext.debugBuilder->createLexicalBlock(cgcontext.dbgInfo.lexicalBlocks.back(), unit, elseif->loc.line, elseif->loc.col);
+            cgcontext.dbgInfo.lexicalBlocks.push_back(dbgLexicalBlock);
             for (auto statement : *elseif->trueBlock->statements)
             {
                 //if (isRetElseIfTrue) llvm::errs() << "[WARN] Code after return statement in block is unreachable.\n";
@@ -1947,11 +1954,11 @@ llvm::Value *IfStatementNode::codegen(CodeGenContext &cgcontext) {
                     break;
                 }
             }
+            cgcontext.dbgInfo.lexicalBlocks.pop_back();
         }
 
         // JMP to END
-        if (!isRetElseIfTrue)
-            BranchInst::Create(ifEnd, cgcontext.currentBlock());
+        if (!isRetElseIfTrue) BranchInst::Create(ifEnd, cgcontext.currentBlock());
 
         cgcontext.popBlock();
         cgcontext.pushBlock(elseIfFalse);
@@ -1959,8 +1966,11 @@ llvm::Value *IfStatementNode::codegen(CodeGenContext &cgcontext) {
         //cgcontext.popBlock();
     }
     bool isRetFalse = false;
+    cgcontext.dbgInfo.emitLocation(cgcontext.builder.get(), falseBlock);
     if (falseBlock != nullptr)
     {
+        auto dbgLexicalBlock = cgcontext.debugBuilder->createLexicalBlock(cgcontext.dbgInfo.lexicalBlocks.back(), unit, falseBlock->loc.line, falseBlock->loc.col);
+        cgcontext.dbgInfo.lexicalBlocks.push_back(dbgLexicalBlock);
         for (auto statement : *falseBlock->statements)
         {
             //if (isRetFalse) llvm::errs() << "[WARN] Code after return statement in block is unreachable.\n";
@@ -1971,10 +1981,10 @@ llvm::Value *IfStatementNode::codegen(CodeGenContext &cgcontext) {
                 break;
             }
         }
+        cgcontext.dbgInfo.lexicalBlocks.pop_back();
     }
     // JMP to END
-    if (!isRetFalse)
-        BranchInst::Create(ifEnd, cgcontext.currentBlock());
+    if (!isRetFalse) BranchInst::Create(ifEnd, cgcontext.currentBlock());
 
     // TODO: fixes "Use still stuck around after Def is destroyed" error, probably that's wrong way to do it, but IR looks ok
     for (auto &elseif : *elseifNodes) {
@@ -2009,9 +2019,12 @@ llvm::Value *WhileStatementNode::codegen(CodeGenContext &cgcontext) {
     // Entering loop block
     cgcontext.pushBlock(whileIter);
     cgcontext.builder->SetInsertPoint(whileIter);
+    DIFile* unit = cgcontext.debugBuilder->createFile(cgcontext.dbgInfo.compileUnit->getFilename(), cgcontext.dbgInfo.compileUnit->getDirectory());
     bool isRet = false;
     if (block != nullptr)
     {
+        auto dbgLexicalBlock = cgcontext.debugBuilder->createLexicalBlock(cgcontext.dbgInfo.lexicalBlocks.back(), unit, block->loc.line, block->loc.col);
+        cgcontext.dbgInfo.lexicalBlocks.push_back(dbgLexicalBlock);
         for (auto statement : *block->statements)
         {
             //if (isRet) llvm::errs() << "[WARN] Code after return statement in block is unreachable.\n";
@@ -2022,6 +2035,7 @@ llvm::Value *WhileStatementNode::codegen(CodeGenContext &cgcontext) {
                 break;
             }
         }
+        cgcontext.dbgInfo.lexicalBlocks.pop_back();
     }
     // Jump back to condition checking
     if (!isRet)

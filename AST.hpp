@@ -14,22 +14,16 @@
 #include "llvm/IR/Value.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/ADT/APFloat.h"
-#include "llvm/IR/Module.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
-
-#include <llvm/IR/Value.h>
 #include <llvm/IR/Module.h>
-#include <llvm/IR/Function.h>
 #include <llvm/IR/Type.h>
-#include <llvm/IR/Verifier.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/CallingConv.h>
 #include <llvm/IR/IRPrintingPasses.h>
-#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/PassManager.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constants.h>
@@ -46,6 +40,9 @@
 #include <llvm/Pass.h>
 #include <llvm/Support/DynamicLibrary.h>
 #include <llvm/IR/DIBuilder.h>
+#include "llvm/Support/TargetRegistry.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Support/TargetSelect.h"
 
 #include "TokenType.hpp"
 
@@ -641,6 +638,7 @@ public:
     std::unique_ptr<std::vector<std::pair<std::string, DeclarationNode*>>> symbols;
     DebugInfo dbgInfo;
     llvm::Module* mModule;
+    llvm::TargetMachine* targetMachine;
     std::vector<CodeGenBlock*> blocks;
     std::map<std::string, StructType *> allocatedClasses;
     FuncDecStatementNode *currentFunc = nullptr;
@@ -659,6 +657,7 @@ public:
         mModule = new Module(moduleStatement->name->value, *context);
         mModule->setTargetTriple("x86_64-w64-windows-gnu");
         mModule->addModuleFlag(Module::Warning, "Debug Info Version", DEBUG_METADATA_VERSION);
+        targetMachine = initializeTargetMachine(mModule->getTargetTriple());
         dataLayout = std::make_unique<llvm::DataLayout>(mModule);
         this->isMainModule = isMainModule;
         moduleName = moduleStatement->name->value;
@@ -873,6 +872,27 @@ public:
             }
         }
         return nullptr;
+    }
+
+    llvm::TargetMachine* initializeTargetMachine(const std::string& targetTriple) {
+        LLVMInitializeX86TargetInfo();
+        LLVMInitializeX86Target();
+        LLVMInitializeX86TargetMC();
+        LLVMInitializeX86AsmPrinter();
+        std::string error;
+        const llvm::Target* target = llvm::TargetRegistry::lookupTarget(targetTriple, error);
+        if (!target) {
+            llvm::errs() << error;
+            return nullptr;
+        }
+
+        llvm::TargetOptions targetOptions;
+        llvm::TargetMachine* machine = target->createTargetMachine(targetTriple, "", "", targetOptions, llvm::Reloc::Model::PIC_, llvm::CodeModel::Small, llvm::CodeGenOpt::Aggressive);
+        if (!machine) {
+            llvm::errs() << "Failed to create target machine";
+            return nullptr;
+        }
+        return machine;
     }
 };
 

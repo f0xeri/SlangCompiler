@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.17)
 project(slangc)
 
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -W3")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -W4")
 #set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
 #set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
 #set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
@@ -9,7 +9,7 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -W3")
 set(CMAKE_CXX_STANDARD 20)
 #DEBUG
 message("Building in DEBUG mode.")
-set(LLVM-debug_DIR "D:\\Program Files (x86)\\LLVM-debug\\lib\\cmake\\llvm")
+set(LLVM-debug_DIR "C:\\Program Files (x86)\\LLVM-debug\\lib\\cmake\\llvm")
 find_package(LLVM-debug REQUIRED CONFIG)
 #RELEASE
 #message("Building in RELEASE mode.")
@@ -23,9 +23,9 @@ list(APPEND CMAKE_MODULE_PATH ${LLVM_DIR})
 
 add_definitions(${LLVM_DEFINITIONS})
 include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
-llvm_map_components_to_libnames(llvm_libs support core irreader TransformUtils)
+llvm_map_components_to_libnames(llvm_libs support core irreader TransformUtils Analysis Passes x86asmparser x86codegen x86desc x86info)
 
-add_executable(slangc main.cpp Lexer.hpp Lexer.cpp TokenType.hpp Logger.hpp Parser.cpp Parser.hpp AST.cpp AST.hpp Scope.hpp)
+add_executable(slangc main.cpp Lexer.hpp Lexer.cpp TokenType.hpp Logger.hpp Parser.cpp Parser.hpp AST.cpp AST.hpp Scope.hpp Optimizer.cpp Optimizer.hpp)
 target_link_libraries(slangc PRIVATE ${llvm_libs})
 
 #DEBUG

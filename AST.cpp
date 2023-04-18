@@ -482,7 +482,26 @@ llvm::Value *VariableExprNode::codegen(CodeGenContext &cgcontext) {
                 if (val->getType()->getPointerElementType()->getPointerElementType()->isStructTy())
                     return val;
     }
-    // check is it pointer to array
+
+    // if it's a "var" func param, load it
+    // example:
+    //     private procedure swap(var real a, var real b):
+    //        variable-real temp := a;  // real temp = *a;
+    //        let a := b;               // *a = *b;
+    //        let b := temp;            // *b = temp;
+    //    end swap;
+    auto varExpr = cgcontext.localsExprsLookup(value);
+    if (varExpr != nullptr) {
+        if (dynamic_cast<FuncParamDecStatementNode*>(varExpr) != nullptr) {
+            auto funcParam = dynamic_cast<FuncParamDecStatementNode*>(varExpr);
+            if (funcParam->parameterType == ParameterType::Var) {
+                if (val->getType()->getPointerElementType()->isPointerTy()) {
+                    type = val->getType()->getPointerElementType()->getPointerElementType();
+                    val = cgcontext.builder->CreateLoad(val);
+                }
+            }
+        }
+    }
     return new LoadInst(type, val, "", false, cgcontext.currentBlock());
 }
 
@@ -874,17 +893,6 @@ llvm::Value *AssignExprNode::codegen(CodeGenContext &cgcontext) {
     if (dynamic_cast<IndexesExprNode*>(left) != nullptr)
     {
         auto indexesExpr = dynamic_cast<IndexesExprNode*>(left);
-        /*auto arrExpr = dynamic_cast<ArrayDecStatementNode*>(varExpr);
-        if (arrExpr == nullptr) {
-            auto field = dynamic_cast<FieldArrayVarDecNode *>(varExpr);
-            if (field != nullptr) arrExpr = field->var;
-        }
-        if (arrExpr == nullptr) {
-            //llvm::errs() << "[ERROR] Variable \"" << left->value << "\" is not an array.\n";
-        }
-        if (arrExpr->indicesCount > indexesExpr->indexes->size()) {
-            //llvm::errs() << "[ERROR] Too much indexes in expression. (\"" << left->value << "\")n";
-        }*/
         auto loadArr = cgcontext.builder->CreateLoad(var);
         llvm::Value *elementPtr = nullptr;
         for (int i = 0; i < indexesExpr->indexes->size(); i++) {

@@ -6,9 +6,9 @@
 
 void Optimizer::addOptimizationPasses(llvm::PassManagerBase &passes, llvm::legacy::FunctionPassManager &funPasses) {
     llvm::PassManagerBuilder builder;
-    builder.OptLevel = 3;
-    builder.SizeLevel = 0;
-    builder.Inliner = llvm::createFunctionInliningPass(3, 0, false);
+    builder.OptLevel = optLevel;
+    builder.SizeLevel = optLevel;
+    builder.Inliner = llvm::createFunctionInliningPass(optLevel, optLevel, false);
     builder.LoopVectorize = true;
     builder.SLPVectorize = true;
     machine->adjustPassManager(builder);
@@ -20,7 +20,7 @@ void Optimizer::addOptimizationPasses(llvm::PassManagerBase &passes, llvm::legac
 void Optimizer::addLinkPasses(llvm::PassManagerBase &passes) {
     llvm::PassManagerBuilder builder;
     builder.VerifyInput = true;
-    builder.Inliner = llvm::createFunctionInliningPass(3, 0, false);
+    builder.Inliner = llvm::createFunctionInliningPass(optLevel, optLevel, false);
     builder.populateLTOPassManager(passes);
 }
 

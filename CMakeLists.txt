@@ -25,7 +25,7 @@ add_definitions(${LLVM_DEFINITIONS})
 include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
 llvm_map_components_to_libnames(llvm_libs support core irreader TransformUtils Analysis Passes x86asmparser x86codegen x86desc x86info)
 
-add_executable(slangc main.cpp Lexer.hpp Lexer.cpp TokenType.hpp Logger.hpp Parser.cpp Parser.hpp AST.cpp AST.hpp Scope.hpp Optimizer.cpp Optimizer.hpp)
+add_executable(slangc main.cpp Lexer.hpp Lexer.cpp TokenType.hpp Logger.hpp Parser.cpp Parser.hpp AST.cpp AST.hpp Scope.hpp Optimizer.cpp Optimizer.hpp CompilerOptions.hpp)
 target_link_libraries(slangc PRIVATE ${llvm_libs})
 
 #DEBUG

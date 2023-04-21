@@ -16,11 +16,12 @@
 class Optimizer {
     llvm::Module *mModule;
     llvm::TargetMachine *machine;
+    int optLevel = 0;
     void addOptimizationPasses(llvm::PassManagerBase &passes,  llvm::legacy::FunctionPassManager &funPasses);
     void addLinkPasses(llvm::legacy::PassManagerBase &passes);
 
 public:
-    explicit Optimizer(llvm::Module *mModule, llvm::TargetMachine *machine) : mModule(mModule), machine(machine) {};
+    explicit Optimizer(llvm::Module *mModule, llvm::TargetMachine *machine, int optLevel) : mModule(mModule), machine(machine), optLevel(optLevel) {};
     void optimize();
 };
 

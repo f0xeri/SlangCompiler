@@ -211,6 +211,12 @@ DIType* getDbgTypeFromExprNode(CodeGenContext &cgcontext, ExprNode* node, Parame
         }
         retTypeName = arrExpr->type + "Array";
     }
+    else if (dynamic_cast<FuncExprNode*>(node) != nullptr)
+    {
+        auto exprNode = dynamic_cast<FuncExprNode*>(node);
+        auto dbgRetFuncType = getDbgTypeFromExprNode(cgcontext, exprNode->type);
+        retType = cgcontext.debugBuilder->createPointerType(dbgRetFuncType, dbgRetFuncType->getSizeInBits(), dbgRetFuncType->getAlignInBits());
+    }
     return retType;
 }
 

@@ -2,6 +2,7 @@ import f2;
 module funcPointers
     public procedure testProc(out function(in integer, in integer): integer func):
         output func(1, 2);
+        output "\n";
     end testProc;
 
     public function testFunc(in integer x, in integer y): integer
@@ -60,10 +61,11 @@ start
     variable-function(in integer): integer funcPointer2;
     variable-function(in real): integer funcPointer3;
     variable-function(): integer funcPointer4;
-    output "~~~";
+
     variable-procedure(out function(in integer, in integer): integer) procPointer5 := testProc;
     let funcPointer := testFunc;
     call procPointer5(funcPointer);
+    output "~~~\n";
     let funcPointer := testFunc2;
     // TODO: fix bug - CallExprNode codegen can't find funcPointer declaration
     call procPointer5(funcPointer);

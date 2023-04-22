@@ -10,9 +10,9 @@ void Parser::parse()
     {
         for (auto &decl : module->currentScope->symbols)
         {
-            if (dynamic_cast<FuncDecStatementNode*>(decl.second) != nullptr)
+            if (decl.second->isA<FuncDecStatementNode>())
             {
-                auto func = dynamic_cast<FuncDecStatementNode*>(decl.second);
+                auto func = decl.second->as<FuncDecStatementNode>();
                 if (!func->isPrivate)
                 {
                     auto declFunc = new FuncDecStatementNode(*func);
@@ -20,18 +20,18 @@ void Parser::parse()
                     currentScope->insert(declFunc);
                 }
             }
-            else if (dynamic_cast<TypeDecStatementNode*>(decl.second) != nullptr)
+            else if (decl.second->isA<TypeDecStatementNode>())
             {
-                auto var = dynamic_cast<TypeDecStatementNode*>(decl.second);
+                auto var = decl.second->as<TypeDecStatementNode>();
                 for (auto &method : *var->methods)
                 {
                     method->block = nullptr;
                 }
                 currentScope->insert(var);
             }
-            else if (dynamic_cast<ExternFuncDecStatementNode*>(decl.second) != nullptr)
+            else if (decl.second->isA<ExternFuncDecStatementNode>())
             {
-                auto func = dynamic_cast<ExternFuncDecStatementNode*>(decl.second);
+                auto func = decl.second->as<ExternFuncDecStatementNode>();
                 if (!func->isPrivate)
                 {
                     auto declFunc = new ExternFuncDecStatementNode(*func);
@@ -39,9 +39,9 @@ void Parser::parse()
                     currentScope->insert(declFunc);
                 }
             }
-            else if (dynamic_cast<VarDecStatementNode*>(decl.second) != nullptr)
+            else if (decl.second->isA<VarDecStatementNode>())
             {
-                auto var = dynamic_cast<VarDecStatementNode*>(decl.second);
+                auto var = decl.second->as<VarDecStatementNode>();
                 if (!var->isPrivate)
                 {
                     auto declVar = new VarDecStatementNode(*var);
@@ -49,9 +49,9 @@ void Parser::parse()
                     currentScope->insert(declVar);
                 }
             }
-            else if (dynamic_cast<ArrayDecStatementNode*>(decl.second) != nullptr)
+            else if (decl.second->isA<ArrayDecStatementNode>())
             {
-                auto var = dynamic_cast<ArrayDecStatementNode*>(decl.second);
+                auto var = decl.second->as<ArrayDecStatementNode>();
                 if (!var->isPrivate)
                 {
                     auto declVar = new ArrayDecStatementNode(*var);
@@ -59,9 +59,9 @@ void Parser::parse()
                     currentScope->insert(declVar);
                 }
             }
-            else if (dynamic_cast<FuncPointerStatementNode*>(decl.second) != nullptr)
+            else if (decl.second->isA<FuncPointerStatementNode>())
             {
-                auto var = dynamic_cast<FuncPointerStatementNode*>(decl.second);
+                auto var = decl.second->as<FuncPointerStatementNode>();
                 if (!var->isPrivate)
                 {
                     auto declVar = new FuncPointerStatementNode(*var);
@@ -251,8 +251,9 @@ DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, 
                 {
                     advance();
                     type = parseTypeName(arrType);
-                    auto typeStatement = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(type));
-                    if (typeStatement == nullptr)
+                    //auto typeStatement = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(type));
+                    //if (typeStatement == nullptr)
+                    if ((currentScope->lookup(type))->isA<TypeDecStatementNode>())
                     {
                         llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Unknown type \"" << type << "\".\n";
                         hasError = true;
@@ -417,17 +418,17 @@ MethodDecNode* Parser::parseMethodDecl(std::vector<MethodDecNode*> *methods, std
                 {
                     auto left = (*argIt)->type;
                     auto right = params->at(i)->type;
-                    if (dynamic_cast<VariableExprNode*>(left) != nullptr && dynamic_cast<VariableExprNode*>(right) != nullptr)
+                    if (left->isA<VariableExprNode>() && right->isA<VariableExprNode>())
                     {
-                        if (dynamic_cast<VariableExprNode*>(left)->value != dynamic_cast<VariableExprNode*>(right)->value)
+                        if (left->as<VariableExprNode>()->value != right->as<VariableExprNode>()->value)
                         {
                             argsEqual = false;
                         }
                     }
-                    else if (dynamic_cast<ArrayExprNode*>(left) != nullptr && dynamic_cast<ArrayExprNode*>(right) != nullptr)
+                    else if (left->isA<ArrayExprNode>() && right->isA<ArrayExprNode>())
                     {
-                        auto larr = dynamic_cast<ArrayExprNode*>(left);
-                        auto rarr = dynamic_cast<ArrayExprNode*>(right);
+                        auto larr = left->as<ArrayExprNode>();
+                        auto rarr = right->as<ArrayExprNode>();
                         if (getArrayFinalType(larr) != getArrayFinalType(rarr))
                         {
                             argsEqual = false;
@@ -499,7 +500,7 @@ bool Parser::parseTypeDecl() {
                 if (decl == nullptr) decl = currentScope->lookup(mainModuleNode->name->value + "." + token.data);
                 if (decl != nullptr)
                 {
-                    parent = dynamic_cast<TypeDecStatementNode*>(decl);
+                    parent = decl->as<TypeDecStatementNode>();
                     if (parent != nullptr)
                     {
                         if (parent->fields != nullptr)
@@ -540,15 +541,15 @@ bool Parser::parseTypeDecl() {
                                 {
                                     for (auto &statement : *method->block->statements)
                                     {
-                                        if (dynamic_cast<FieldVarDecNode*>(statement) != nullptr)
+                                        if (statement->isA<FieldVarDecNode>())
                                         {
-                                            auto pFieldVar = dynamic_cast<FieldVarDecNode*>(statement);
+                                            auto pFieldVar = statement->as<FieldVarDecNode>();
                                             auto fieldVarDec = new FieldVarDecNode(statement->loc, name, new VariableExprNode(statement->loc, pFieldVar->name->value), pFieldVar->isPrivate, pFieldVar->type, pFieldVar->expr, pFieldVar->index);
                                             newStatements->push_back(fieldVarDec);
                                         }
-                                        else if (dynamic_cast<FieldArrayVarDecNode*>(statement) != nullptr)
+                                        else if (statement->isA<FieldArrayVarDecNode>())
                                         {
-                                            auto pFieldArrVar = dynamic_cast<FieldArrayVarDecNode*>(statement);
+                                            auto pFieldArrVar = statement->as<FieldArrayVarDecNode>();
                                             auto fieldArrVarDec = new FieldArrayVarDecNode(statement->loc, name, new VariableExprNode(statement->loc, pFieldArrVar->name->value), pFieldArrVar->isPrivate, pFieldArrVar->var, pFieldArrVar->index);
                                             newStatements->push_back(fieldArrVarDec);
                                         }
@@ -629,7 +630,7 @@ bool Parser::parseTypeDecl() {
                             //constructorStatements->push_back(new AssignExprNode());
                             for (auto field : *fields)
                             {
-                                if (dynamic_cast<FieldVarDecNode*>(field) != nullptr || dynamic_cast<FieldArrayVarDecNode*>(field) != nullptr)
+                                if (field->isA<FieldVarDecNode>() || field->isA<FieldArrayVarDecNode>())
                                 {
                                     constructorStatements->push_back(field);
                                 }
@@ -643,28 +644,28 @@ bool Parser::parseTypeDecl() {
                             auto constructor = *constructorExists;
                             for (auto field : *fields)
                             {
-                                if (dynamic_cast<FieldVarDecNode*>(field) != nullptr || dynamic_cast<FieldArrayVarDecNode*>(field) != nullptr)
+                                if (field->isA<FieldVarDecNode>() || field->isA<FieldArrayVarDecNode>())
                                 {
                                     auto fieldExists = std::find_if(constructor->block->statements->begin(), constructor->block->statements->end(), [&field](StatementNode *statement) {
-                                        if (dynamic_cast<FieldVarDecNode*>(statement) != nullptr)
+                                        if (statement->isA<FieldVarDecNode>())
                                         {
-                                            return field->name->value == dynamic_cast<FieldVarDecNode*>(statement)->name->value;
+                                            return field->name->value == statement->as<FieldVarDecNode>()->name->value;
                                         }
-                                        else if (dynamic_cast<FieldArrayVarDecNode*>(statement) != nullptr)
+                                        else if (statement->isA<FieldArrayVarDecNode>())
                                         {
-                                            return field->name->value == dynamic_cast<FieldArrayVarDecNode*>(statement)->name->value;
+                                            return field->name->value == statement->as<FieldArrayVarDecNode>()->name->value;
                                         }
                                         return false;
                                     });
                                     if (fieldExists == constructor->block->statements->end())
                                     {
-                                        if (dynamic_cast<FieldVarDecNode*>(field) != nullptr)
+                                        if (field->isA<FieldVarDecNode>())
                                         {
-                                            dynamic_cast<FieldVarDecNode*>(field)->index += parent->fields->size();
+                                            field->as<FieldVarDecNode>()->index += parent->fields->size();
                                         }
-                                        else if (dynamic_cast<FieldArrayVarDecNode*>(field) != nullptr)
+                                        else if (field->isA<FieldArrayVarDecNode>())
                                         {
-                                            dynamic_cast<FieldArrayVarDecNode*>(field)->index += parent->fields->size();
+                                            field->as<FieldArrayVarDecNode>()->index += parent->fields->size();
                                         }
                                         constructor->block->statements->push_back(field);
                                     }
@@ -908,7 +909,7 @@ StatementNode* Parser::parseVarOrCall() {
         }
         if (!dotModule)
         {
-            type = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(name));
+            type = (currentScope->lookup(name))->as<TypeDecStatementNode>();
             if (type != nullptr) dotClass = true;
         }
         if (!dotModule && !dotClass)
@@ -925,14 +926,13 @@ StatementNode* Parser::parseVarOrCall() {
                 }
             }
 
-            if (dynamic_cast<VarDecStatementNode*>(var) != nullptr)
-                type = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(dynamic_cast<VarDecStatementNode*>(var)->type));
-            else if (dynamic_cast<FuncParamDecStatementNode*>(var) != nullptr) {
-                auto funcParamVar = dynamic_cast<FuncParamDecStatementNode*>(var);
-                auto typeString = dynamic_cast<VariableExprNode*>(funcParamVar->type)->value;
-                type = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(typeString));
+            if (var->isA<VarDecStatementNode>())
+                type = (currentScope->lookup(var->as<VarDecStatementNode>()->type))->as<TypeDecStatementNode>();
+            else if (var->isA<FuncParamDecStatementNode>()) {
+                auto funcParamVar = var->as<FuncParamDecStatementNode>();
+                auto typeString = (funcParamVar->type)->as<VariableExprNode>()->value;
+                type = (currentScope->lookup(typeString))->as<TypeDecStatementNode>();
             }
-
 
             if (type != nullptr)
             {
@@ -954,24 +954,24 @@ StatementNode* Parser::parseVarOrCall() {
 
                 auto var = moduleP->currentScope->lookup(name);
                 // check is private
-                if (dynamic_cast<VarDecStatementNode*>(var) != nullptr)
+                if (var->isA<VarDecStatementNode>())
                 {
-                    if (dynamic_cast<VarDecStatementNode*>(var)->isPrivate && moduleP->mainModuleNode->name->value != mainModuleNode->name->value)
+                    if (var->as<VarDecStatementNode>()->isPrivate && moduleP->mainModuleNode->name->value != mainModuleNode->name->value)
                     {
                         llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Cannot access private variable " << name << ".\n";
                         hasError = true;
                     }
                 }
-                else if (dynamic_cast<FuncDecStatementNode*>(var) != nullptr) {
-                    if (dynamic_cast<FuncDecStatementNode*>(var)->isPrivate && moduleP->mainModuleNode->name->value != mainModuleNode->name->value)
+                else if (var->isA<FuncDecStatementNode>()) {
+                    if ((var)->as<FuncDecStatementNode>()->isPrivate && moduleP->mainModuleNode->name->value != mainModuleNode->name->value)
                     {
                         llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Cannot access private function " << name << ".\n";
                         hasError = true;
                     }
                 }
-                else if (dynamic_cast<ExternFuncDecStatementNode*>(var) != nullptr)
+                else if (var->isA<ExternFuncDecStatementNode>())
                 {
-                    if (dynamic_cast<ExternFuncDecStatementNode*>(var)->isPrivate && moduleP->mainModuleNode->name->value != mainModuleNode->name->value)
+                    if ((var)->as<ExternFuncDecStatementNode>()->isPrivate && moduleP->mainModuleNode->name->value != mainModuleNode->name->value)
                     {
                         llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Cannot access private extern function " << name << ".\n";
                         hasError = true;
@@ -992,9 +992,9 @@ StatementNode* Parser::parseVarOrCall() {
                 {
                     name += "." + token.data;
                     fieldExists = true;
-                    if (dynamic_cast<FieldVarDecNode*>(field) != nullptr)
+                    if (field->isA<FieldVarDecNode>())
                     {
-                        auto f = dynamic_cast<FieldVarDecNode*>(field);
+                        auto f = field->as<FieldVarDecNode>();
                         fieldIndex = f->index;
                         if (f->isPrivate && type->name->value != currentParsingTypeName)
                         {
@@ -1002,9 +1002,9 @@ StatementNode* Parser::parseVarOrCall() {
                             hasError = true;
                         }
                     }
-                    else if (dynamic_cast<FieldArrayVarDecNode*>(field)) {
-                        fieldIndex = dynamic_cast<FieldArrayVarDecNode*>(field)->index;
-                        fieldArray = dynamic_cast<FieldArrayVarDecNode*>(field);
+                    else if (field->isA<FieldArrayVarDecNode>()) {
+                        fieldIndex = field->as<FieldArrayVarDecNode>()->index;
+                        fieldArray = field->as<FieldArrayVarDecNode>();
                     }
                     break;
                 }
@@ -1058,7 +1058,7 @@ StatementNode* Parser::parseVarOrCall() {
             //}
 
             if (fieldArray != nullptr) {
-                type = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(getArrayFinalType(fieldArray->var->expr)));
+                type = (currentScope->lookup(getArrayFinalType(fieldArray->var->expr)))->as<TypeDecStatementNode>();
             }
             else {
                 auto var = currentScope->lookup(name);
@@ -1072,7 +1072,7 @@ StatementNode* Parser::parseVarOrCall() {
                         return nullptr;
                     }
                 }
-                type = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(getArrayFinalType(dynamic_cast<ArrayDecStatementNode *>(var)->expr)));
+                type = (currentScope->lookup(getArrayFinalType((var)->as<ArrayDecStatementNode>()->expr)))->as<TypeDecStatementNode>();
             }
             if (type != nullptr) dotClass = true;
             if (dotClass)
@@ -1083,8 +1083,8 @@ StatementNode* Parser::parseVarOrCall() {
                     {
                         name += "." + token.data;
                         fieldExists = true;
-                        if (dynamic_cast<FieldVarDecNode*>(field) != nullptr) fieldIndex = dynamic_cast<FieldVarDecNode*>(field)->index;
-                        else if (dynamic_cast<FieldArrayVarDecNode*>(field)) fieldIndex = dynamic_cast<FieldArrayVarDecNode*>(field)->index;
+                        if (field->isA<FieldVarDecNode>()) fieldIndex = (field)->as<FieldVarDecNode>()->index;
+                        else if (field->isA<FieldArrayVarDecNode>()) fieldIndex = (field)->as<FieldArrayVarDecNode>()->index;
                         break;
                     }
                 }
@@ -1144,46 +1144,46 @@ StatementNode* Parser::parseVarOrCall() {
     }
     auto funcDecl = currentScope->lookup(name);
 
-    if (dynamic_cast<FuncDecStatementNode*>(funcDecl) != nullptr) {
-        funcDecl = dynamic_cast<FuncDecStatementNode*>(funcDecl);
+    if (funcDecl->isA<FuncDecStatementNode>()) {
+        funcDecl = funcDecl->as<FuncDecStatementNode>();
     }
-    else if (dynamic_cast<ExternFuncDecStatementNode*>(funcDecl) != nullptr) {
-        funcDecl = dynamic_cast<ExternFuncDecStatementNode*>(funcDecl);
+    else if (funcDecl->isA<ExternFuncDecStatementNode>()) {
+        funcDecl = funcDecl->as<ExternFuncDecStatementNode>();
     }
-    else if (dynamic_cast<FuncPointerStatementNode*>(funcDecl) != nullptr) {
-        funcDecl = dynamic_cast<FuncPointerStatementNode*>(funcDecl);
+    else if (funcDecl->isA<FuncPointerStatementNode>()) {
+        funcDecl = funcDecl->as<FuncPointerStatementNode>();
     }
-    if (dynamic_cast<FuncDecStatementNode*>(funcDecl) != nullptr)
+    if (funcDecl->isA<FuncDecStatementNode>())
     {
-        if (params->size() == dynamic_cast<FuncDecStatementNode*>(funcDecl)->args->size()) {
+        if (params->size() == (funcDecl)->as<FuncDecStatementNode>()->args->size()) {
             int i = 0;
             while (i < params->size()) {
-                if (dynamic_cast<NilExprNode*>(params->at(i)) != nullptr) {
-                    dynamic_cast<NilExprNode*>(params->at(i))->type = dynamic_cast<ExternFuncDecStatementNode*>(funcDecl)->args->at(i)->type;
+                if ((params->at(i))->isA<NilExprNode>()) {
+                    (params->at(i))->as<NilExprNode>()->type = (funcDecl)->as<ExternFuncDecStatementNode>()->args->at(i)->type;
                 }
                 i++;
             }
         }
     }
-    else if (dynamic_cast<ExternFuncDecStatementNode*>(funcDecl) != nullptr)
+    else if (funcDecl->isA<ExternFuncDecStatementNode>())
     {
-        if (params->size() == dynamic_cast<ExternFuncDecStatementNode*>(funcDecl)->args->size()) {
+        if (params->size() == (funcDecl)->as<ExternFuncDecStatementNode>()->args->size()) {
             int i = 0;
             while (i < params->size()) {
-                if (dynamic_cast<NilExprNode*>(params->at(i)) != nullptr) {
-                    dynamic_cast<NilExprNode*>(params->at(i))->type = dynamic_cast<ExternFuncDecStatementNode*>(funcDecl)->args->at(i)->type;
+                if ((params->at(i))->isA<NilExprNode>()) {
+                    (params->at(i))->as<NilExprNode>()->type = (funcDecl)->as<ExternFuncDecStatementNode>()->args->at(i)->type;
                 }
                 i++;
             }
         }
     }
-    else if (dynamic_cast<FuncPointerStatementNode*>(funcDecl) != nullptr)
+    else if (funcDecl->isA<FuncPointerStatementNode>())
     {
-        if (params->size() == dynamic_cast<FuncPointerStatementNode*>(funcDecl)->args->size()) {
+        if (params->size() == (funcDecl)->as<FuncPointerStatementNode>()->args->size()) {
             int i = 0;
             while (i < params->size()) {
-                if (dynamic_cast<NilExprNode*>(params->at(i)) != nullptr) {
-                    dynamic_cast<NilExprNode*>(params->at(i))->type = dynamic_cast<FuncPointerStatementNode*>(funcDecl)->args->at(i)->type;
+                if ((params->at(i))->isA<NilExprNode>()) {
+                    (params->at(i))->as<NilExprNode>()->type = (funcDecl)->as<ExternFuncDecStatementNode>()->args->at(i)->type;
                 }
                 i++;
             }
@@ -1282,7 +1282,7 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
                 {
                     advance();
                     type = parseTypeName(arrType);
-                    auto typeStatement = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(type));
+                    auto typeStatement = (currentScope->lookup(type))->as<TypeDecStatementNode>();
                     if (typeStatement == nullptr)
                     {
                         llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Unknown type \"" << type << "\".\n";
@@ -1330,7 +1330,7 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
     else
     {
         type = parseTypeName(type);
-        auto typeStatement = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(type));
+        auto typeStatement = (currentScope->lookup(type))->as<TypeDecStatementNode>();
         if (typeStatement == nullptr)
         {
             llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Unknown type \"" << type << "\".\n";
@@ -1356,7 +1356,7 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
     }
     if (isGlobal && !isExtern) name = mainModuleNode->name->value + "." + name;
     if (isArray) {
-        result = new ArrayDecStatementNode(loc, new VariableExprNode(loc, name), dynamic_cast<ArrayExprNode*>(expr), isGlobal, indicesCount, isPrivate, isExtern);
+        result = new ArrayDecStatementNode(loc, new VariableExprNode(loc, name), expr->as<ArrayExprNode>(), isGlobal, indicesCount, isPrivate, isExtern);
     }
     else if (isFuncPointer) {
         result = new FuncPointerStatementNode(loc, funcType, new VariableExprNode(loc, name), isFunction, isGlobal, args, expr, isPrivate, isExtern);
@@ -1423,8 +1423,8 @@ DeclarationNode *Parser::parseFunctionDecl() {
 
     currentScope->insert(function);
     block = parseBlock(new VariableExprNode(loc, name), params);
-    if (dynamic_cast<ExternFuncDecStatementNode*>(function)) dynamic_cast<ExternFuncDecStatementNode*>(function)->block = block;
-    else if (dynamic_cast<FuncDecStatementNode*>(function)) dynamic_cast<FuncDecStatementNode*>(function)->block = block;
+    if (function->isA<ExternFuncDecStatementNode>()) (function)->as<ExternFuncDecStatementNode>()->block = block;
+    else if (function->isA<FuncDecStatementNode>()) (function)->as<FuncDecStatementNode>()->block = block;
 
     if (token.type != TokenType::Semicolon)
     {
@@ -1573,13 +1573,13 @@ AssignExprNode *Parser::parseAssignStatement() {
     //token = *tokensIterator;
     consume(TokenType::Assign);
     auto expr = parseExpression();
-    if (dynamic_cast<VariableExprNode *>(varName) != nullptr)
+    if (varName->isA<VariableExprNode>())
     {
-        return new AssignExprNode(loc, dynamic_cast<VariableExprNode *>(varName), expr);
+        return new AssignExprNode(loc, varName->as<VariableExprNode>(), expr);
     }
-    else if (dynamic_cast<IndexExprNode *>(varName) != nullptr)
+    else if (varName->isA<IndexExprNode>())
     {
-        return new AssignExprNode(loc, dynamic_cast<IndexExprNode *>(varName), expr);
+        return new AssignExprNode(loc, varName->as<IndexExprNode>(), expr);
     }
     expect(TokenType::Semicolon);
     return nullptr;
@@ -1612,13 +1612,13 @@ CallExprNode *Parser::parseCall() {
         hasError = true;
         return nullptr;
     }
-    else if (dynamic_cast<CallExprNode *>(callExpr) == nullptr)
+    else if (!callExpr->isA<CallExprNode>())
     {
-        llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") " << dynamic_cast<VariableExprNode *>(callExpr)->value << " is not a function.\n";
+        llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") " << callExpr->as<VariableExprNode>()->value << " is not a function.\n";
         hasError = true;
     }
     expect(TokenType::Semicolon);
-    return dynamic_cast<CallExprNode *>(callExpr);
+    return callExpr->as<CallExprNode>();
 }
 
 DeleteExprNode *Parser::parseDelete() {

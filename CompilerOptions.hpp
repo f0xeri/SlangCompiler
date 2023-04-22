@@ -43,6 +43,10 @@ public:
                 llvm::cl::Positional, llvm::cl::desc("<input files>"), llvm::cl::OneOrMore,
                 llvm::cl::cat(options));
 
+        llvm::cl::opt<std::string> Define(
+                "D", llvm::cl::desc("Define macro"), llvm::cl::value_desc("macro"),
+                llvm::cl::Prefix, llvm::cl::cat(options));
+
         cl::HideUnrelatedOptions(options);
         cl::SetVersionPrinter([](raw_ostream &OS) {
             OS << "Slangc LLVM compiler version 1.0\n";

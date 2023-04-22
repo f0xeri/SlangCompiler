@@ -79,8 +79,18 @@ class Node
 {
 public:
     SourceLoc loc{};
-    Node(SourceLoc loc) : loc(loc) {}
+    explicit Node(SourceLoc loc) : loc(loc) {}
     virtual llvm::Value *codegen(CodeGenContext &cgcontext) = 0;
+
+    template<typename T>
+    [[nodiscard]] bool isA() const {
+        return dynamic_cast<const T*>(this) != nullptr;
+    }
+
+    template<typename T>
+    T* as() {
+        return dynamic_cast<T*>(this);
+    }
 };
 
 class ExprNode : public Node

@@ -12,6 +12,7 @@ void printModuleToFile(llvm::Module *module, const std::string& filename) {
 }
 
 std::string join(const std::vector<std::string>& vec, const std::string& delimiter, const std::string& prefix = "") {
+    if (vec.empty()) return "";
     std::string result;
     result.reserve(vec.size() * (prefix.size() + delimiter.size()) + prefix.size() + vec.back().size());
     for (auto& elem : vec) {
@@ -40,7 +41,8 @@ int main(int argc, char **argv) {
     CodeGenContext codeGenContext(parser.mainModuleNode, true, parser.currentScope->symbols);
     codeGenContext.generateCode(parser.mainModuleNode);
     if (DEBUG) codeGenContext.mModule->print(llvm::dbgs(), nullptr);
-    printModuleToFile(codeGenContext.mModule, mainFilename + ".ll");
+    std::string sourceFilename = mainFilename.substr(0, mainFilename.find_last_of('.'));
+    printModuleToFile(codeGenContext.mModule, sourceFilename + ".ll");
     Optimizer optimizer(codeGenContext.mModule, codeGenContext.targetMachine, options.getOptimizationLevel());
     optimizer.optimize();
     printModuleToFile(codeGenContext.mModule, mainFilename + "_optimized" + ".ll");

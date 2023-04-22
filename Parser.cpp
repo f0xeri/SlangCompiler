@@ -251,9 +251,8 @@ DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, 
                 {
                     advance();
                     type = parseTypeName(arrType);
-                    //auto typeStatement = dynamic_cast<TypeDecStatementNode*>(currentScope->lookup(type));
-                    //if (typeStatement == nullptr)
-                    if ((currentScope->lookup(type))->isA<TypeDecStatementNode>())
+                    auto typeStatement = (currentScope->lookup(type))->as<TypeDecStatementNode>();
+                    if (typeStatement == nullptr)
                     {
                         llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Unknown type \"" << type << "\".\n";
                         hasError = true;
@@ -1159,7 +1158,7 @@ StatementNode* Parser::parseVarOrCall() {
             int i = 0;
             while (i < params->size()) {
                 if ((params->at(i))->isA<NilExprNode>()) {
-                    (params->at(i))->as<NilExprNode>()->type = (funcDecl)->as<ExternFuncDecStatementNode>()->args->at(i)->type;
+                    (params->at(i))->as<NilExprNode>()->type = (funcDecl)->as<FuncDecStatementNode>()->args->at(i)->type;
                 }
                 i++;
             }
@@ -1183,7 +1182,7 @@ StatementNode* Parser::parseVarOrCall() {
             int i = 0;
             while (i < params->size()) {
                 if ((params->at(i))->isA<NilExprNode>()) {
-                    (params->at(i))->as<NilExprNode>()->type = (funcDecl)->as<ExternFuncDecStatementNode>()->args->at(i)->type;
+                    (params->at(i))->as<NilExprNode>()->type = (funcDecl)->as<FuncPointerStatementNode>()->args->at(i)->type;
                 }
                 i++;
             }

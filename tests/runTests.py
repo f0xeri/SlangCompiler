@@ -12,7 +12,7 @@ class ArraysTest(unittest.TestCase):
         with open(f"{test_name}.txt", "r") as f:
             expected_program_output = f.read()
         test = SuccessCompilationTest(SLANGC_PATH, test_name,
-                                      f"{test_name}.sl -o {test_name}.exe -lgc-lib",
+                                      f"{test_name}.sl -o {test_name}.exe -lgc",
                                       f"{test_name}.exe",
                                       f"[INFO] Compiling module \"{test_name}\"...\n[INFO] Linking...\n",
                                       expected_program_output)

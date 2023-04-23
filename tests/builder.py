@@ -14,8 +14,8 @@ class FailCompilationTest:
         self.errs = ""
 
     def compile_test(self):
-        cmd = self.slangc_path + " " + self.args
-        print("Running: " + cmd)
+        cmd = [self.slangc_path] + self.args.split(" ")
+        print("Building: " + str(cmd))
         r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         self.outs = r.stdout.decode("utf-8", errors="ignore")
         self.errs = r.stderr.decode("utf-8", errors="ignore")
@@ -45,15 +45,17 @@ class SuccessCompilationTest:
         self.program_outs = ""
 
     def compile_test(self):
-        cmd = self.slangc_path + " " + self.args
-        print("Building: " + cmd)
+        cmd = [self.slangc_path] + self.args.split(" ")
+        print("Building: " + str(cmd))
         r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         self.outs = r.stdout.decode("utf-8", errors="ignore")
         self.errs = r.stderr.decode("utf-8", errors="ignore")
+        print(self.outs)
+        print(self.errs)
 
     def run_compiled(self):
-        cmd = self.output_executable
-        print("Running: " + cmd)
+        cmd = os.getcwd() + "/" + self.output_executable
+        print("Running: " + str(cmd))
         r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         self.program_outs = r.stdout.decode("utf-8", errors="ignore")
         self.program_outs = self.program_outs.replace("\r\n", "\n")

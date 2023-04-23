@@ -75,7 +75,7 @@ int main(int argc, char **argv) {
     std::string clangCall = mingw64path + "\\bin\\clang " + filenamesString + " -static-libgcc -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive -Wl,-Bdynamic " + libs + " -o " + options.getOutputFileName();
     system(clangCall.c_str());
 #elif __linux__
-    std::string clangCall = "clang " + filenamesString + "-static-libgcc " + libs + " -o " + options.getOutputFileName();
+    std::string clangCall = "clang-13 " + filenamesString + "-static-libgcc " + libs + " -o " + options.getOutputFileName();
     system(clangCall.c_str());
 #endif
     return 0;

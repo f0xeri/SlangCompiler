@@ -1,4 +1,7 @@
-teststr
+str = test str
+str = test str updated
+globalStr = global test string
+globalStr = globalStr updated
 ~~~
 A class
 i2 = 1, f = 1.100000

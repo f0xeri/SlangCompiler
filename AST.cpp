@@ -1369,29 +1369,38 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
     else
         var = cgcontext.locals()[name->value];
 
-    auto elementSize = ConstantInt::get(int32type, cgcontext.dataLayout->getTypeAllocSize(finalType));
-    auto allocSize = BinaryOperator::Create(Instruction::Mul, elementSize, arraySize, "", cgcontext.currentBlock());
-    // GC_malloc
-    auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int32type, finalType, allocSize, nullptr, cgcontext.mModule->getFunction("malloc"), "");
-    // malloc
-    //auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int32type, type, allocSize, nullptr, nullptr, "");
-    cgcontext.builder->Insert(arr);
-    cgcontext.builder->CreateStore(arr, var);
-
-    auto currentArr = arr;
-    auto currentType = finalType;
-
-    if (indicesCount > 1)
+    // if we assign string literal or other array we do not need to allocate memory
+    if (assignExpr == nullptr)
     {
-        std::vector<llvm::Value*> jvars;
-        jvars.reserve(indicesCount);
-        for (int i = 0; i < indicesCount; i++) {
-            jvars.push_back(cgcontext.builder->CreateAlloca(int32type, 0, nullptr, "j" + std::to_string(i)));
-            cgcontext.builder->CreateStore(ConstantInt::get(int32type, 0), jvars[i]);
-        }
-        int i = 1;
+        auto elementSize = ConstantInt::get(int32type, cgcontext.dataLayout->getTypeAllocSize(finalType));
+        auto allocSize = BinaryOperator::Create(Instruction::Mul, elementSize, arraySize, "", cgcontext.currentBlock());
+        // GC_malloc
+        auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int32type, finalType, allocSize, nullptr, cgcontext.mModule->getFunction("malloc"), "");
+        // malloc
+        //auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int32type, type, allocSize, nullptr, nullptr, "");
+        cgcontext.builder->Insert(arr);
+        cgcontext.builder->CreateStore(arr, var);
 
-        generateMallocLoopsRecursive(cgcontext, i, indicesCount, currentType, sizes, jvars, currentArr, var);
+        auto currentArr = arr;
+        auto currentType = finalType;
+
+        if (indicesCount > 1)
+        {
+            std::vector<llvm::Value*> jvars;
+            jvars.reserve(indicesCount);
+            for (int i = 0; i < indicesCount; i++) {
+                jvars.push_back(cgcontext.builder->CreateAlloca(int32type, 0, nullptr, "j" + std::to_string(i)));
+                cgcontext.builder->CreateStore(ConstantInt::get(int32type, 0), jvars[i]);
+            }
+            int i = 1;
+
+            generateMallocLoopsRecursive(cgcontext, i, indicesCount, currentType, sizes, jvars, currentArr, var);
+        }
+    }
+
+    if (assignExpr != nullptr) {
+        auto assignData = assignExpr->codegen(cgcontext);
+        cgcontext.builder->CreateStore(assignData, var);
     }
 
     if (isGlobal)
@@ -1422,12 +1431,6 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
     else
     {
         auto lVar = cgcontext.locals()[name->value];
-
-        if (assignExpr != nullptr) {
-            auto assignData = assignExpr->codegen(cgcontext);
-            cgcontext.builder->CreateStore(assignData, lVar);
-        }
-
         DIFile* unit = cgcontext.debugBuilder->createFile(cgcontext.dbgInfo.compileUnit->getFilename(), cgcontext.dbgInfo.compileUnit->getDirectory());
         auto funcScope = cgcontext.dbgInfo.lexicalBlocks.back();
         auto dbg = cgcontext.debugBuilder->createAutoVariable(funcScope, name->value, unit, loc.line, dbgType);
@@ -1435,9 +1438,6 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
         //cgcontext.builder->CreateStore(arr, lVar);
         return var;
     }
-    //ArrayType *arrayType = ArrayType::get(type, reinterpret_cast<ConstantInt*>(arraySize)->getZExtValue());
-    //AllocaInst *alloc = new AllocaInst(arrayType, value->value, cgcontext.currentBlock());
-    // auto var = new AllocaInst(arrayType, 0, value->value, cgcontext.currentBlock());
     return nullptr;
 }
 
@@ -1681,29 +1681,31 @@ llvm::Value *FieldArrayVarDecNode::codegen(CodeGenContext &cgcontext) {
     cgcontext.locals()[name->value] = elementPtr;
     cgcontext.localsExprs()[name->value] = this;
 
-    auto elementSize = ConstantInt::get(int32type, cgcontext.dataLayout->getTypeAllocSize(finalType));
-    auto allocSize = BinaryOperator::Create(Instruction::Mul, elementSize, arraySize, "", cgcontext.currentBlock());
-    // GC_malloc
-    auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int32type, finalType, allocSize, nullptr, cgcontext.mModule->getFunction("malloc"), "");
-    // malloc
-    //auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int32type, type, allocSize, nullptr, nullptr, "");
-    cgcontext.builder->Insert(arr);
-    cgcontext.builder->CreateStore(arr, elementPtr);
+    if (arrDec->assignExpr == nullptr) {
+        auto elementSize = ConstantInt::get(int32type, cgcontext.dataLayout->getTypeAllocSize(finalType));
+        auto allocSize = BinaryOperator::Create(Instruction::Mul, elementSize, arraySize, "", cgcontext.currentBlock());
+        // GC_malloc
+        auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int32type, finalType, allocSize, nullptr, cgcontext.mModule->getFunction("malloc"), "");
+        // malloc
+        //auto arr = CallInst::CreateMalloc(cgcontext.currentBlock(), int32type, type, allocSize, nullptr, nullptr, "");
+        cgcontext.builder->Insert(arr);
+        cgcontext.builder->CreateStore(arr, elementPtr);
 
-    auto currentArr = arr;
-    auto currentType = finalType;
+        auto currentArr = arr;
+        auto currentType = finalType;
 
-    if (var->indicesCount > 1)
-    {
-        std::vector<llvm::Value*> jvars;
-        jvars.reserve(var->indicesCount);
-        for (int i = 0; i < var->indicesCount; i++) {
-            jvars.push_back(cgcontext.builder->CreateAlloca(int32type, 0, nullptr, "j" + std::to_string(i)));
-            cgcontext.builder->CreateStore(ConstantInt::get(int32type, 0), jvars[i]);
+        if (var->indicesCount > 1)
+        {
+            std::vector<llvm::Value*> jvars;
+            jvars.reserve(var->indicesCount);
+            for (int i = 0; i < var->indicesCount; i++) {
+                jvars.push_back(cgcontext.builder->CreateAlloca(int32type, 0, nullptr, "j" + std::to_string(i)));
+                cgcontext.builder->CreateStore(ConstantInt::get(int32type, 0), jvars[i]);
+            }
+            int i = 1;
+
+            generateMallocLoopsRecursive(cgcontext, i, var->indicesCount, currentType, sizes, jvars, currentArr, elementPtr);
         }
-        int i = 1;
-
-        generateMallocLoopsRecursive(cgcontext, i, var->indicesCount, currentType, sizes, jvars, currentArr, elementPtr);
     }
 
     if (arrDec->assignExpr != nullptr) {

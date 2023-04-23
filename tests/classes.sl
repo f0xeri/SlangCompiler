@@ -2,6 +2,7 @@ import classes2;
 module classes
     public variable-integer globalInt := 1;
     private variable-float globalFloat := 99.9f;
+    public variable-array[19] character globalStr := "global test string";
     public class A inherits Object
         // something goes wrong with debug info, when we have an array as field
         public field-array[11] character str := "test"; // inline init for array doesn't work
@@ -44,8 +45,18 @@ module classes
     end printHello;
 
 start
-    variable-array[11] character str := "teststr";
+    variable-array[11] character str := "test str";
+    output "str = ";
     output str;
+    let str := "test str updated";
+    output "\nstr = ";
+    output str;
+    output "\n";
+    output "globalStr = ";
+    output globalStr;
+    let globalStr := "globalStr updated";
+    output "\nglobalStr = ";
+    output globalStr;
     output "\n~~~\n";
 
     //variable-integer i := 0;

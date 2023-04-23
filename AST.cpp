@@ -1209,7 +1209,7 @@ llvm::Value *FuncParamDecStatementNode::codegen(CodeGenContext &cgcontext) {
     return nullptr;
 }
 
-void generateMallocLoopsRecursive(CodeGenContext &cgcontext, int i, int indicesCount, Type* currentType, vector<ExprNode *>* sizes, std::vector<Value*> jvars, Value *currentArr, Value *var)
+void generateMallocLoopsRecursive(CodeGenContext &cgcontext, int i, int indicesCount, Type* currentType, std::vector<ExprNode *>* sizes, std::vector<Value*> jvars, Value *currentArr, Value *var)
 {
     if (i == indicesCount) return;
     Function *TheFunctionMain = cgcontext.builder->GetInsertBlock()->getParent();

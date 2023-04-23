@@ -2,3 +2,4 @@
 /cmake-build-debug/Testing/
 /cmake-build-debug/.cmake/
 /.idea/
+/venv/

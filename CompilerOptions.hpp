@@ -18,6 +18,8 @@ enum OptLevel {
 class CompilerOptions {
 public:
     CompilerOptions(int argc, char **argv) {
+        std::filesystem::path program_path(argv[0]);
+        std::filesystem::path current_directory = program_path.parent_path();
         llvm::cl::OptionCategory options("Compiler options");
 
         llvm::cl::opt<std::string> OutputFileName(

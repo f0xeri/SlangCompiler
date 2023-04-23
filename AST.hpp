@@ -557,7 +557,6 @@ public:
 };
 
 using namespace llvm;
-using namespace std;
 
 struct DebugInfo {
     DICompileUnit* compileUnit;
@@ -684,7 +683,7 @@ public:
     ~CodeGenContext() = default;
 
     Function* printfFunction() {
-        vector<Type*> printfArgs;
+        std::vector<Type*> printfArgs;
         printfArgs.push_back(Type::getInt8PtrTy(*context));
         FunctionType* printfType = FunctionType::get(Type::getInt32Ty(*context), printfArgs, true);
         Function *printfFunc = Function::Create(printfType, Function::ExternalLinkage, Twine("printf"), mModule);
@@ -693,7 +692,7 @@ public:
     }
 
     Function* scanfFunction() {
-        vector<Type*> scanfArgs;
+        std::vector<Type*> scanfArgs;
         scanfArgs.push_back(Type::getInt8PtrTy(*context));
         FunctionType* scanfType = FunctionType::get(Type::getInt32Ty(*context), scanfArgs, true);
         Function *scanfFunc = Function::Create(scanfType, Function::ExternalLinkage, Twine("scanf"), mModule);
@@ -702,7 +701,7 @@ public:
     }
 
     Function* GC_InitFunction() {
-        vector<Type*> args;
+        std::vector<Type*> args;
         FunctionType* type = FunctionType::get(Type::getVoidTy(*context), args, false);
         Function *GC_InitFunc = Function::Create(type, Function::ExternalLinkage, Twine("GC_init"), mModule);
         GC_InitFunc->setCallingConv(CallingConv::C);
@@ -710,7 +709,7 @@ public:
     }
 
     Function* GC_MallocFunction() {
-        vector<Type*> args;
+        std::vector<Type*> args;
         args.push_back(Type::getInt32Ty(*context));
         FunctionType* type = FunctionType::get(Type::getInt8PtrTy(*context), args, false);
         Function *GC_MallocFunc = Function::Create(type, Function::ExternalLinkage, Twine("GC_malloc"), mModule);
@@ -719,7 +718,7 @@ public:
     }
 
     Function* GC_FreeFunction() {
-        vector<Type*> args;
+        std::vector<Type*> args;
         args.push_back(Type::getInt8PtrTy(*context));
         FunctionType* type = FunctionType::get(Type::getVoidTy(*context), args, false);
         Function *GC_FreeFunc = Function::Create(type, Function::ExternalLinkage, Twine("GC_free"), mModule);
@@ -728,7 +727,7 @@ public:
     }
 
     Function* llvmTrap() {
-        vector<Type*> agrs;
+        std::vector<Type*> agrs;
         FunctionType* type = FunctionType::get(Type::getVoidTy(*context), agrs, false);
         Function *llvmTrap = Function::Create(type, Function::ExternalLinkage, Twine("llvm.trap"), mModule);
         llvmTrap->setCallingConv(CallingConv::C);
@@ -816,7 +815,7 @@ public:
         return value;
     }
 
-    std::map<string, Value*>& globals() {
+    std::map<std::string, Value*>& globals() {
         return globalVariables;
     }
 

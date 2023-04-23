@@ -145,7 +145,7 @@ bool Parser::parseModuleDecl()
         else return false;
         advance();
     }
-    llvm::errs() << "[INFO] Compiling module \"" << mainModuleNode->name->value << "\"...\n";
+    llvm::outs() << "[INFO] Compiling module \"" << mainModuleNode->name->value << "\"...\n";
     return ret;
 }
 

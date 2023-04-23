@@ -396,18 +396,12 @@ public:
     bool isGlobal = false;
     bool isPrivate = false;
     ArrayExprNode* expr;
+    ExprNode* assignExpr;
     int indicesCount = 1;
     bool isExtern = false;
-    ArrayDecStatementNode(SourceLoc loc, VariableExprNode *name, ArrayExprNode *expr, bool isGlobal, int indicesCount = 1, bool isPrivate = false, bool isExtern = false) : DeclarationNode(loc, name), expr(expr), isGlobal(isGlobal), indicesCount(indicesCount), isPrivate(isPrivate), isExtern(isExtern) {}
+    ArrayDecStatementNode(SourceLoc loc, VariableExprNode *name, ArrayExprNode *expr, bool isGlobal, int indicesCount = 1, bool isPrivate = false, bool isExtern = false) : DeclarationNode(loc, name), expr(expr), isGlobal(isGlobal), indicesCount(indicesCount), isPrivate(isPrivate), isExtern(isExtern), assignExpr(nullptr) {}
+    ArrayDecStatementNode(SourceLoc loc, VariableExprNode *name, ArrayExprNode *expr, ExprNode *assignExpr, bool isGlobal, int indicesCount = 1, bool isPrivate = false, bool isExtern = false) : DeclarationNode(loc, name), expr(expr), isGlobal(isGlobal), indicesCount(indicesCount), isPrivate(isPrivate), isExtern(isExtern), assignExpr(assignExpr) {}
 
-    /*ArrayDecStatementNode(std::string type, VariableExprNode *value, ExprNode *size): type(std::move(type)), DeclarationNode(value), init(new std::vector<ExprNode*>()), size(size), isString(false) {}
-    ArrayDecStatementNode(std::string type, VariableExprNode *value, std::vector<ExprNode*> *init): type(std::move(type)), DeclarationNode(value), init(init), size(new IntExprNode(init->size())), isString(false) {}
-    ArrayDecStatementNode(std::string type, VariableExprNode *value, const std::string &str): type(std::move(type)), DeclarationNode(value), init(new std::vector<ExprNode*>()), isString(true) {
-        for(auto it = str.begin(); it != str.end(); it++)
-            init->push_back((ExprNode*)(new CharExprNode(*it)));
-        init->push_back((ExprNode*)(new CharExprNode(0)));
-        size = init->size() + 1;
-    }*/
     virtual llvm::Value *codegen(CodeGenContext &cgcontext);
 };
 

@@ -267,7 +267,20 @@ DeclarationNode* Parser::parseFieldDecl(std::vector<DeclarationNode *> *fields, 
         advance();
         name = consume(TokenType::Identifier).data;
         constructorRequired = true;
-        field = new FieldArrayVarDecNode(loc, thisClassName, new VariableExprNode(loc, name), isPrivate, new ArrayDecStatementNode(loc, nullptr, arrExpr, isPrivate, indicesCount), index);
+        ExprNode *assignExpr = nullptr;
+        if (token.type == TokenType::Assign || token.type == TokenType::Semicolon) {
+            bool init = token.type == TokenType::Assign;
+            if (init) {
+                advance();
+                assignExpr = parseExpression();
+                if (!(arrExpr->type == "character")) {
+                    llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Inline initialization of arrays is not supported except string literals.\n";
+                    hasError = true;
+                }
+                expect(TokenType::Semicolon);
+            }
+        } else error();
+        field = new FieldArrayVarDecNode(loc, thisClassName, new VariableExprNode(loc, name), isPrivate, new ArrayDecStatementNode(loc, nullptr, arrExpr, assignExpr, isPrivate, indicesCount), index);
     }
     else
     {
@@ -1231,6 +1244,7 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
     advance();
     consume(TokenType::Minus);
     ExprNode *expr = nullptr;
+    ArrayExprNode* arrExpr = nullptr;
     type = token.data;
     advance();
     bool isArray = false;
@@ -1266,7 +1280,7 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
             tokensIterator--;
             token = *tokensIterator;
         }
-        ArrayExprNode* arrExpr = new ArrayExprNode(loc, arrType, size, new std::vector<ExprNode*>());
+        arrExpr = new ArrayExprNode(loc, arrType, size, new std::vector<ExprNode*>());
         while (token.data == "array")
         {
             indicesCount++;
@@ -1298,7 +1312,7 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
             }
             arrExpr->values->push_back(new ArrayExprNode(loc, arrType, size, nullptr));
         }
-        expr = arrExpr;
+        //expr = arrExpr;
         advance();
         name = consume(TokenType::Identifier).data;
     }
@@ -1346,6 +1360,12 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
     {
         advance();
         expr = parseExpression();
+        if (arrExpr != nullptr) {
+            if (!(arrExpr->type == "character")) {
+                llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Inline initialization of arrays is not supported except string literals.\n";
+                hasError = true;
+            }
+        }
     }
     expect(TokenType::Semicolon);
     if (currentScope->lookup(name) != nullptr || oneOfDefaultTypes(name))
@@ -1355,7 +1375,7 @@ DeclarationNode* Parser::parseVariableDecl(bool isGlobal) {
     }
     if (isGlobal && !isExtern) name = mainModuleNode->name->value + "." + name;
     if (isArray) {
-        result = new ArrayDecStatementNode(loc, new VariableExprNode(loc, name), expr->as<ArrayExprNode>(), isGlobal, indicesCount, isPrivate, isExtern);
+        result = new ArrayDecStatementNode(loc, new VariableExprNode(loc, name), arrExpr, expr, isGlobal, indicesCount, isPrivate, isExtern);
     }
     else if (isFuncPointer) {
         result = new FuncPointerStatementNode(loc, funcType, new VariableExprNode(loc, name), isFunction, isGlobal, args, expr, isPrivate, isExtern);

@@ -1422,6 +1422,12 @@ llvm::Value *ArrayDecStatementNode::codegen(CodeGenContext &cgcontext) {
     else
     {
         auto lVar = cgcontext.locals()[name->value];
+
+        if (assignExpr != nullptr) {
+            auto assignData = assignExpr->codegen(cgcontext);
+            cgcontext.builder->CreateStore(assignData, lVar);
+        }
+
         DIFile* unit = cgcontext.debugBuilder->createFile(cgcontext.dbgInfo.compileUnit->getFilename(), cgcontext.dbgInfo.compileUnit->getDirectory());
         auto funcScope = cgcontext.dbgInfo.lexicalBlocks.back();
         auto dbg = cgcontext.debugBuilder->createAutoVariable(funcScope, name->value, unit, loc.line, dbgType);
@@ -1698,6 +1704,11 @@ llvm::Value *FieldArrayVarDecNode::codegen(CodeGenContext &cgcontext) {
         int i = 1;
 
         generateMallocLoopsRecursive(cgcontext, i, var->indicesCount, currentType, sizes, jvars, currentArr, elementPtr);
+    }
+
+    if (arrDec->assignExpr != nullptr) {
+        auto assignData = arrDec->assignExpr->codegen(cgcontext);
+        cgcontext.builder->CreateStore(assignData, elementPtr);
     }
     return elementPtr;
 }

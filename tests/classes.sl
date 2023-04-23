@@ -142,7 +142,6 @@ start
         while j < 3 repeat
             while k < 4 repeat
                 output a.arr3d[i][j][k];
-                output " ";
                 let k := k + 1;
             end while;
             let k := 0;

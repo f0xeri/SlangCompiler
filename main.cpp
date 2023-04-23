@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
     printModuleToFile(codeGenContext.mModule, sourceFilename + ".ll");
     Optimizer optimizer(codeGenContext.mModule, codeGenContext.targetMachine, options.getOptimizationLevel());
     optimizer.optimize();
-    printModuleToFile(codeGenContext.mModule, mainFilename + "_optimized" + ".ll");
+    //printModuleToFile(codeGenContext.mModule, mainFilename + "_optimized" + ".ll");
 
     std::string filenamesString;
     llvm::outs() << "[INFO] Linking...\n";

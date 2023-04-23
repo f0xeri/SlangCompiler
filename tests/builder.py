@@ -33,7 +33,7 @@ class FailCompilationTest:
 
 
 class SuccessCompilationTest:
-    def __init__(self, slangc_path: str, filenames: str, args: str, output_executable: str, expected_compiler_output: str, expected_program_output: str):
+    def __init__(self, slangc_path: str, filenames: list[str], args: str, output_executable: str, expected_compiler_output: str, expected_program_output: str):
         self.slangc_path = slangc_path
         self.filenames = filenames
         self.args = args

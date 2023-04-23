@@ -24,6 +24,28 @@ class ArraysTest(unittest.TestCase):
         test.clean_up()
 
 
+class StringTest(unittest.TestCase):
+    def runTest(self):
+        expected_program_output = ""
+        test_name = "StdStringTests"
+        filenames = ["StdStringTests", "StdString", "StdMath"]
+        with open(f"{test_name}.txt", "r") as f:
+            expected_program_output = f.read()
+        test = SuccessCompilationTest(SLANGC_PATH, filenames,
+                                      f"{test_name}.sl StdString.sl StdMath.sl -o {test_name}.exe -lgc",
+                                      f"{test_name}.exe",
+                                      f"[INFO] Compiling module \"StdMath\"...\n"
+                                      f"[INFO] Compiling module \"StdString\"...\n"
+                                      f"[INFO] Compiling module \"StdStringTests\"...\n"
+                                      f"[INFO] Linking...\n",
+                                      expected_program_output)
+        test.compile_test()
+        self.assertEqual(test.check_outs(), True)
+        test.run_compiled()
+        self.assertEqual(test.check_program_outs(), True)
+        test.clean_up()
+
+
 class ClassesTest(unittest.TestCase):
     def runTest(self):
         expected_program_output = ""

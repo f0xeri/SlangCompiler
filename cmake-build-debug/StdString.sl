@@ -196,7 +196,6 @@ module StdString
             return -1;
         end find;
 
-        // create replace method
         public method replace(String this)(in character ch, in character newCh) : String
             variable-integer i := 0;
             while i < this.length repeat
@@ -208,7 +207,6 @@ module StdString
             return this;
         end replace;
 
-        // create insert character method with memory realloc
         public method insert(String this)(in integer index, in character ch) : String
             variable-integer i := 0;
             variable-integer j := 0;

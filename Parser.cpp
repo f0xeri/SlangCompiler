@@ -1015,8 +1015,14 @@ StatementNode* Parser::parseVarOrCall() {
                         }
                     }
                     else if (field->isA<FieldArrayVarDecNode>()) {
-                        fieldIndex = field->as<FieldArrayVarDecNode>()->index;
-                        fieldArray = field->as<FieldArrayVarDecNode>();
+                        auto f = field->as<FieldArrayVarDecNode>();
+                        fieldIndex = f->index;
+                        fieldArray = f;
+                        if (f->isPrivate && type->name->value != currentParsingTypeName)
+                        {
+                            llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Field " + name + " is private member of class " + type->name->value + ".\n";
+                            hasError = true;
+                        }
                     }
                     break;
                 }
@@ -1095,8 +1101,24 @@ StatementNode* Parser::parseVarOrCall() {
                     {
                         name += "." + token.data;
                         fieldExists = true;
-                        if (field->isA<FieldVarDecNode>()) fieldIndex = (field)->as<FieldVarDecNode>()->index;
-                        else if (field->isA<FieldArrayVarDecNode>()) fieldIndex = (field)->as<FieldArrayVarDecNode>()->index;
+                        if (field->isA<FieldVarDecNode>()) {
+                            auto f = field->as<FieldVarDecNode>();
+                            fieldIndex = f->index;
+                            if (f->isPrivate && type->name->value != currentParsingTypeName)
+                            {
+                                llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Field " + name + " is private member of class " + type->name->value + ".\n";
+                                hasError = true;
+                            }
+                        }
+                        else if (field->isA<FieldArrayVarDecNode>()) {
+                            auto f = field->as<FieldArrayVarDecNode>();
+                            fieldIndex = f->index;
+                            if (f->isPrivate && type->name->value != currentParsingTypeName)
+                            {
+                                llvm::errs() << "[ERROR] (" << token.stringNumber << ", " << token.symbolNumber << ") Field " + name + " is private member of class " + type->name->value + ".\n";
+                                hasError = true;
+                            }
+                        }
                         break;
                     }
                 }

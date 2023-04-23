@@ -32,7 +32,7 @@ class StringTest(unittest.TestCase):
         with open(f"{test_name}.txt", "r") as f:
             expected_program_output = f.read()
         test = SuccessCompilationTest(SLANGC_PATH, filenames,
-                                      f"{test_name}.sl StdString.sl StdMath.sl -o {test_name}.exe -lgc",
+                                      f"{test_name}.sl StdString.sl StdMath.sl -o {test_name}.exe -lgc -lm",
                                       f"{test_name}.exe",
                                       f"[INFO] Compiling module \"StdMath\"...\n"
                                       f"[INFO] Compiling module \"StdString\"...\n"

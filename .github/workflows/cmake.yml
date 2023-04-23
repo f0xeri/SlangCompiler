@@ -34,7 +34,7 @@ jobs:
 
     - name: Run tests
       run: >
-        cd ${{github.workspace}}/tests
-        python -m setSlangcPath "${{github.workspace}}/build/slangc.exe"
+        cd ${{github.workspace}}/tests &&
+        python -m setSlangcPath "${{github.workspace}}/build/slangc.exe" &&
         python -m unittest runTests.py
 

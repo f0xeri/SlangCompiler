@@ -1,0 +1,11 @@
+/cmake-build-debug/.cmake/
+/cmake-build-debug/CMakeFiles/
+/cmake-build-debug/Testing/
+/cmake-build-debug/.ninja_deps
+/cmake-build-debug/.ninja_log
+/cmake-build-debug/build.ninja
+/cmake-build-debug/cmake_install.cmake
+/cmake-build-debug/CMakeCache.txt
+/cmake-build-debug/SlangcRefactored.ilk
+/cmake-build-debug/SlangcRefactored.pdb
+/.vs/

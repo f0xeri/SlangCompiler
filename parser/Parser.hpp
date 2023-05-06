@@ -14,21 +14,34 @@
 
 namespace Slangc {
 
+    using namespace AST;
+    using ParserExprResult = std::optional<ExprPtrVariant>;
+    using ParserStmtResult = std::optional<StmtPtrVariant>;
+    using ParserDeclResult = std::optional<DeclPtrVariant>;
+
     class Parser {
     public:
-        explicit Parser(const std::map<std::uint64_t, std::vector<Token>> &tokens, std::vector<ErrorMessage> &errors, const CompilerOptions& options)
-                : options(options), errors(errors), tokens(tokens) {}
+        explicit Parser(std::vector<Token> tokens, std::vector<ErrorMessage> &errors, const CompilerOptions &options)
+                : options(options), errors(errors), tokens(std::move(tokens)) {
+            currentToken = this->tokens.begin();
+            currentScope = std::make_shared<Scope>();
 
-        const CompilerOptions& options;
+        }
+
+        const CompilerOptions &options;
         std::vector<ErrorMessage> &errors;
         bool hasError = false;
 
         auto parse() -> bool;
-		auto parseImports() -> bool;
+
+        auto parseImports() -> bool;
+
+        auto parseModuleStmt() -> std::optional<ModuleStatementNode>;
 
     private:
-        const std::map<std::uint64_t, std::vector<Token>> &tokens;
+        std::vector<Token> tokens;
         std::shared_ptr<Scope> currentScope;
+        std::vector<Token>::iterator currentToken;
     };
 
 } // Slangc

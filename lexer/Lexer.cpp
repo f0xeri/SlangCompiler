@@ -83,7 +83,7 @@ namespace Slangc {
                 result = lexString(sourceText);
             }
             if (!result) {
-                errors.emplace_back("Unknown token", SourceLocation{currentLine, currentColumn}, false, false);
+                errors.emplace_back("Unknown token", SourceLoc{currentLine, currentColumn}, false, false);
                 break;
             }
         }
@@ -216,7 +216,7 @@ namespace Slangc {
         auto stringValueView = takeWhile(sourceText.substr(1), [=](char c) { return c != '"';});
 
         if (stringValueView.back() == sourceText.back()) {
-            errors.emplace_back("Unclosed string", SourceLocation{currentLine, stringColumn}, false, false);
+            errors.emplace_back("Unclosed string", SourceLoc{currentLine, stringColumn}, false, false);
             return false;
         }
 
@@ -244,7 +244,7 @@ namespace Slangc {
                             stringValue.replace(i, 2, "\0");
                             break;
                         default:
-                            errors.emplace_back("Unknown escape sequence", SourceLocation{currentLine, stringColumn}, false, false);
+                            errors.emplace_back("Unknown escape sequence", SourceLoc{currentLine, stringColumn}, false, false);
                             sequenceError = true;
                             break;
                     }

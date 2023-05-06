@@ -82,7 +82,7 @@ namespace Slangc {
     struct Token {
         TokenType type;
         std::string value;
-        SourceLocation location;
+        SourceLoc location;
     };
 }
 

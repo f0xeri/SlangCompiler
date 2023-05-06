@@ -18,22 +18,22 @@ namespace Slangc {
         Scope() = default;
         explicit Scope(std::shared_ptr<Scope> parent) : parent(std::move(parent)) {}
 
-        std::vector<std::pair<std::string_view, AST::DeclarationNode>> symbols;
+        std::vector<std::pair<std::string_view, AST::DeclPtrVariant>> symbols;
 
-        void insert(AST::DeclarationNode declarationNode) {
+        void insert(AST::DeclPtrVariant declarationNode) {
             symbols.emplace_back(getDeclarationName(declarationNode), std::move(declarationNode));
         }
 
         bool contains(std::string_view name) {
-            return std::ranges::find(symbols, name, &std::pair<std::string_view, AST::DeclarationNode>::first) != symbols.end();
+            return std::ranges::find(symbols, name, &std::pair<std::string_view, AST::DeclPtrVariant>::first) != symbols.end();
         }
 
-        auto get(std::string_view name) -> const AST::DeclarationNode* {
-            auto it = std::ranges::find(symbols, name, &std::pair<std::string_view, AST::DeclarationNode>::first);
+        auto get(std::string_view name) -> const AST::DeclPtrVariant* {
+            auto it = std::ranges::find(symbols, name, &std::pair<std::string_view, AST::DeclPtrVariant>::first);
             return (it == symbols.end()) ? nullptr : &(it->second);
         }
 
-        auto lookup(std::string_view name) -> const AST::DeclarationNode* {
+        auto lookup(std::string_view name) -> const AST::DeclPtrVariant* {
             Scope *s = this;
             while (s) {
                 if (auto* node = s->get(name)) {

@@ -9,6 +9,7 @@
 #include <variant>
 #include <memory>
 #include <vector>
+#include <optional>
 #include "llvm/IR/Value.h"
 #include "lexer/TokenType.hpp"
 #include "codegen/CodeGenContext.hpp"
@@ -20,160 +21,182 @@ namespace Slangc::AST {
         Var
     };
 
-#pragma region Variant types for basic types of nodes
-    using ExprNode = std::variant<
-            std::unique_ptr<struct ArrayExprNode>,
-            std::unique_ptr<struct BlockExprNode>,
-            std::unique_ptr<struct BooleanExprNode>,
-            std::unique_ptr<struct CharExprNode>,
-            std::unique_ptr<struct FloatExprNode>,
-            std::unique_ptr<struct FuncExprNode>,
-            std::unique_ptr<struct IntExprNode>,
-            std::unique_ptr<struct NilExprNode>,
-            std::unique_ptr<struct OperatorExprNode>,
-            std::unique_ptr<struct RealExprNode>,
-            std::unique_ptr<struct StringExprNode>,
-            std::unique_ptr<struct UnaryOperatorExprNode>,
-            std::unique_ptr<struct VarExprNode>,
-            std::unique_ptr<struct IndexesExprNode>,
-            std::unique_ptr<struct IndexExprNode>,
-            std::unique_ptr<struct CallExprNode>
-    >;
+    struct ArrayExprNode;
+    struct BlockExprNode;
+    struct BooleanExprNode;
+    struct CharExprNode;
+    struct FloatExprNode;
+    struct FuncExprNode;
+    struct IntExprNode;
+    struct NilExprNode;
+    struct OperatorExprNode;
+    struct RealExprNode;
+    struct StringExprNode;
+    struct UnaryOperatorExprNode;
+    struct VarExprNode;
+    struct IndexesExprNode;
+    struct IndexExprNode;
+    struct CallExprNode;
 
-    using VariableExprNode = std::variant<
-            std::unique_ptr<struct IndexExprNode>,
-            std::unique_ptr<struct IndexesExprNode>,
-            std::unique_ptr<struct VarExprNode>
-    >;
+    using ArrayExprPtr = std::unique_ptr<ArrayExprNode>;
+    using BlockExprPtr = std::unique_ptr<BlockExprNode>;
+    using BooleanExprPtr = std::unique_ptr<BooleanExprNode>;
+    using CharExprPtr = std::unique_ptr<CharExprNode>;
+    using FloatExprPtr = std::unique_ptr<FloatExprNode>;
+    using FuncExprPtr = std::unique_ptr<FuncExprNode>;
+    using IntExprPtr = std::unique_ptr<IntExprNode>;
+    using NilExprPtr = std::unique_ptr<NilExprNode>;
+    using OperatorExprPtr = std::unique_ptr<OperatorExprNode>;
+    using RealExprPtr = std::unique_ptr<RealExprNode>;
+    using StringExprPtr = std::unique_ptr<StringExprNode>;
+    using UnaryOperatorExprPtr = std::unique_ptr<UnaryOperatorExprNode>;
+    using VarExprPtr = std::unique_ptr<VarExprNode>;
+    using IndexesExprPtr = std::unique_ptr<IndexesExprNode>;
+    using IndexExprPtr = std::unique_ptr<IndexExprNode>;
+    using CallExprPtr = std::unique_ptr<CallExprNode>;
 
-    using DeclarationNode = std::variant<
-            std::unique_ptr<struct ArrayDecStatementNode>,
-            std::unique_ptr<struct ExternFuncDecStatementNode>,
-            std::unique_ptr<struct FieldArrayVarDecNode>,
-            std::unique_ptr<struct FieldVarDecNode>,
-            std::unique_ptr<struct FuncDecStatementNode>,
-            std::unique_ptr<struct FuncParamDecStatementNode>,
-            std::unique_ptr<struct FuncPointerStatementNode>,
-            std::unique_ptr<struct MethodDecNode>,
-            std::unique_ptr<struct TypeDecStatementNode>,
-            std::unique_ptr<struct VarDecStatementNode>
-    >;
+    using ExprPtrVariant
+            = std::variant<ArrayExprPtr, BlockExprPtr, BooleanExprPtr, CharExprPtr, FloatExprPtr,
+            FuncExprPtr, IntExprPtr, NilExprPtr, OperatorExprPtr, RealExprPtr, StringExprPtr,
+            UnaryOperatorExprPtr, VarExprPtr, IndexesExprPtr, IndexExprPtr, CallExprPtr>;
 
-    using StatementNode = std::variant<
-            std::unique_ptr<struct AssignExprNode>,
-            std::unique_ptr<struct CallExprNode>,
-            std::unique_ptr<struct ArrayDecStatementNode>,
-            std::unique_ptr<struct ExternFuncDecStatementNode>,
-            std::unique_ptr<struct FieldArrayVarDecNode>,
-            std::unique_ptr<struct FieldVarDecNode>,
-            std::unique_ptr<struct FuncDecStatementNode>,
-            std::unique_ptr<struct FuncParamDecStatementNode>,
-            std::unique_ptr<struct FuncPointerStatementNode>,
-            std::unique_ptr<struct MethodDecNode>,
-            std::unique_ptr<struct TypeDecStatementNode>,
-            std::unique_ptr<struct VarDecStatementNode>,
-            std::unique_ptr<struct DeleteExprNode>,
-            std::unique_ptr<struct ElseIfStatementNode>,
-            std::unique_ptr<struct IfStatementNode>,
-            std::unique_ptr<struct InputStatementNode>,
-            std::unique_ptr<struct ModuleStatementNode>,
-            std::unique_ptr<struct OutputStatementNode>,
-            std::unique_ptr<struct ReturnStatementNode>,
-            std::unique_ptr<struct VarExprNode>,
-            std::unique_ptr<struct IndexesExprNode>,
-            std::unique_ptr<struct IndexExprNode>,
-            std::unique_ptr<struct WhileStatementNode>
-    >;
-#pragma endregion
+    using VarExprPtrVariant = std::variant<VarExprPtr, IndexesExprPtr, IndexExprPtr>;
+
+    struct ArrayDecStatementNode;
+    struct ExternFuncDecStatementNode;
+    struct FieldArrayVarDecNode;
+    struct FieldVarDecNode;
+    struct FuncDecStatementNode;
+    struct FuncParamDecStatementNode;
+    struct FuncPointerStatementNode;
+    struct MethodDecNode;
+    struct TypeDecStatementNode;
+    struct VarDecStatementNode;
+
+    using ArrayDecStatementPtr = std::unique_ptr<ArrayDecStatementNode>;
+    using ExternFuncDecStatementPtr = std::unique_ptr<ExternFuncDecStatementNode>;
+    using FieldArrayVarDecPtr = std::unique_ptr<FieldArrayVarDecNode>;
+    using FieldVarDecPtr = std::unique_ptr<FieldVarDecNode>;
+    using FuncDecStatementPtr = std::unique_ptr<FuncDecStatementNode>;
+    using FuncParamDecStmtPtr = std::unique_ptr<FuncParamDecStatementNode>;
+    using FuncPointerStatementPtr = std::unique_ptr<FuncPointerStatementNode>;
+    using MethodDecPtr = std::unique_ptr<MethodDecNode>;
+    using TypeDecStatementPtr = std::unique_ptr<TypeDecStatementNode>;
+    using VarDecStatementPtr = std::unique_ptr<VarDecStatementNode>;
+
+    using DeclPtrVariant
+            = std::variant<ArrayDecStatementPtr, ExternFuncDecStatementPtr, FieldArrayVarDecPtr, FieldVarDecPtr,
+            FuncDecStatementPtr, FuncParamDecStmtPtr, FuncPointerStatementPtr, MethodDecPtr,
+            TypeDecStatementPtr, VarDecStatementPtr>;
+
+    struct AssignExprNode;
+    struct DeleteExprNode;
+    struct ElseIfStatementNode;
+    struct IfStatementNode;
+    struct InputStatementNode;
+    struct ModuleStatementNode;
+    struct OutputStatementNode;
+    struct ReturnStatementNode;
+    struct WhileStatementNode;
+
+    using AssignExprPtr = std::unique_ptr<AssignExprNode>;
+    using DeleteExprPtr = std::unique_ptr<DeleteExprNode>;
+    using ElseIfStatementPtr = std::unique_ptr<ElseIfStatementNode>;
+    using IfStatementPtr = std::unique_ptr<IfStatementNode>;
+    using InputStatementPtr = std::unique_ptr<InputStatementNode>;
+    using ModuleStatementPtr = std::unique_ptr<ModuleStatementNode>;
+    using OutputStatementPtr = std::unique_ptr<OutputStatementNode>;
+    using ReturnStatementPtr = std::unique_ptr<ReturnStatementNode>;
+    using WhileStatementPtr = std::unique_ptr<WhileStatementNode>;
+
+
+    using StmtPtrVariant
+            = std::variant<AssignExprPtr, CallExprPtr, ArrayDecStatementPtr, ExternFuncDecStatementPtr,
+            FieldArrayVarDecPtr, FieldVarDecPtr, FuncDecStatementPtr, FuncParamDecStmtPtr, FuncPointerStatementPtr,
+            MethodDecPtr, TypeDecStatementPtr, VarDecStatementPtr, DeleteExprPtr, ElseIfStatementPtr, IfStatementPtr,
+            InputStatementPtr, ModuleStatementPtr, OutputStatementPtr, ReturnStatementPtr, VarExprPtr,
+            IndexesExprPtr, IndexExprPtr, WhileStatementPtr>;
 
 #pragma region Nodes declarations
     // codegen methods are defined in codegen/CodeGen.cpp
 
     struct IntExprNode {
-        SourceLocation location;
+        SourceLoc loc{0, 0};
         int value{};
         bool isConst = true;
 
-        IntExprNode(SourceLocation location, int value) : location(std::move(location)), value(value) {}
-
+        IntExprNode(SourceLoc loc, int value) : loc(loc), value(value) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct FloatExprNode {
-        SourceLocation location;
+        SourceLoc loc{0, 0};
         float value{};
         bool isConst = true;
 
-        FloatExprNode(SourceLocation location, float value) : location(location), value(value) {}
-
+        FloatExprNode(SourceLoc loc, float value) : loc(loc), value(value) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct RealExprNode {
-        SourceLocation location;
+        SourceLoc loc{0, 0};
         double value{};
         bool isConst = true;
 
-        RealExprNode(SourceLocation location, double value) : location(location), value(value) {}
-
+        RealExprNode(SourceLoc loc, double value) : loc(loc), value(value) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct CharExprNode {
-        SourceLocation location;
+        SourceLoc loc{0, 0};
         char value{};
         bool isConst = true;
 
-        CharExprNode(SourceLocation location, char value) : location(location), value(value) {}
-
+        CharExprNode(SourceLoc loc, char value) : loc(loc), value(value) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct StringExprNode {
-        SourceLocation location;
+        SourceLoc loc{0, 0};
         std::string value;
         bool isConst = true;
 
-        StringExprNode(SourceLocation location, std::string value) : location(location), value(std::move(value)) {}
-
+        StringExprNode(SourceLoc loc, std::string value) : loc(loc), value(std::move(value)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct NilExprNode {
-        SourceLocation location;
-        ExprNode expr;
+        SourceLoc loc{0, 0};
+        ExprPtrVariant expr;
         bool isConst = true;
 
-        NilExprNode(SourceLocation location, ExprNode expr) : location(location), expr(std::move(expr)) {}
-
+        NilExprNode(SourceLoc loc, ExprPtrVariant expr) : loc(loc), expr(std::move(expr)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct ArrayExprNode {
-        SourceLocation location;
-        std::vector<ExprNode> values;
+        SourceLoc loc{0, 0};
+        std::vector<ExprPtrVariant> values;
         std::string type;
-        ExprNode size;
+        ExprPtrVariant size;
         bool isConst = false;
 
-        ArrayExprNode(SourceLocation location, std::vector<ExprNode> values, std::string type, ExprNode size)
-                : location(location), values(std::move(values)), type(std::move(type)), size(std::move(size)) {}
-
+        ArrayExprNode(SourceLoc loc, std::vector<ExprPtrVariant> values, std::string type, ExprPtrVariant size) :
+            loc(loc), values(std::move(values)), type(std::move(type)), size(std::move(size)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct BooleanExprNode {
-        SourceLocation location;
+        SourceLoc loc{0, 0};
         bool value{};
         bool isConst = true;
 
-        BooleanExprNode(SourceLocation location, bool value) : location(location), value(value) {}
-
+        BooleanExprNode(SourceLoc loc, bool value) : loc(loc), value(value) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct VarExprNode {
-        SourceLocation location;
+        SourceLoc loc{0, 0};
         std::string value;
         bool dotClass = false;
         bool dotModule = false;
@@ -181,402 +204,387 @@ namespace Slangc::AST {
         int index = -1;
         bool isConst = false;
 
-        VarExprNode(SourceLocation location, std::string value) : location(location), value(std::move(value)) {}
-
+        VarExprNode(SourceLoc loc, std::string value, bool dotClass = false, bool dotModule = false, bool isPointer = false, int index = -1)
+            : loc(loc), value(std::move(value)), dotClass(dotClass), dotModule(dotModule), isPointer(isPointer), index(index) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct IndexExprNode {
-        SourceLocation location;
-        ExprNode indexExpr;
-        ExprNode assign;
+        SourceLoc loc{0, 0};
+        ExprPtrVariant indexExpr;
+        ExprPtrVariant assign;
         bool isConst = false;
 
-        IndexExprNode(SourceLocation location, ExprNode indexExpr, ExprNode assign) : location(location),
-                                                                                      indexExpr(std::move(indexExpr)),
-                                                                                      assign(std::move(assign)) {}
-
+        IndexExprNode(SourceLoc loc, ExprPtrVariant indexExpr, ExprPtrVariant assign)
+            : loc(loc), indexExpr(std::move(indexExpr)), assign(std::move(assign)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct IndexesExprNode {
-        SourceLocation location;
-        std::vector<ExprNode> indexes;
-        ExprNode assign;
+        SourceLoc loc{0, 0};
+        std::vector<ExprPtrVariant> indexes;
+        ExprPtrVariant assign;
         bool isConst = false;
 
-        IndexesExprNode(SourceLocation location, std::vector<ExprNode> indexes, ExprNode assign) : location(location),
-                                                                                                   indexes(std::move(
-                                                                                                           indexes)),
-                                                                                                   assign(std::move(
-                                                                                                           assign)) {}
-
+        IndexesExprNode(SourceLoc loc, std::vector<ExprPtrVariant> indexes, ExprPtrVariant assign)
+            : loc(loc), indexes(std::move(indexes)), assign(std::move(assign)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct UnaryOperatorExprNode {
-        SourceLocation location;
+        SourceLoc loc{0, 0};
         TokenType op{};
-        ExprNode expr;
+        ExprPtrVariant expr;
         bool isConst = false;
 
-        UnaryOperatorExprNode(SourceLocation location, TokenType op, ExprNode expr) : location(location), op(op),
-                                                                                      expr(std::move(expr)) {}
-
+        UnaryOperatorExprNode(SourceLoc loc, TokenType op, ExprPtrVariant expr)
+            : loc(loc), op(op), expr(std::move(expr)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct OperatorExprNode {
-        SourceLocation location;
+        SourceLoc loc{0, 0};
         TokenType op{};
-        ExprNode left, right;
+        ExprPtrVariant left, right;
         bool isConst = false;
 
-        OperatorExprNode(SourceLocation location, TokenType op, ExprNode left, ExprNode right) : location(location),
-                                                                                                 op(op),
-                                                                                                 left(std::move(left)),
-                                                                                                 right(std::move(
-                                                                                                         right)) {}
-
+        OperatorExprNode(SourceLoc loc, TokenType op, ExprPtrVariant left, ExprPtrVariant right)
+            : loc(loc), op(op), left(std::move(left)), right(std::move(right)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct CallExprNode {
-        SourceLocation location;
-        VariableExprNode name;
-        std::vector<ExprNode> args;
+        SourceLoc loc{0, 0};
+        VarExprPtrVariant name;
+        std::vector<ExprPtrVariant> args;
         bool isConst = false;
 
-        CallExprNode(SourceLocation location, VariableExprNode name, std::vector<ExprNode> args) : location(location),
-                                                                                                   name(std::move(
-                                                                                                           name)),
-                                                                                                   args(std::move(
-                                                                                                           args)) {}
-
+        CallExprNode(SourceLoc loc, VarExprPtrVariant name, std::vector<ExprPtrVariant> args)
+            : loc(loc), name(std::move(name)), args(std::move(args)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct DeleteExprNode {
-        SourceLocation location;
-        ExprNode expr;
+        SourceLoc loc{0, 0};
+        ExprPtrVariant expr;
 
-        DeleteExprNode(SourceLocation location, ExprNode expr) : location(location), expr(std::move(expr)) {}
+        DeleteExprNode(SourceLoc loc, ExprPtrVariant expr) : loc(loc), expr(std::move(expr)) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct BlockExprNode {
-        SourceLocation location;
-        std::vector<StatementNode> statements;
+        SourceLoc loc{0, 0};
+        std::vector<StmtPtrVariant> statements;
         bool isConst = false;
 
-        BlockExprNode(SourceLocation location, std::vector<StatementNode> statements) : location(location), statements(
-                std::move(statements)) {}
-
+        BlockExprNode(SourceLoc loc, std::vector<StmtPtrVariant> statements) : loc(loc), statements(std::move(statements)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct AssignExprNode {
-        SourceLocation location;
-        VariableExprNode left;
-        ExprNode right;
+        SourceLoc loc{0, 0};
+        VarExprPtrVariant left;
+        ExprPtrVariant right;
 
-        AssignExprNode(SourceLocation location, VariableExprNode left, ExprNode right) : location(location),
-                                                                                         left(std::move(left)),
-                                                                                         right(std::move(right)) {}
-
+        AssignExprNode(SourceLoc loc, VarExprPtrVariant left, ExprPtrVariant right)
+            : loc(loc), left(std::move(left)), right(std::move(right)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct FuncParamDecStatementNode {
-        SourceLocation location;
+        SourceLoc loc{0, 0};
         std::string name;
         ParameterType parameterType{};
-        ExprNode type;
-        ExprNode expr;
+        ExprPtrVariant type;
+        ExprPtrVariant expr;
 
-        FuncParamDecStatementNode(SourceLocation location, std::string name, ParameterType parameterType, ExprNode type,
-                                  ExprNode expr)
-                : location(location), name(std::move(name)), parameterType(parameterType), type(std::move(type)),
-                  expr(std::move(expr)) {}
-
+        FuncParamDecStatementNode(SourceLoc loc, std::string name, ParameterType parameterType, ExprPtrVariant type, ExprPtrVariant expr)
+            : loc(loc), name(std::move(name)), parameterType(parameterType), type(std::move(type)), expr(std::move(expr)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct FuncExprNode {
-        SourceLocation location;
-        ExprNode type;
+        SourceLoc loc{0, 0};
+        ExprPtrVariant type;
         bool isFunction = true;
-        std::vector<std::unique_ptr<FuncParamDecStatementNode>> params;
+        std::vector<FuncParamDecStmtPtr> params;
         bool isConst = false;
 
-        FuncExprNode(SourceLocation location, ExprNode type, bool isFunction,
-                     std::vector<std::unique_ptr<FuncParamDecStatementNode>> params)
-                : location(location), type(std::move(type)), isFunction(isFunction), params(std::move(params)) {}
+        FuncExprNode(SourceLoc loc, ExprPtrVariant type, bool isFunction, std::vector<FuncParamDecStmtPtr> params)
+            : loc(loc), type(std::move(type)), isFunction(isFunction), params(std::move(params)) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct ReturnStatementNode {
-        SourceLocation location;
-        ExprNode expr;
+        SourceLoc loc{0, 0};
+        std::optional<ExprPtrVariant> expr;
 
-        ReturnStatementNode(SourceLocation location, ExprNode expr) : location(location), expr(std::move(expr)) {}
+        ReturnStatementNode(SourceLoc loc, std::optional<ExprPtrVariant> expr) : loc(loc), expr(std::move(expr)) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct OutputStatementNode {
-        SourceLocation location;
-        ExprNode expr;
+        SourceLoc loc{0, 0};
+        ExprPtrVariant expr;
 
-        OutputStatementNode(SourceLocation location, ExprNode expr) : location(location), expr(std::move(expr)) {}
+        OutputStatementNode(SourceLoc loc, ExprPtrVariant expr) : loc(loc), expr(std::move(expr)) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct InputStatementNode {
-        SourceLocation location;
-        ExprNode expr;
+        SourceLoc loc{0, 0};
+        ExprPtrVariant expr;
 
-        InputStatementNode(SourceLocation location, ExprNode expr) : location(location), expr(std::move(expr)) {}
-
+        InputStatementNode(SourceLoc loc, ExprPtrVariant expr) : loc(loc), expr(std::move(expr)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct VarDecStatementNode {
-        SourceLocation location;
+        SourceLoc loc{0, 0};
         std::string name;
         std::string type;
-        ExprNode expr;
+        ExprPtrVariant expr;
         bool isGlobal = false;
         bool isPrivate = false;
         bool isExtern = false;
 
-        VarDecStatementNode(SourceLocation location, std::string name, std::string type, ExprNode expr,
-                            bool isGlobal = false, bool isPrivate = false, bool isExtern = false)
-                : location(location), name(std::move(name)), type(std::move(type)), expr(std::move(expr)),
-                  isGlobal(isGlobal), isPrivate(isPrivate), isExtern(isExtern) {}
+        VarDecStatementNode(SourceLoc loc, std::string name, std::string type, ExprPtrVariant expr, bool isGlobal = false, bool isPrivate = false, bool isExtern = false)
+            : loc(loc), name(std::move(name)), type(std::move(type)), expr(std::move(expr)), isGlobal(isGlobal), isPrivate(isPrivate), isExtern(isExtern) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct FuncPointerStatementNode {
-        SourceLocation location;
+        SourceLoc loc{0, 0};
         std::string name;
-        ExprNode type;
-        std::vector<std::unique_ptr<FuncParamDecStatementNode>> args;
+        ExprPtrVariant type;
+        std::vector<FuncParamDecStmtPtr> args;
         bool isFunction = false;
         bool isGlobal = false;
         bool isPrivate = false;
         bool isExtern = false;
-        ExprNode expr;
+        ExprPtrVariant expr;
 
-        FuncPointerStatementNode(SourceLocation location, std::string name, ExprNode type,
-                                 std::vector<std::unique_ptr<FuncParamDecStatementNode>> args, ExprNode expr,
-                                 bool isFunction = false, bool isGlobal = false, bool isPrivate = false,
-                                 bool isExtern = false)
-                : location(location), name(std::move(name)), type(std::move(type)), args(std::move(args)),
-                  isFunction(isFunction), isGlobal(isGlobal), isPrivate(isPrivate), isExtern(isExtern),
-                  expr(std::move(expr)) {}
-
+        FuncPointerStatementNode(SourceLoc loc, std::string name, ExprPtrVariant type, std::vector<FuncParamDecStmtPtr> args,
+                                 ExprPtrVariant expr, bool isFunction = false, bool isGlobal = false, bool isPrivate = false, bool isExtern = false)
+            : loc(loc), name(std::move(name)), type(std::move(type)), args(std::move(args)), expr(std::move(expr)),
+            isFunction(isFunction), isGlobal(isGlobal), isPrivate(isPrivate), isExtern(isExtern) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct ArrayDecStatementNode {
-        SourceLocation location;
+        SourceLoc loc{0, 0};
         std::string name;
         bool isGlobal = false;
         bool isPrivate = false;
-        std::unique_ptr<ArrayExprNode> expr;
-        ExprNode assignExpr;
+        ArrayExprPtr expr;
+        ExprPtrVariant assignExpr;
         int indicesCount = 1;
         bool isExtern = false;
         bool isConst = false;
 
-        ArrayDecStatementNode(SourceLocation location, std::string name, std::unique_ptr<ArrayExprNode> expr,
-                              bool isGlobal = false, bool isPrivate = false, bool isExtern = false,
-                              bool isConst = false)
-                : location(location), name(std::move(name)), isGlobal(isGlobal), isPrivate(isPrivate),
-                  expr(std::move(expr)), isExtern(isExtern), isConst(isConst) {}
+        ArrayDecStatementNode(SourceLoc loc, std::string name, ArrayExprPtr expr, bool isGlobal = false, bool isPrivate = false, bool isExtern = false, bool isConst = false)
+            : loc(loc), name(std::move(name)), expr(std::move(expr)), isGlobal(isGlobal), isPrivate(isPrivate), isExtern(isExtern), isConst(isConst) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct FuncDecStatementNode {
-        SourceLocation location;
+        SourceLoc loc{0, 0};
         std::string name;
-        ExprNode type;
-        std::vector<std::unique_ptr<FuncParamDecStatementNode>> args;
-        std::unique_ptr<BlockExprNode> block;
+        ExprPtrVariant type;
+        std::vector<FuncParamDecStmtPtr> args;
+        BlockExprPtr block;
         bool isPrivate = false;
         bool isFunction = false;
 
-        FuncDecStatementNode(SourceLocation location, std::string name, ExprNode type,
-                             std::vector<std::unique_ptr<FuncParamDecStatementNode>> args,
-                             std::unique_ptr<BlockExprNode> block, bool isPrivate = false, bool isFunction = false)
-                : location(location), name(std::move(name)), type(std::move(type)), args(std::move(args)),
-                  block(std::move(block)), isPrivate(isPrivate), isFunction(isFunction) {}
+        FuncDecStatementNode(SourceLoc loc, std::string name, ExprPtrVariant type, std::vector<FuncParamDecStmtPtr> args, BlockExprPtr block, bool isPrivate = false, bool isFunction = false)
+            : loc(loc), name(std::move(name)), type(std::move(type)), args(std::move(args)), block(std::move(block)), isPrivate(isPrivate), isFunction(isFunction) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct FieldVarDecNode {
-        SourceLocation location;
+        SourceLoc loc{0, 0};
         std::string name;
         std::string typeName;
         bool isPrivate;
         int index;
         std::string type;
-        ExprNode expr;
+        ExprPtrVariant expr;
 
-        FieldVarDecNode(SourceLocation location, std::string name, std::string typeName, bool isPrivate, int index,
-                        std::string type, ExprNode expr)
-                : location(location), name(std::move(name)), typeName(std::move(typeName)), isPrivate(isPrivate),
-                  index(index), type(std::move(type)), expr(std::move(expr)) {}
-
+        FieldVarDecNode(SourceLoc loc, std::string name, std::string typeName, bool isPrivate, int index, std::string type, ExprPtrVariant expr)
+            : loc(loc), name(std::move(name)), typeName(std::move(typeName)), isPrivate(isPrivate), index(index), type(std::move(type)), expr(std::move(expr)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct FieldArrayVarDecNode {
-        SourceLocation location;
+        SourceLoc loc{0, 0};
         std::string name;
         std::string typeName;
         bool isPrivate;
         int index;
-        std::unique_ptr<ArrayDecStatementNode> var;
+        ArrayDecStatementPtr var;
 
-        FieldArrayVarDecNode(SourceLocation location, std::string name, std::string typeName, bool isPrivate, int index,
-                             std::unique_ptr<ArrayDecStatementNode> var)
-                : location(location), name(std::move(name)), typeName(std::move(typeName)), isPrivate(isPrivate),
-                  index(index), var(std::move(var)) {}
+        FieldArrayVarDecNode(SourceLoc loc, std::string name, std::string typeName, bool isPrivate, int index, ArrayDecStatementPtr var)
+            : loc(loc), name(std::move(name)), typeName(std::move(typeName)), isPrivate(isPrivate), index(index), var(std::move(var)) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct MethodDecNode {
-        SourceLocation location;
+        SourceLoc loc{0, 0};
         std::string name;
-        ExprNode type;
-        VariableExprNode thisName;
-        std::vector<std::unique_ptr<FuncParamDecStatementNode>> args;
-        std::unique_ptr<BlockExprNode> block;
+        ExprPtrVariant type;
+        std::string thisName;
+        std::vector<FuncParamDecStmtPtr> args;
+        BlockExprPtr block;
         bool isPrivate = false;
         bool isFunction = false;
 
-        MethodDecNode(SourceLocation location, std::string name, ExprNode type, VariableExprNode thisName,
-                      std::vector<std::unique_ptr<FuncParamDecStatementNode>> args,
-                      std::unique_ptr<BlockExprNode> block, bool isPrivate = false, bool isFunction = false)
-                : location(location), name(std::move(name)), type(std::move(type)), thisName(std::move(thisName)),
-                  args(std::move(args)), block(std::move(block)), isPrivate(isPrivate), isFunction(isFunction) {}
+        MethodDecNode(SourceLoc loc, std::string name, ExprPtrVariant type, std::string thisName, std::vector<FuncParamDecStmtPtr> args,
+                      BlockExprPtr block, bool isPrivate = false, bool isFunction = false)
+            : loc(loc), name(std::move(name)), type(std::move(type)), thisName(std::move(thisName)), args(std::move(args)),
+              block(std::move(block)), isPrivate(isPrivate), isFunction(isFunction) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct TypeDecStatementNode {
-        SourceLocation location;
+        SourceLoc loc{0, 0};
         std::string name;
-        std::vector<DeclarationNode> fields;
-        std::vector<std::unique_ptr<MethodDecNode>> methods;
-        std::unique_ptr<TypeDecStatementNode> parentType;
+        std::vector<DeclPtrVariant> fields;
+        std::vector<MethodDecPtr> methods;
+        std::optional<TypeDecStatementPtr> parentType = std::nullopt;
         bool isExtern = false;
         bool isPrivate = false;
 
-        TypeDecStatementNode(SourceLocation location, std::string name, std::vector<DeclarationNode> fields,
-                             std::vector<std::unique_ptr<MethodDecNode>> methods,
-                             std::unique_ptr<TypeDecStatementNode> parentType, bool isExtern = false,
-                             bool isPrivate = false)
-                : location(location), name(std::move(name)), fields(std::move(fields)), methods(std::move(methods)),
-                  parentType(std::move(parentType)), isExtern(isExtern), isPrivate(isPrivate) {}
+        TypeDecStatementNode(SourceLoc loc, std::string name, std::vector<DeclPtrVariant> fields,
+                             std::vector<MethodDecPtr> methods, std::optional<TypeDecStatementPtr> parentType = std::nullopt,
+                             bool isExtern = false, bool isPrivate = false)
+                             : loc(loc), name(std::move(name)), fields(std::move(fields)), methods(std::move(methods)),
+                               parentType(std::move(parentType)), isExtern(isExtern), isPrivate(isPrivate) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct ExternFuncDecStatementNode {
-        SourceLocation location;
+        SourceLoc loc{0, 0};
         std::string name;
-        ExprNode type;
-        std::vector<std::unique_ptr<FuncParamDecStatementNode>> args;
+        ExprPtrVariant type;
+        std::vector<FuncParamDecStmtPtr> args;
         bool isPrivate = false;
         bool isFunction = false;
 
-        ExternFuncDecStatementNode(SourceLocation location, std::string name, ExprNode type,
-                                   std::vector<std::unique_ptr<FuncParamDecStatementNode>> args, bool isPrivate = false,
-                                   bool isFunction = false)
-                : location(location), name(std::move(name)), type(std::move(type)), args(std::move(args)),
-                  isPrivate(isPrivate), isFunction(isFunction) {}
+        ExternFuncDecStatementNode(SourceLoc loc, std::string name, ExprPtrVariant type, std::vector<FuncParamDecStmtPtr> args,
+                                   bool isPrivate = false, bool isFunction = false)
+                                   : loc(loc), name(std::move(name)), type(std::move(type)), args(std::move(args)),
+                                     isPrivate(isPrivate), isFunction(isFunction) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct ElseIfStatementNode {
-        SourceLocation location;
-        ExprNode condExpr;
-        std::unique_ptr<BlockExprNode> trueBlock;
+        SourceLoc loc{0, 0};
+        ExprPtrVariant condExpr;
+        BlockExprPtr trueBlock;
 
-        ElseIfStatementNode(SourceLocation location, ExprNode condExpr, std::unique_ptr<BlockExprNode> trueBlock)
-                : location(location), condExpr(std::move(condExpr)), trueBlock(std::move(trueBlock)) {}
+        ElseIfStatementNode(SourceLoc loc, ExprPtrVariant condExpr, BlockExprPtr trueBlock)
+            : loc(loc), condExpr(std::move(condExpr)), trueBlock(std::move(trueBlock)) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct IfStatementNode {
-        SourceLocation location;
-        ExprNode condExpr;
-        std::unique_ptr<BlockExprNode> trueBlock;
-        std::unique_ptr<BlockExprNode> falseBlock;
-        std::vector<std::unique_ptr<ElseIfStatementNode>> elseIfNodes;
+        SourceLoc loc{0, 0};
+        ExprPtrVariant condExpr;
+        BlockExprPtr trueBlock;
+        BlockExprPtr falseBlock;
+        std::vector<ElseIfStatementPtr> elseIfNodes;
 
-        IfStatementNode(SourceLocation location, ExprNode condExpr, std::unique_ptr<BlockExprNode> trueBlock,
-                        std::unique_ptr<BlockExprNode> falseBlock,
-                        std::vector<std::unique_ptr<ElseIfStatementNode>> elseIfNodes)
-                : location(location), condExpr(std::move(condExpr)), trueBlock(std::move(trueBlock)),
-                  falseBlock(std::move(falseBlock)), elseIfNodes(std::move(elseIfNodes)) {}
+        IfStatementNode(SourceLoc loc, BlockExprPtr condExpr, BlockExprPtr trueBlock, BlockExprPtr falseBlock,
+                        std::vector<ElseIfStatementPtr> elseIfNodes)
+            : loc(loc), condExpr(std::move(condExpr)), trueBlock(std::move(trueBlock)),
+            falseBlock(std::move(falseBlock)), elseIfNodes(std::move(elseIfNodes)) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct WhileStatementNode {
-        SourceLocation location;
-        ExprNode whileExpr;
-        std::unique_ptr<BlockExprNode> block;
+        SourceLoc loc{0, 0};
+        ExprPtrVariant whileExpr;
+        BlockExprPtr block;
 
-        WhileStatementNode(SourceLocation location, ExprNode whileExpr, std::unique_ptr<BlockExprNode> block)
-                : location(location), whileExpr(std::move(whileExpr)), block(std::move(block)) {}
-
+        WhileStatementNode(SourceLoc loc, ExprPtrVariant whileExpr, BlockExprPtr block)
+            : loc(loc), whileExpr(std::move(whileExpr)), block(std::move(block)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct ModuleStatementNode {
-        SourceLocation location;
+        SourceLoc loc{0, 0};
         std::string name;
-        std::unique_ptr<BlockExprNode> block;
+        BlockExprPtr block;
 
-        ModuleStatementNode(SourceLocation location, std::string name, std::unique_ptr<BlockExprNode> block)
-                : location(location), name(std::move(name)), block(std::move(block)) {}
+        ModuleStatementNode(SourceLoc loc, std::string name, BlockExprPtr block)
+            : loc(loc), name(std::move(name)), block(std::move(block)) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
 #pragma endregion
 
+    template<typename T, typename VARIANT_T>
+    struct is_variant_member;
+
+    template<typename T, typename... ALL_T>
+    struct is_variant_member<T, std::variant<ALL_T...>>
+            : public std::disjunction<std::is_same<T, ALL_T>...> {};
+
+    template<typename T, typename... Args>
+    requires is_variant_member<std::unique_ptr<T>, ExprPtrVariant>::value
+    auto createExpr(Args&&... args) -> ExprPtrVariant {
+        return std::make_unique<T>(std::forward<Args>(args)...);
+    }
+
+    template<typename T, typename... Args>
+    requires is_variant_member<std::unique_ptr<T>, VarExprPtrVariant>::value
+    auto createVarExpr(Args&&... args) -> VarExprPtrVariant {
+        return std::make_unique<T>(std::forward<Args>(args)...);
+    }
+
+    template<typename T, typename... Args>
+    requires is_variant_member<std::unique_ptr<T>, DeclPtrVariant>::value
+    auto createDecl(Args&&... args) -> DeclPtrVariant {
+        return std::make_unique<T>(std::forward<Args>(args)...);
+    }
+
+    template<typename T, typename... Args>
+    requires is_variant_member<std::unique_ptr<T>, StmtPtrVariant>::value
+    auto createStmt(Args&&... args) -> StmtPtrVariant {
+        return std::make_unique<T>(std::forward<Args>(args)...);
+    }
+
     struct IsExprConstVisitor {
         auto operator()(const auto &x) const -> bool {
-            return x.get()->isConst;
+            return x->isConst;
         }
     };
 
-    static auto isConstExpr(const ExprNode &expr) -> bool {
+    static auto isConstExpr(const ExprPtrVariant &expr) -> bool {
         return std::visit(IsExprConstVisitor{}, expr);
     }
 
     struct DeclarationNameVisitor {
         auto operator()(const auto &x) const -> std::string_view {
-            return x.get()->name;
+            return x->name;
         }
     };
 
-    static auto getDeclarationName(const DeclarationNode &declaration) -> std::string_view {
+    static auto getDeclarationName(const DeclPtrVariant &declaration) -> std::string_view {
         return std::visit(DeclarationNameVisitor{}, declaration);
     }
 }

@@ -4,6 +4,8 @@
 
 #include <iostream>
 #include "CodeGen.hpp"
+#include "parser/AST.hpp"
+
 
 namespace Slangc {
     using namespace AST;

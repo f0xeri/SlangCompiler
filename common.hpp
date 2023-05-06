@@ -12,7 +12,8 @@
 #include <utility>
 
 namespace Slangc {
-    struct SourceLocation {
+    struct SourceLoc {
+        SourceLoc(std::uint64_t line, std::uint64_t column) : line(line), column(column) {}
         std::uint64_t line;
         std::uint64_t column;
 
@@ -24,11 +25,11 @@ namespace Slangc {
     class ErrorMessage {
     public:
         std::string_view message;
-        SourceLocation location;
+        SourceLoc location;
         bool isWarning = false;
         bool internal = false;
 
-        ErrorMessage(std::string_view message, SourceLocation location, bool isWarning = false, bool internal = false)
+        ErrorMessage(std::string_view message, SourceLoc location, bool isWarning = false, bool internal = false)
                 : message(message), location(location), isWarning(isWarning), internal(internal) {}
 
         void print(auto &stream, std::string_view file) const {

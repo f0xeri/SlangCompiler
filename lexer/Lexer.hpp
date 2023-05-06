@@ -29,11 +29,11 @@ namespace Slangc {
         auto lexString(std::string_view &sourceText) -> bool;
 
         void addToken(TokenType type, std::string_view value, uint64_t column) {
-            tokens[currentLine].emplace_back(Token{type, std::string(value), SourceLocation{currentLine, column}});
+            tokens.emplace_back(Token{type, std::string(value), SourceLoc{currentLine, column}});
         }
 
         void addToken(TokenType type, std::string value, uint64_t column) {
-            tokens[currentLine].emplace_back(Token{type, std::move(value), SourceLocation{currentLine, column}});
+            tokens.emplace_back(Token{type, std::move(value), SourceLoc{currentLine, column}});
         }
 
         auto getErrors() -> std::vector<ErrorMessage> {
@@ -41,7 +41,7 @@ namespace Slangc {
         }
 
     public:
-        std::map<std::uint64_t, std::vector<Token>> tokens;
+       std::vector<Token> tokens;
 
         explicit Lexer(SourceBuffer &&sourceBuffer, std::vector<ErrorMessage> &errors) : errors(errors), sourceBuffer(std::make_unique<SourceBuffer>(sourceBuffer)) {}
         void tokenize();
@@ -72,12 +72,10 @@ namespace Slangc {
         }
 
         void printTokens() {
-            for (auto& line : tokens) {
-                for (auto& token : line.second) {
-                    std::cout << "" << getTokenName(token) << " ";
-                }
-                std::cout << "\n";
+            for (auto& token : tokens) {
+                std::cout << "" << getTokenName(token) << " ";
             }
+            std::cout << "\n";
         }
     };
 }

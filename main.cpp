@@ -5,7 +5,6 @@
 #include "CompilerOptions.hpp"
 #include "parser/Parser.hpp"
 #include "parser/AST.hpp"
-#include "parser/ASTBox.hpp"
 #include "parser/Scope.hpp"
 #include <codegen/CodeGen.hpp>
 
@@ -22,6 +21,7 @@ int main(int argc, char **argv) {
     lexer.printTokens();
 
     Slangc::Parser parser(lexer.tokens, errors, options);
+    parser.parse();
 
     std::cout << "\n";
     Slangc::printErrorMessages(errors, std::cout, buffer->getFilename());

@@ -537,6 +537,11 @@ namespace Slangc::AST {
 
 #pragma endregion
 
+    template<typename T, typename... Args>
+    auto create(Args&&... args) -> std::unique_ptr<T> {
+        return std::make_unique<T>(std::forward<Args>(args)...);
+    }
+
     template<typename T, typename VARIANT_T>
     struct is_variant_member;
 

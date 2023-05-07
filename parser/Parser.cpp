@@ -10,11 +10,13 @@ namespace Slangc {
         parseImports();
 
         auto loc = SourceLoc{0, 0};
-        auto plus = createExpr<OperatorExprNode>(loc, TokenType::Plus,
+        auto plus = createExpr<OperatorExprNode>(loc,
+                                                 TokenType::Plus,
                                                  createExpr<IntExprNode>(loc, 5),
                                                  createExpr<IntExprNode>(loc, 10));
-
-        return false;
+        moduleAST = create<ModuleStatementNode>(loc, "test", create<BlockExprNode>(loc, std::vector<StmtPtrVariant>()));
+        moduleAST->block->statements.push_back(createStmt<ReturnStatementNode>(loc, createExpr<IntExprNode>(loc, 0)));
+        return true;
     }
 
     auto Parser::parseImports() -> bool {

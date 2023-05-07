@@ -6,7 +6,7 @@
 
 namespace Slangc {
     auto Parser::parseModuleStmt() -> std::optional<ModuleStatementNode> {
-        SourceLoc start = currentToken->location;
+
         return std::nullopt;
     }
 } // Slangc

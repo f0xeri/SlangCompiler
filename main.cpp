@@ -23,6 +23,9 @@ int main(int argc, char **argv) {
     Slangc::Parser parser(lexer.tokens, errors, options);
     parser.parse();
 
+    Slangc::CodeGen codeGen(std::move(parser.moduleAST));
+    codeGen.process();
+
     std::cout << "\n";
     Slangc::printErrorMessages(errors, std::cout, buffer->getFilename());
     return 0;

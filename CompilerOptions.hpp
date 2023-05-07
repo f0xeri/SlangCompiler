@@ -70,17 +70,12 @@ namespace Slangc {
             inputFiles_ = InputFiles;
         };
 
-        [[nodiscard]] const std::vector<std::string> &getInputFileNames() const { return inputFiles_; }
-
-        [[nodiscard]] const std::string &getOutputFileName() const { return outputFileName_; }
-
-        [[nodiscard]] bool isDebug() const { return debug_; }
-
-        [[nodiscard]] const std::vector<std::string> &getLinkLibraries() const { return libraries_; }
-
-        [[nodiscard]] OptLevel getOptimizationLevel() const { return optimizationLevel_; }
-
-        [[nodiscard]] bool isGCEnabled() const { return gcEnabled_; }
+        [[nodiscard]] auto getInputFileNames() const -> const std::vector<std::string>& { return inputFiles_; }
+        [[nodiscard]] auto getOutputFileName() const -> const std::string& { return outputFileName_; }
+        [[nodiscard]] auto isDebug() const -> bool { return debug_; }
+        [[nodiscard]] auto getLinkLibraries() const -> const std::vector<std::string> & { return libraries_; }
+        [[nodiscard]] auto getOptimizationLevel() const -> OptLevel { return optimizationLevel_; }
+        [[nodiscard]] auto isGCEnabled() const -> bool { return gcEnabled_; }
 
     private:
         std::string outputFileName_;

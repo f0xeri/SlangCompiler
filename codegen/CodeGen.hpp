@@ -11,13 +11,20 @@ namespace Slangc {
 
     class CodeGen {
     public:
-        CodeGen() = default;
+        CodeGen(AST::ModuleStatementPtr moduleAST) : moduleAST(std::move(moduleAST)) {}
+        AST::ModuleStatementPtr moduleAST;
+        auto process() -> void {
+            for (auto &stmt : moduleAST->block->statements) {
+                processNode(stmt);
+            }
+        }
     private:
         CodeGenContext context;
 
 
-        auto processNode(const auto &node) -> bool {
-            return std::visit(node.codegen, context);
+        auto processNode(const auto &node) -> void {
+            auto call = [this](auto& expr) { return expr.get()->codegen(context); };
+            std::visit(call, node);
         }
     };
 

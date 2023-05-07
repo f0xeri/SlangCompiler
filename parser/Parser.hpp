@@ -30,6 +30,7 @@ namespace Slangc {
 
         const CompilerOptions &options;
         std::vector<ErrorMessage> &errors;
+        ModuleStatementPtr moduleAST;
         bool hasError = false;
 
         auto parse() -> bool;

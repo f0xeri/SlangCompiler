@@ -16,6 +16,16 @@ namespace Slangc {
                                                  createExpr<IntExprNode>(loc, 10));
         moduleAST = create<ModuleStatementNode>(loc, "test", create<BlockExprNode>(loc, std::vector<StmtPtrVariant>()));
         moduleAST->block->statements.push_back(createStmt<ReturnStatementNode>(loc, createExpr<IntExprNode>(loc, 0)));
+
+        while (token->type != TokenType::EndOfFile) {
+            auto decl = parseVarDecl(false);
+            if (decl.has_value()) {
+                //moduleAST->block->statements.emplace_back(std::move(decl.value()));
+            }
+            else {
+                return false;
+            }
+        }
         return true;
     }
 

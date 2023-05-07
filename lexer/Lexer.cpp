@@ -87,6 +87,7 @@ namespace Slangc {
                 break;
             }
         }
+        addToken(TokenType::EndOfFile, currentColumn);
     }
 
     auto Lexer::skipWhitespaces(std::string_view &sourceText) -> bool {

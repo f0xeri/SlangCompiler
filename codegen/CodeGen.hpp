@@ -21,7 +21,6 @@ namespace Slangc {
     private:
         CodeGenContext context;
 
-
         auto processNode(const auto &node) -> void {
             auto call = [this](auto& expr) { return expr.get()->codegen(context); };
             std::visit(call, node);

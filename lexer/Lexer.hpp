@@ -9,9 +9,10 @@
 #include <map>
 #include <memory>
 #include <utility>
+#include <iostream>
 #include "TokenType.hpp"
-#include "../common.hpp"
-#include "../source/SourceBuffer.hpp"
+#include "common.hpp"
+#include "source/SourceBuffer.hpp"
 #include "source_location"
 
 namespace Slangc {
@@ -34,6 +35,10 @@ namespace Slangc {
 
         void addToken(TokenType type, std::string value, uint64_t column) {
             tokens.emplace_back(Token{type, std::move(value), SourceLoc{currentLine, column}});
+        }
+
+        void addToken(TokenType type, uint64_t column) {
+            tokens.emplace_back(Token{type, "", SourceLoc{currentLine, column}});
         }
 
         auto getErrors() -> std::vector<ErrorMessage> {

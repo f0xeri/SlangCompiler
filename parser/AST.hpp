@@ -255,11 +255,11 @@ namespace Slangc::AST {
 
     struct CallExprNode {
         SourceLoc loc{0, 0};
-        VarExprPtrVariant name;
+        ExprPtrVariant name;        // TODO: change to VarExprPtrVariant?
         std::vector<ExprPtrVariant> args;
         bool isConst = false;
 
-        CallExprNode(SourceLoc loc, VarExprPtrVariant name, std::vector<ExprPtrVariant> args)
+        CallExprNode(SourceLoc loc, ExprPtrVariant name, std::vector<ExprPtrVariant> args)
             : loc(loc), name(std::move(name)), args(std::move(args)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
@@ -347,12 +347,12 @@ namespace Slangc::AST {
         SourceLoc loc{0, 0};
         std::string name;
         std::string type;
-        ExprPtrVariant expr;
+        std::optional<ExprPtrVariant> expr;
         bool isGlobal = false;
         bool isPrivate = false;
         bool isExtern = false;
 
-        VarDecStatementNode(SourceLoc loc, std::string name, std::string type, ExprPtrVariant expr, bool isGlobal = false, bool isPrivate = false, bool isExtern = false)
+        VarDecStatementNode(SourceLoc loc, std::string name, std::string type, std::optional<ExprPtrVariant> expr = std::nullopt, bool isGlobal = false, bool isPrivate = false, bool isExtern = false)
             : loc(loc), name(std::move(name)), type(std::move(type)), expr(std::move(expr)), isGlobal(isGlobal), isPrivate(isPrivate), isExtern(isExtern) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;

@@ -24,13 +24,13 @@ namespace Slangc {
 
     class ErrorMessage {
     public:
-        std::string_view message;
+        std::string message;
         SourceLoc location;
         bool isWarning = false;
         bool internal = false;
 
-        ErrorMessage(std::string_view message, SourceLoc location, bool isWarning = false, bool internal = false)
-                : message(message), location(location), isWarning(isWarning), internal(internal) {}
+        ErrorMessage(std::string message, SourceLoc location, bool isWarning = false, bool internal = false)
+                : message(std::move(message)), location(location), isWarning(isWarning), internal(internal) {}
 
         void print(auto &stream, std::string_view file) const {
             stream << file;
@@ -49,7 +49,7 @@ namespace Slangc {
     };
 
     // https://www.foonathan.net/2022/05/recursive-variant-box/
-    template <typename T>
+    /*template <typename T>
     class Box
     {
         // Wrapper over unique_ptr.
@@ -77,7 +77,7 @@ namespace Slangc {
 
         T *operator->() { return _impl.get(); }
         const T *operator->() const { return _impl.get(); }
-    };
+    };*/
 
     [[nodiscard]] static std::string_view takeWhile(std::string_view str, std::function<bool(char)> pred) {
         auto endIt = std::find_if_not(str.begin(), str.end(), std::move(pred));

@@ -303,10 +303,10 @@ namespace Slangc::AST {
 
     struct AssignExprNode {
         SourceLoc loc{0, 0};
-        VarExprPtrVariant left;
+        ExprPtrVariant left;
         ExprPtrVariant right;
 
-        AssignExprNode(SourceLoc loc, VarExprPtrVariant left, ExprPtrVariant right)
+        AssignExprNode(SourceLoc loc, ExprPtrVariant left, ExprPtrVariant right)
             : loc(loc), left(std::move(left)), right(std::move(right)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };

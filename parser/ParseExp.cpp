@@ -131,7 +131,7 @@ namespace Slangc {
             consume(TokenType::RParen);
             return expr;
         }
-        errors.emplace_back("Failed to parse expression." + tok.value, loc);
+        errors.emplace_back("Failed to parse expression.", loc);
         return std::nullopt;
     }
 
@@ -142,6 +142,33 @@ namespace Slangc {
         auto name = token->value;
         advance();
         return createExpr<VarExprNode>(loc, name);
+    }
+
+    auto Parser::parseVarExpr() -> std::optional<ExprPtrVariant> {
+        return parseAccess();
+    }
+    auto Parser::parseAccess() -> std::optional<ExprPtrVariant> {
+        advance();              // because parseVar() makes token--.
+        auto expr = parseVar();
+        while (true) {
+            if (match(TokenType::Dot)) {
+                auto opToken = prevToken();
+                auto name = consume(TokenType::Identifier).value;
+                expr = createExpr<AccessExprNode>(opToken.location, std::move(expr.value()), name);
+            }
+            else if (match(TokenType::LBracket)) {
+                auto opToken = prevToken();
+                do {
+                    auto indexExpr = parseExpr().value();
+                    consume(TokenType::RBracket);
+                    expr = createExpr<IndexExprNode>(opToken.location, std::move(expr.value()), std::move(indexExpr));
+                } while (match(TokenType::LBracket));
+            }
+            else {
+                break;
+            }
+        }
+        return expr;
     }
 
 } // Slangc

@@ -49,10 +49,20 @@ namespace Slangc {
         auto parsePrimary() -> std::optional<ExprPtrVariant>;
         auto parseVar() -> std::optional<ExprPtrVariant>;
 
+        auto parseVarExpr() -> std::optional<ExprPtrVariant>;
+        auto parseAccess() -> std::optional<ExprPtrVariant>;
 
         auto parseModuleDecl() -> std::optional<ModuleDeclPtr>;
-        auto parseVarStmt() -> std::optional<StmtPtrVariant>;
         auto parseBlockStmt(const std::string& name) -> std::optional<BlockStmtPtr>;
+        auto parseVarStmt() -> std::optional<StmtPtrVariant>;
+        auto parseIfStmt() -> std::optional<StmtPtrVariant>;
+        auto parseWhileStmt() -> std::optional<StmtPtrVariant>;
+        auto parseOutputStmt() -> std::optional<StmtPtrVariant>;
+        auto parseInputStmt() -> std::optional<StmtPtrVariant>;
+        auto parseLetStmt() -> std::optional<StmtPtrVariant>;
+        auto parseReturnStmt() -> std::optional<StmtPtrVariant>;
+        auto parseCallStmt() -> std::optional<StmtPtrVariant>;
+        auto parseDeleteStmt() -> std::optional<StmtPtrVariant>;
 
         auto parseVarDecl(bool isGlobal) -> std::optional<DeclPtrVariant>;
 
@@ -72,13 +82,13 @@ namespace Slangc {
         }
 
         void error() {
-            errors.emplace_back("Unexpected token " + std::string(Lexer::getTokenName(*token)), token->location);
+            errors.emplace_back("Unexpected token " + std::string(Lexer::getTokenName(*token)) + ".", token->location);
             hasError = true;
         }
 
         bool expect(TokenType tokenType) {
             if (token->type != tokenType) {
-                errors.emplace_back(std::string("Unexpected token ") + std::string(Lexer::getTokenName(*token)) + std::string(", expected ") + std::string(Lexer::getTokenName(tokenType)), token->location);
+                errors.emplace_back(std::string("Unexpected token ") + std::string(Lexer::getTokenName(*token)) + std::string(", expected ") + std::string(Lexer::getTokenName(tokenType)) + ".", token->location);
                 hasError = true;
                 return false;
             }

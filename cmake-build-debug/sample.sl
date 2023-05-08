@@ -2,6 +2,7 @@ module sample
 start
     // test line comment
     variable-array[2] array[3] array[4] integer arr3d2;
+    let arr3d2[auf()][2][3] := 1;
     variable-integer i := arr[xdd](22);
     variable-boolean fafaf := f(1, 2.1f, fa(T.a).test).tst().test().test(test());
     variable-integer i := 2 + (1 + 4) * 2;      // test trailing comment

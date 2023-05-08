@@ -22,7 +22,6 @@ namespace Slangc::AST {
     };
 
     struct ArrayExprNode;
-    struct BlockExprNode;
     struct BooleanExprNode;
     struct CharExprNode;
     struct FloatExprNode;
@@ -37,9 +36,9 @@ namespace Slangc::AST {
     struct IndexesExprNode;
     struct IndexExprNode;
     struct CallExprNode;
+    struct AccessExprNode;
 
     using ArrayExprPtr = std::unique_ptr<ArrayExprNode>;
-    using BlockExprPtr = std::unique_ptr<BlockExprNode>;
     using BooleanExprPtr = std::unique_ptr<BooleanExprNode>;
     using CharExprPtr = std::unique_ptr<CharExprNode>;
     using FloatExprPtr = std::unique_ptr<FloatExprNode>;
@@ -54,11 +53,12 @@ namespace Slangc::AST {
     using IndexesExprPtr = std::unique_ptr<IndexesExprNode>;
     using IndexExprPtr = std::unique_ptr<IndexExprNode>;
     using CallExprPtr = std::unique_ptr<CallExprNode>;
+    using AccessExprPtr = std::unique_ptr<AccessExprNode>;
 
     using ExprPtrVariant
-            = std::variant<ArrayExprPtr, BlockExprPtr, BooleanExprPtr, CharExprPtr, FloatExprPtr,
+            = std::variant<ArrayExprPtr, BooleanExprPtr, CharExprPtr, FloatExprPtr,
             FuncExprPtr, IntExprPtr, NilExprPtr, OperatorExprPtr, RealExprPtr, StringExprPtr,
-            UnaryOperatorExprPtr, VarExprPtr, IndexesExprPtr, IndexExprPtr, CallExprPtr>;
+            UnaryOperatorExprPtr, VarExprPtr, IndexesExprPtr, IndexExprPtr, CallExprPtr, AccessExprPtr>;
 
     using VarExprPtrVariant = std::variant<VarExprPtr, IndexesExprPtr, IndexExprPtr>;
 
@@ -72,6 +72,7 @@ namespace Slangc::AST {
     struct MethodDecNode;
     struct TypeDecStatementNode;
     struct VarDecStatementNode;
+    struct ModuleDeclNode;
 
     using ArrayDecStatementPtr = std::unique_ptr<ArrayDecStatementNode>;
     using ExternFuncDecStatementPtr = std::unique_ptr<ExternFuncDecStatementNode>;
@@ -83,39 +84,39 @@ namespace Slangc::AST {
     using MethodDecPtr = std::unique_ptr<MethodDecNode>;
     using TypeDecStatementPtr = std::unique_ptr<TypeDecStatementNode>;
     using VarDecStatementPtr = std::unique_ptr<VarDecStatementNode>;
+    using ModuleDeclPtr = std::unique_ptr<ModuleDeclNode>;
 
     using DeclPtrVariant
             = std::variant<ArrayDecStatementPtr, ExternFuncDecStatementPtr, FieldArrayVarDecPtr, FieldVarDecPtr,
             FuncDecStatementPtr, FuncParamDecStmtPtr, FuncPointerStatementPtr, MethodDecPtr,
-            TypeDecStatementPtr, VarDecStatementPtr>;
+            TypeDecStatementPtr, VarDecStatementPtr, ModuleDeclPtr>;
 
     struct AssignExprNode;
     struct DeleteExprNode;
     struct ElseIfStatementNode;
     struct IfStatementNode;
     struct InputStatementNode;
-    struct ModuleStatementNode;
     struct OutputStatementNode;
     struct ReturnStatementNode;
     struct WhileStatementNode;
+    struct BlockStmtNode;
 
     using AssignExprPtr = std::unique_ptr<AssignExprNode>;
     using DeleteExprPtr = std::unique_ptr<DeleteExprNode>;
     using ElseIfStatementPtr = std::unique_ptr<ElseIfStatementNode>;
     using IfStatementPtr = std::unique_ptr<IfStatementNode>;
     using InputStatementPtr = std::unique_ptr<InputStatementNode>;
-    using ModuleStatementPtr = std::unique_ptr<ModuleStatementNode>;
     using OutputStatementPtr = std::unique_ptr<OutputStatementNode>;
     using ReturnStatementPtr = std::unique_ptr<ReturnStatementNode>;
     using WhileStatementPtr = std::unique_ptr<WhileStatementNode>;
-
+    using BlockStmtPtr = std::unique_ptr<BlockStmtNode>;
 
     using StmtPtrVariant
             = std::variant<AssignExprPtr, CallExprPtr, ArrayDecStatementPtr, ExternFuncDecStatementPtr,
             FieldArrayVarDecPtr, FieldVarDecPtr, FuncDecStatementPtr, FuncParamDecStmtPtr, FuncPointerStatementPtr,
             MethodDecPtr, TypeDecStatementPtr, VarDecStatementPtr, DeleteExprPtr, ElseIfStatementPtr, IfStatementPtr,
-            InputStatementPtr, ModuleStatementPtr, OutputStatementPtr, ReturnStatementPtr, VarExprPtr,
-            IndexesExprPtr, IndexExprPtr, WhileStatementPtr>;
+            InputStatementPtr, OutputStatementPtr, ReturnStatementPtr, VarExprPtr,
+            IndexesExprPtr, IndexExprPtr, WhileStatementPtr, BlockStmtPtr>;
 
 #pragma region Nodes declarations
     // codegen methods are defined in codegen/CodeGen.cpp
@@ -197,36 +198,43 @@ namespace Slangc::AST {
 
     struct VarExprNode {
         SourceLoc loc{0, 0};
-        std::string value;
+        std::string name;
         bool dotClass = false;
         bool dotModule = false;
         bool isPointer = false;
         int index = -1;
         bool isConst = false;
 
-        VarExprNode(SourceLoc loc, std::string value, bool dotClass = false, bool dotModule = false, bool isPointer = false, int index = -1)
-            : loc(loc), value(std::move(value)), dotClass(dotClass), dotModule(dotModule), isPointer(isPointer), index(index) {};
+        VarExprNode(SourceLoc loc, std::string name, bool dotClass = false, bool dotModule = false, bool isPointer = false, int index = -1)
+            : loc(loc), name(std::move(name)), dotClass(dotClass), dotModule(dotModule), isPointer(isPointer), index(index) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct IndexExprNode {
         SourceLoc loc{0, 0};
+        ExprPtrVariant expr;
         ExprPtrVariant indexExpr;
-        ExprPtrVariant assign;
+        std::optional<ExprPtrVariant> assign = std::nullopt;
+        bool dotClass = false;
+        bool dotModule = false;
+        bool isPointer = false;
+        int index = -1;
         bool isConst = false;
 
-        IndexExprNode(SourceLoc loc, ExprPtrVariant indexExpr, ExprPtrVariant assign)
-            : loc(loc), indexExpr(std::move(indexExpr)), assign(std::move(assign)) {};
+        IndexExprNode(SourceLoc loc, ExprPtrVariant expr, ExprPtrVariant indexExpr, std::optional<ExprPtrVariant> assign = std::nullopt,
+                      bool dotClass = false, bool dotModule = false, bool isPointer = false, int index = -1)
+            : loc(loc), expr(std::move(expr)), indexExpr(std::move(indexExpr)), assign(std::move(assign)), dotClass(dotClass),
+              dotModule(dotModule), isPointer(isPointer), index(index) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct IndexesExprNode {
         SourceLoc loc{0, 0};
         std::vector<ExprPtrVariant> indexes;
-        ExprPtrVariant assign;
+        std::optional<ExprPtrVariant> assign = std::nullopt;
         bool isConst = false;
 
-        IndexesExprNode(SourceLoc loc, std::vector<ExprPtrVariant> indexes, ExprPtrVariant assign)
+        IndexesExprNode(SourceLoc loc, std::vector<ExprPtrVariant> indexes, std::optional<ExprPtrVariant> assign = std::nullopt)
             : loc(loc), indexes(std::move(indexes)), assign(std::move(assign)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
@@ -264,6 +272,17 @@ namespace Slangc::AST {
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
+    struct AccessExprNode {
+        SourceLoc loc{0, 0};
+        ExprPtrVariant expr;
+        std::string name;
+        bool isConst = false;
+
+        AccessExprNode(SourceLoc loc, ExprPtrVariant expr, std::string name)
+            : loc(loc), expr(std::move(expr)), name(std::move(name)) {};
+        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+    };
+
     struct DeleteExprNode {
         SourceLoc loc{0, 0};
         ExprPtrVariant expr;
@@ -273,12 +292,12 @@ namespace Slangc::AST {
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
-    struct BlockExprNode {
+    struct BlockStmtNode {
         SourceLoc loc{0, 0};
         std::vector<StmtPtrVariant> statements;
         bool isConst = false;
 
-        BlockExprNode(SourceLoc loc, std::vector<StmtPtrVariant> statements) : loc(loc), statements(std::move(statements)) {};
+        BlockStmtNode(SourceLoc loc, std::vector<StmtPtrVariant> statements) : loc(loc), statements(std::move(statements)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
@@ -379,16 +398,19 @@ namespace Slangc::AST {
     struct ArrayDecStatementNode {
         SourceLoc loc{0, 0};
         std::string name;
+        ArrayExprPtr expr;
+        std::optional<ExprPtrVariant> assignExpr;
+        int indicesCount = 1;
         bool isGlobal = false;
         bool isPrivate = false;
-        ArrayExprPtr expr;
-        ExprPtrVariant assignExpr;
-        int indicesCount = 1;
         bool isExtern = false;
         bool isConst = false;
 
-        ArrayDecStatementNode(SourceLoc loc, std::string name, ArrayExprPtr expr, bool isGlobal = false, bool isPrivate = false, bool isExtern = false, bool isConst = false)
-            : loc(loc), name(std::move(name)), expr(std::move(expr)), isGlobal(isGlobal), isPrivate(isPrivate), isExtern(isExtern), isConst(isConst) {};
+        ArrayDecStatementNode(SourceLoc loc, std::string name, ArrayExprPtr expr, std::optional<ExprPtrVariant> assignExpr,
+                              int indicesCount = 1, bool isGlobal = false, bool isPrivate = false,
+                              bool isExtern = false, bool isConst = false)
+            : loc(loc), name(std::move(name)), expr(std::move(expr)), assignExpr(std::move(assignExpr)), indicesCount(indicesCount),
+            isGlobal(isGlobal), isPrivate(isPrivate), isExtern(isExtern), isConst(isConst) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
@@ -398,11 +420,11 @@ namespace Slangc::AST {
         std::string name;
         ExprPtrVariant type;
         std::vector<FuncParamDecStmtPtr> args;
-        BlockExprPtr block;
+        BlockStmtPtr block;
         bool isPrivate = false;
         bool isFunction = false;
 
-        FuncDecStatementNode(SourceLoc loc, std::string name, ExprPtrVariant type, std::vector<FuncParamDecStmtPtr> args, BlockExprPtr block, bool isPrivate = false, bool isFunction = false)
+        FuncDecStatementNode(SourceLoc loc, std::string name, ExprPtrVariant type, std::vector<FuncParamDecStmtPtr> args, BlockStmtPtr block, bool isPrivate = false, bool isFunction = false)
             : loc(loc), name(std::move(name)), type(std::move(type)), args(std::move(args)), block(std::move(block)), isPrivate(isPrivate), isFunction(isFunction) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
@@ -442,12 +464,12 @@ namespace Slangc::AST {
         ExprPtrVariant type;
         std::string thisName;
         std::vector<FuncParamDecStmtPtr> args;
-        BlockExprPtr block;
+        BlockStmtPtr block;
         bool isPrivate = false;
         bool isFunction = false;
 
         MethodDecNode(SourceLoc loc, std::string name, ExprPtrVariant type, std::string thisName, std::vector<FuncParamDecStmtPtr> args,
-                      BlockExprPtr block, bool isPrivate = false, bool isFunction = false)
+                      BlockStmtPtr block, bool isPrivate = false, bool isFunction = false)
             : loc(loc), name(std::move(name)), type(std::move(type)), thisName(std::move(thisName)), args(std::move(args)),
               block(std::move(block)), isPrivate(isPrivate), isFunction(isFunction) {};
 
@@ -491,9 +513,9 @@ namespace Slangc::AST {
     struct ElseIfStatementNode {
         SourceLoc loc{0, 0};
         ExprPtrVariant condExpr;
-        BlockExprPtr trueBlock;
+        BlockStmtPtr trueBlock;
 
-        ElseIfStatementNode(SourceLoc loc, ExprPtrVariant condExpr, BlockExprPtr trueBlock)
+        ElseIfStatementNode(SourceLoc loc, ExprPtrVariant condExpr, BlockStmtPtr trueBlock)
             : loc(loc), condExpr(std::move(condExpr)), trueBlock(std::move(trueBlock)) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
@@ -502,11 +524,11 @@ namespace Slangc::AST {
     struct IfStatementNode {
         SourceLoc loc{0, 0};
         ExprPtrVariant condExpr;
-        BlockExprPtr trueBlock;
-        BlockExprPtr falseBlock;
+        BlockStmtPtr trueBlock;
+        BlockStmtPtr falseBlock;
         std::vector<ElseIfStatementPtr> elseIfNodes;
 
-        IfStatementNode(SourceLoc loc, BlockExprPtr condExpr, BlockExprPtr trueBlock, BlockExprPtr falseBlock,
+        IfStatementNode(SourceLoc loc, ExprPtrVariant condExpr, BlockStmtPtr trueBlock, BlockStmtPtr falseBlock,
                         std::vector<ElseIfStatementPtr> elseIfNodes)
             : loc(loc), condExpr(std::move(condExpr)), trueBlock(std::move(trueBlock)),
             falseBlock(std::move(falseBlock)), elseIfNodes(std::move(elseIfNodes)) {};
@@ -517,19 +539,19 @@ namespace Slangc::AST {
     struct WhileStatementNode {
         SourceLoc loc{0, 0};
         ExprPtrVariant whileExpr;
-        BlockExprPtr block;
+        BlockStmtPtr block;
 
-        WhileStatementNode(SourceLoc loc, ExprPtrVariant whileExpr, BlockExprPtr block)
+        WhileStatementNode(SourceLoc loc, ExprPtrVariant whileExpr, BlockStmtPtr block)
             : loc(loc), whileExpr(std::move(whileExpr)), block(std::move(block)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
-    struct ModuleStatementNode {
+    struct ModuleDeclNode {
         SourceLoc loc{0, 0};
         std::string name;
-        BlockExprPtr block;
+        BlockStmtPtr block;
 
-        ModuleStatementNode(SourceLoc loc, std::string name, BlockExprPtr block)
+        ModuleDeclNode(SourceLoc loc, std::string name, BlockStmtPtr block)
             : loc(loc), name(std::move(name)), block(std::move(block)) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;

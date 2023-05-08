@@ -10,21 +10,15 @@ namespace Slangc {
         parseImports();
 
         auto loc = SourceLoc{0, 0};
-        auto plus = createExpr<OperatorExprNode>(loc,
-                                                 TokenType::Plus,
-                                                 createExpr<IntExprNode>(loc, 5),
-                                                 createExpr<IntExprNode>(loc, 10));
-        moduleAST = create<ModuleStatementNode>(loc, "test", create<BlockExprNode>(loc, std::vector<StmtPtrVariant>()));
-        moduleAST->block->statements.push_back(createStmt<ReturnStatementNode>(loc, createExpr<IntExprNode>(loc, 0)));
-
-        while (token->type != TokenType::EndOfFile) {
-            auto decl = parseVarDecl(false);
-            if (decl.has_value()) {
-                //moduleAST->block->statements.emplace_back(std::move(decl.value()));
-            }
-            else {
-                return false;
-            }
+        moduleAST = create<ModuleDeclNode>(loc, "test", create<BlockStmtNode>(loc, std::vector<StmtPtrVariant>()));
+        auto moduleNode = parseModuleDecl();
+        if (moduleNode.has_value()) {
+            std::cout << moduleNode.value()->block->statements.size() << std::endl;
+            moduleAST = std::move(moduleNode.value());
+        }
+        else {
+            errors.emplace_back("Failed to parse module declaration.", token->location, false, true);
+            return false;
         }
         return true;
     }

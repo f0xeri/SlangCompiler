@@ -66,11 +66,15 @@ namespace Slangc {
         return {};
     }
 
+    auto AccessExprNode::codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value> {
+        return {};
+    }
+
     auto DeleteExprNode::codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value> {
         return {};
     }
 
-    auto BlockExprNode::codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value> {
+    auto BlockStmtNode::codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value> {
         return {};
     }
 
@@ -146,7 +150,7 @@ namespace Slangc {
         return {};
     }
 
-    auto ModuleStatementNode::codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value> {
+    auto ModuleDeclNode::codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value> {
         return {};
     }
 

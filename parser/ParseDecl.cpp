@@ -5,33 +5,24 @@
 #include "Parser.hpp"
 
 namespace Slangc {
-    auto Parser::parseVarDecl(bool isGlobal) -> std::optional<DeclPtrVariant> {
+    auto Parser::parseModuleDecl() -> std::optional<ModuleDeclPtr> {
         SourceLoc loc = token->location;
-        consume(TokenType::Variable);
-        consume(TokenType::Minus);
+        consume(TokenType::Module);
         expect(TokenType::Identifier);
-        auto type = token->value;
+        auto moduleName = token->value;
         advance();
-        std::string name;
-        std::optional<ExprPtrVariant> value;
-        if (oneOfDefaultTypes(type)) {
-            name = consume(TokenType::Identifier).value;
+        expect(TokenType::Start);
+        auto block = parseBlockStmt(moduleName);
+        if (!block.has_value()) {
+            errors.emplace_back("Failed to parse module block.", token->location, false, true);
+            return std::nullopt;
         }
-        else if (type == "array") {
-            // ...
-        }
-        else if (type == "function" || type == "procedure") {
-            // ...
-        }
-        else {
-            // custom types...
-        }
-        if (expect(TokenType::Assign)) {
-            advance();
-            value = parseExpr();
-        }
-        consume(TokenType::Semicolon);
-        auto result = createDecl<VarDecStatementNode>(loc, name, type, std::move(value));
-        return result;
+        auto moduleDecl = create<ModuleDeclNode>(loc, moduleName, std::move(block.value()));
+
+        return moduleDecl;
+    }
+
+    auto Parser::parseVarDecl(bool isGlobal) -> std::optional<DeclPtrVariant> {
+        return {};
     }
 } // Slangc

@@ -92,10 +92,17 @@ namespace Slangc {
                 expr = createExpr<CallExprNode>(opToken.location, std::move(expr.value()), std::move(args));
             }
             else if (match(TokenType::Dot)) {
-                break;
+                auto opToken = prevToken();
+                auto name = consume(TokenType::Identifier).value;
+                expr = createExpr<AccessExprNode>(opToken.location, std::move(expr.value()), name);
             }
             else if (match(TokenType::LBracket)) {
-                break;
+                auto opToken = prevToken();
+                do {
+                    auto indexExpr = parseExpr().value();
+                    consume(TokenType::RBracket);
+                    expr = createExpr<IndexExprNode>(opToken.location, std::move(expr.value()), std::move(indexExpr));
+                } while (match(TokenType::LBracket));
             }
             else {
                 break;
@@ -134,7 +141,6 @@ namespace Slangc {
         expect(TokenType::Identifier);
         auto name = token->value;
         advance();
-        // type access, array access, etc.
         return createExpr<VarExprNode>(loc, name);
     }
 

@@ -158,8 +158,7 @@ namespace Slangc {
 
         if (tokensMap.contains(identifierValue)) {
             addToken(tokensMap.at(identifierValue), identifierValue, identifierCol);
-        }
-        else {
+        } else {
             addToken(TokenType::Identifier, identifierValue, identifierCol);
         }
 
@@ -199,11 +198,9 @@ namespace Slangc {
         }
         if (isInt) {
             addToken(TokenType::Integer, numberValue, numberColumn);
-        }
-        else if (isFloat) {
+        } else if (isFloat) {
             addToken(TokenType::Float, numberValue, numberColumn);
-        }
-        else if (!isInt && !isFloat) {
+        } else if (!isInt && !isFloat) {
             addToken(TokenType::Real, numberValue, numberColumn);
         }
         return true;
@@ -214,11 +211,13 @@ namespace Slangc {
             return false;
         }
         auto stringColumn = currentColumn;
-        auto stringValueView = takeWhile(sourceText.substr(1), [=](char c) { return c != '"';});
+        auto stringValueView = takeWhile(sourceText.substr(1), [=](char c) { return c != '"'; });
 
-        if (stringValueView.back() == sourceText.back()) {
-            errors.emplace_back("Unclosed string", SourceLoc{currentLine, stringColumn}, false, false);
-            return false;
+        if (!stringValueView.empty()) {
+            if (stringValueView.back() == sourceText.back()) {
+                errors.emplace_back("Unclosed string", SourceLoc{currentLine, stringColumn}, false, false);
+                return false;
+            }
         }
 
         currentColumn += stringValueView.size() + 2;
@@ -245,7 +244,8 @@ namespace Slangc {
                             stringValue.replace(i, 2, "\0");
                             break;
                         default:
-                            errors.emplace_back("Unknown escape sequence", SourceLoc{currentLine, stringColumn}, false, false);
+                            errors.emplace_back("Unknown escape sequence", SourceLoc{currentLine, stringColumn}, false,
+                                                false);
                             sequenceError = true;
                             break;
                     }

@@ -35,7 +35,7 @@ add_definitions(${LLVM_DEFINITIONS})
 include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
 llvm_map_components_to_libnames(llvm_libs support core irreader TransformUtils Analysis Passes x86asmparser x86codegen x86desc x86info linker)
 
-add_executable(SlangcRefactored main.cpp common.hpp source/SourceBuffer.cpp source/SourceBuffer.hpp CompilerOptions.hpp lexer/Lexer.cpp parser/Parser.cpp parser/Parser.hpp parser/AST.hpp codegen/CodeGenContext.hpp codegen/CodeGen.cpp codegen/CodeGen.hpp parser/Scope.hpp parser/ParseExp.cpp parser/ParseDecl.cpp parser/ParseStatement.cpp parser/AST.cpp)
+add_executable(SlangcRefactored main.cpp common.hpp source/SourceBuffer.cpp source/SourceBuffer.hpp CompilerOptions.hpp lexer/Lexer.cpp parser/Parser.cpp parser/Parser.hpp parser/AST.hpp codegen/CodeGenContext.hpp codegen/CodeGen.cpp codegen/CodeGen.hpp parser/Scope.hpp parser/ParseExp.cpp parser/ParseDecl.cpp parser/ParseStmt.cpp parser/AST.cpp)
 target_link_libraries(SlangcRefactored PRIVATE ${llvm_libs})
 
 #DEBUG

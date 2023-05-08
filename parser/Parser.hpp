@@ -31,10 +31,11 @@ namespace Slangc {
 
         const CompilerOptions &options;
         std::vector<ErrorMessage> &errors;
-        ModuleStatementPtr moduleAST;
+        ModuleDeclPtr moduleAST;
         bool hasError = false;
 
         auto parse() -> bool;
+        auto parseImports() -> bool;
 
         auto parseExpr() -> std::optional<ExprPtrVariant>;
         auto parseOr() -> std::optional<ExprPtrVariant>;
@@ -48,9 +49,10 @@ namespace Slangc {
         auto parsePrimary() -> std::optional<ExprPtrVariant>;
         auto parseVar() -> std::optional<ExprPtrVariant>;
 
-        auto parseImports() -> bool;
 
-        auto parseModuleStmt() -> std::optional<ModuleStatementNode>;
+        auto parseModuleDecl() -> std::optional<ModuleDeclPtr>;
+        auto parseVarStmt() -> std::optional<StmtPtrVariant>;
+        auto parseBlockStmt(const std::string& name) -> std::optional<BlockStmtPtr>;
 
         auto parseVarDecl(bool isGlobal) -> std::optional<DeclPtrVariant>;
 

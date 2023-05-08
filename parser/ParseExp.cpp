@@ -82,14 +82,13 @@ namespace Slangc {
         while (true) {
             if (match(TokenType::LParen)) {
                 auto opToken = prevToken();
-                advance();
                 std::vector<ExprPtrVariant> args;
                 if (!match(TokenType::RParen)) {
                     do {
                         args.push_back(parseExpr().value());
                     } while (match(TokenType::Comma));
+                    consume(TokenType::RParen);
                 }
-                expect(TokenType::RParen);
                 expr = createExpr<CallExprNode>(opToken.location, std::move(expr.value()), std::move(args));
             }
             else if (match(TokenType::Dot)) {
@@ -130,6 +129,7 @@ namespace Slangc {
     }
 
     auto Parser::parseVar() -> std::optional<ExprPtrVariant> {
+        --token;
         SourceLoc loc = token->location;
         expect(TokenType::Identifier);
         auto name = token->value;

@@ -116,11 +116,29 @@ namespace Slangc {
     }
 
     auto Parser::parseOutputStmt() -> std::optional<StmtPtrVariant> {
-        return {};
+        auto loc = token->location;
+        consume(TokenType::Output);
+        auto expr = parseExpr();
+        consume(TokenType::Semicolon);
+        if (expr.has_value()) {
+            return createStmt<OutputStatementNode>(loc, std::move(expr.value()));
+        }
+        errors.emplace_back("Failed to parse output statement.", loc, false, false);
+        hasError = true;
+        return std::nullopt;
     }
 
     auto Parser::parseInputStmt() -> std::optional<StmtPtrVariant> {
-        return {};
+        auto loc = token->location;
+        consume(TokenType::Input);
+        auto expr = parseVarExpr();
+        consume(TokenType::Semicolon);
+        if (expr.has_value()) {
+            return createStmt<InputStatementNode>(loc, std::move(expr.value()));
+        }
+        errors.emplace_back("Failed to parse input statement.", loc, false, false);
+        hasError = true;
+        return std::nullopt;
     }
 
     auto Parser::parseLetStmt() -> std::optional<StmtPtrVariant> {
@@ -133,11 +151,9 @@ namespace Slangc {
         if (varExpr.has_value() && value.has_value()) {
             return createStmt<AssignExprNode>(loc, std::move(varExpr.value()), std::move(value.value()));
         }
-        else {
-            errors.emplace_back("Failed to parse let statement.", loc, false, false);
-            hasError = true;
-            return std::nullopt;
-        }
+        errors.emplace_back("Failed to parse let statement.", loc, false, false);
+        hasError = true;
+        return std::nullopt;
     }
 
     auto Parser::parseReturnStmt() -> std::optional<StmtPtrVariant> {

@@ -17,7 +17,7 @@ namespace Slangc {
             moduleAST = std::move(moduleNode.value());
         }
         else {
-            errors.emplace_back("Failed to parse module declaration.", token->location, false, true);
+            errors.emplace_back("Failed to parse module declaration.", token->location, false, false);
             return false;
         }
         return true;

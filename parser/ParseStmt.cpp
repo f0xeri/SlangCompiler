@@ -29,11 +29,14 @@ namespace Slangc {
             else if (token->type == TokenType::Delete) result = parseDeleteStmt();
             else if (token->type == TokenType::End) {
                 advance();
-                expect(TokenType::Identifier);
+                expect({TokenType::Identifier, TokenType::While, TokenType::If});
                 auto endName = token->value;
-                if (endName != name) {
+                if ((endName == "while" && token->type != TokenType::While) &&
+                    (endName == "if" && token->type != TokenType::If) &&
+                    (endName == name && token->type != TokenType::Identifier)) {
                     errors.emplace_back(std::string("Expected end of block " + name + ", got " + endName + "."), token->location, false, false);
-                } else { advance(); }
+                }
+                else { advance(); }
                 return block;
             } else if (token->type == TokenType::EndOfFile) {
                 errors.emplace_back("Unexpected end of file.", token->location, false, false);
@@ -66,20 +69,14 @@ namespace Slangc {
         advance();
         std::string name;
         std::optional<ExprPtrVariant> value;
-        if (oneOfDefaultTypes(type)) {
-            name = consume(TokenType::Identifier).value;
-            if (match(TokenType::Assign)) {
-                value = parseExpr();
-            }
-            result = createStmt<VarDecStatementNode>(loc, name, type, std::move(value));
-        } else if (type == "array") {
+        if (type == "array") {
             auto indicesCount = 1;
             consume(TokenType::LBracket);
             auto size = parseExpr().value();
             consume(TokenType::RBracket);
-            auto arrayType = token->value;
+            auto arrayType = parseTypeName().value();
             auto arrExpr = create<ArrayExprNode>(loc, std::vector<ExprPtrVariant>(), arrayType, std::move(size));
-            while (token->value == "array") {
+            while (arrayType == "array") {
                 advance();
                 indicesCount++;
                 consume(TokenType::LBracket);
@@ -87,12 +84,12 @@ namespace Slangc {
                 consume(TokenType::RBracket);
 
                 if (token->type == TokenType::Identifier && token->value != "array") {
-                    arrayType = token->value;
-                    advance();
+                    arrayType = parseTypeName().value();
                 }
                 arrExpr->values.emplace_back(
                         createExpr<ArrayExprNode>(loc, std::vector<ExprPtrVariant>(), arrayType, std::move(size)));
             }
+            advance();
             name = consume(TokenType::Identifier).value;
             if (match(TokenType::Assign)) {
                 value = parseExpr();
@@ -101,7 +98,17 @@ namespace Slangc {
         } else if (type == "function" || type == "procedure") {
             // ...
         } else {
-            // custom types...
+            if (token->type == TokenType::Dot) {
+                advance();
+                expect(TokenType::Identifier);
+                type += "." + token->value;
+                advance();
+            }
+            name = consume(TokenType::Identifier).value;
+            if (match(TokenType::Assign)) {
+                value = parseExpr();
+            }
+            result = createStmt<VarDecStatementNode>(loc, name, type, std::move(value));
         }
         consume(TokenType::Semicolon);
         return result;
@@ -112,7 +119,19 @@ namespace Slangc {
     }
 
     auto Parser::parseWhileStmt() -> std::optional<StmtPtrVariant> {
-        return {};
+        auto loc = token->location;
+        consume(TokenType::While);
+        auto condition = parseExpr();
+        expect(TokenType::Repeat);
+        auto block = parseBlockStmt("while");
+        std::cout << block.value()->statements.size() << std::endl;
+        consume(TokenType::Semicolon);
+        if (condition.has_value() && block.has_value()) {
+            return createStmt<WhileStatementNode>(loc, std::move(condition.value()), std::move(block.value()));
+        }
+        errors.emplace_back("Failed to parse while statement.", loc, false, false);
+        hasError = true;
+        return std::nullopt;
     }
 
     auto Parser::parseOutputStmt() -> std::optional<StmtPtrVariant> {
@@ -157,14 +176,41 @@ namespace Slangc {
     }
 
     auto Parser::parseReturnStmt() -> std::optional<StmtPtrVariant> {
-        return {};
+        auto loc = token->location;
+        consume(TokenType::Return);
+        auto expr = parseExpr();
+        consume(TokenType::Semicolon);
+        if (expr.has_value()) {
+            return createStmt<ReturnStatementNode>(loc, std::move(expr.value()));
+        }
+        errors.emplace_back("Failed to parse return statement.", loc, false, false);
+        hasError = true;
+        return std::nullopt;
     }
 
     auto Parser::parseCallStmt() -> std::optional<StmtPtrVariant> {
-        return {};
+        consume(TokenType::Call);
+        auto expr = parseExpr();
+        consume(TokenType::Semicolon);
+        // check if expr has value and is a call expr
+        if (expr.has_value() && std::holds_alternative<CallExprPtr>(expr.value())) {
+            // move expr from variant to caller
+            return std::move(std::get<CallExprPtr>(expr.value()));
+        }
+        errors.emplace_back("Failed to parse call statement.", token->location, false, false);
+        hasError = true;
+        return std::nullopt;
     }
 
     auto Parser::parseDeleteStmt() -> std::optional<StmtPtrVariant> {
-        return {};
+        consume(TokenType::Delete);
+        auto expr = parseExpr();
+        consume(TokenType::Semicolon);
+        if (expr.has_value()) {
+            return createStmt<DeleteStmtNode>(token->location, std::move(expr.value()));
+        }
+        errors.emplace_back("Failed to parse delete statement.", token->location, false, false);
+        hasError = true;
+        return std::nullopt;
     }
 } // Slangc

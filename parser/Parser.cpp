@@ -26,4 +26,22 @@ namespace Slangc {
     auto Parser::parseImports() -> bool {
         return true;
     }
+
+    auto Parser::parseTypeName() -> std::optional<std::string> {
+        if (token->type != TokenType::Identifier) {
+            errors.emplace_back("Expected type name.", token->location, false, false);
+            hasError = true;
+            return std::nullopt;
+        }
+        auto typeName = token->value;
+        advance();
+        if (token->type == TokenType::Dot) {
+            advance();
+            expect(TokenType::Identifier);
+            typeName += "." + token->value;
+        } else {
+            --token;
+        }
+        return typeName;
+    }
 } // Slangc

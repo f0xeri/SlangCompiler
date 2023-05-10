@@ -70,7 +70,7 @@ namespace Slangc {
         return {};
     }
 
-    auto DeleteExprNode::codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value> {
+    auto DeleteStmtNode::codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value> {
         return {};
     }
 

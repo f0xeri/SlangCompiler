@@ -92,7 +92,7 @@ namespace Slangc::AST {
             TypeDecStatementPtr, VarDecStatementPtr, ModuleDeclPtr>;
 
     struct AssignExprNode;
-    struct DeleteExprNode;
+    struct DeleteStmtNode;
     struct ElseIfStatementNode;
     struct IfStatementNode;
     struct InputStatementNode;
@@ -102,7 +102,7 @@ namespace Slangc::AST {
     struct BlockStmtNode;
 
     using AssignExprPtr = std::unique_ptr<AssignExprNode>;
-    using DeleteExprPtr = std::unique_ptr<DeleteExprNode>;
+    using DeleteStmtPtr = std::unique_ptr<DeleteStmtNode>;
     using ElseIfStatementPtr = std::unique_ptr<ElseIfStatementNode>;
     using IfStatementPtr = std::unique_ptr<IfStatementNode>;
     using InputStatementPtr = std::unique_ptr<InputStatementNode>;
@@ -114,7 +114,7 @@ namespace Slangc::AST {
     using StmtPtrVariant
             = std::variant<AssignExprPtr, CallExprPtr, ArrayDecStatementPtr, ExternFuncDecStatementPtr,
             FieldArrayVarDecPtr, FieldVarDecPtr, FuncDecStatementPtr, FuncParamDecStmtPtr, FuncPointerStatementPtr,
-            MethodDecPtr, TypeDecStatementPtr, VarDecStatementPtr, DeleteExprPtr, ElseIfStatementPtr, IfStatementPtr,
+            MethodDecPtr, TypeDecStatementPtr, VarDecStatementPtr, DeleteStmtPtr, ElseIfStatementPtr, IfStatementPtr,
             InputStatementPtr, OutputStatementPtr, ReturnStatementPtr, VarExprPtr,
             IndexesExprPtr, IndexExprPtr, WhileStatementPtr, BlockStmtPtr>;
 
@@ -283,11 +283,11 @@ namespace Slangc::AST {
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
-    struct DeleteExprNode {
+    struct DeleteStmtNode {
         SourceLoc loc{0, 0};
         ExprPtrVariant expr;
 
-        DeleteExprNode(SourceLoc loc, ExprPtrVariant expr) : loc(loc), expr(std::move(expr)) {};
+        DeleteStmtNode(SourceLoc loc, ExprPtrVariant expr) : loc(loc), expr(std::move(expr)) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };

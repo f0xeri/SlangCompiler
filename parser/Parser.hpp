@@ -36,6 +36,7 @@ namespace Slangc {
 
         auto parse() -> bool;
         auto parseImports() -> bool;
+        auto parseTypeName() -> std::optional<std::string>;
 
         auto parseExpr() -> std::optional<ExprPtrVariant>;
         auto parseOr() -> std::optional<ExprPtrVariant>;
@@ -89,6 +90,25 @@ namespace Slangc {
         bool expect(TokenType tokenType) {
             if (token->type != tokenType) {
                 errors.emplace_back(std::string("Unexpected token ") + std::string(Lexer::getTokenName(*token)) + std::string(", expected ") + std::string(Lexer::getTokenName(tokenType)) + ".", token->location);
+                hasError = true;
+                return false;
+            }
+            return true;
+        }
+
+        bool expect(std::initializer_list<TokenType> tokenTypes) {
+            if (std::none_of(tokenTypes.begin(), tokenTypes.end(), [this](TokenType tokenType) { return token->type == tokenType; })) {
+                std::string err = "Unexpected token ";
+                err += Lexer::getTokenName(*token);
+                err += ", expected one of: ";
+                for (auto it = tokenTypes.begin(); it != tokenTypes.end(); ++it) {
+                    err += Lexer::getTokenName(*it);
+                    if (it != tokenTypes.end() - 1) {
+                        err += ", ";
+                    }
+                }
+                err += ".";
+                errors.emplace_back(err, token->location);
                 hasError = true;
                 return false;
             }

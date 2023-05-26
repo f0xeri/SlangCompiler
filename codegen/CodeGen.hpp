@@ -11,8 +11,8 @@ namespace Slangc {
 
     class CodeGen {
     public:
-        CodeGen(AST::ModuleDeclPtr moduleAST) : moduleAST(std::move(moduleAST)) {}
-        AST::ModuleDeclPtr moduleAST;
+        CodeGen(ModuleDeclPtr moduleAST) : moduleAST(std::move(moduleAST)) {}
+        ModuleDeclPtr moduleAST;
         auto process() -> void {
             for (auto &stmt : moduleAST->block->statements) {
                 processNode(stmt);

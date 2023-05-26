@@ -11,19 +11,21 @@
 #include "lexer/TokenType.hpp"
 #include "Scope.hpp"
 #include "lexer/Lexer.hpp"
+#include "AST.hpp"
+#include "analysis/BasicAnalysis.hpp"
 #include <CompilerOptions.hpp>
 
 namespace Slangc {
 
-    using namespace AST;
     using ParserExprResult = std::optional<ExprPtrVariant>;
     using ParserStmtResult = std::optional<StmtPtrVariant>;
     using ParserDeclResult = std::optional<DeclPtrVariant>;
 
     class Parser {
+        BasicAnalysis &analysis;
     public:
-        explicit Parser(std::vector<Token> tokens, std::vector<ErrorMessage> &errors, const CompilerOptions &options)
-                : options(options), errors(errors), tokens(std::move(tokens)) {
+        explicit Parser(std::vector<Token> tokens, std::vector<ErrorMessage> &errors, const CompilerOptions &options, BasicAnalysis &analysis)
+                : analysis(analysis), options(options), errors(errors), tokens(std::move(tokens)) {
             token = this->tokens.cbegin();
             currentScope = std::make_shared<Scope>();
 
@@ -37,6 +39,7 @@ namespace Slangc {
         auto parse() -> bool;
         auto parseImports() -> bool;
         auto parseTypeName() -> std::optional<std::string>;
+        auto parseType() -> std::optional<ExprPtrVariant>;
 
         auto parseExpr() -> std::optional<ExprPtrVariant>;
         auto parseOr() -> std::optional<ExprPtrVariant>;
@@ -54,7 +57,7 @@ namespace Slangc {
         auto parseAccess() -> std::optional<ExprPtrVariant>;
 
         auto parseModuleDecl() -> std::optional<ModuleDeclPtr>;
-        auto parseBlockStmt(const std::string& name) -> std::optional<BlockStmtPtr>;
+        auto parseBlockStmt(const std::string& name, std::vector<FuncParamDecStmtPtr> *args = nullptr) -> std::optional<BlockStmtPtr>;
         auto parseVarStmt() -> std::optional<StmtPtrVariant>;
         auto parseIfStmt() -> std::optional<StmtPtrVariant>;
         auto parseWhileStmt() -> std::optional<StmtPtrVariant>;
@@ -66,6 +69,8 @@ namespace Slangc {
         auto parseDeleteStmt() -> std::optional<StmtPtrVariant>;
 
         auto parseVarDecl(bool isGlobal) -> std::optional<DeclPtrVariant>;
+        auto parseFuncParams() -> std::optional<std::vector<FuncParamDecStmtPtr>>;
+        auto parseFuncDecl() -> std::optional<DeclPtrVariant>;
 
     private:
         std::vector<Token> tokens;

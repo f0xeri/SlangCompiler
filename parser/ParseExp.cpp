@@ -209,7 +209,7 @@ namespace Slangc {
         expect(TokenType::Identifier);
         auto name = token->value;
         advance();
-        return createExpr<VarExprNode>(loc, name);
+        return createExpr<VarExprNode>(loc, moduleAST->name + "." + name);
     }
 
     auto Parser::parseVarExpr() -> std::optional<ExprPtrVariant> {

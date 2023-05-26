@@ -13,7 +13,13 @@
     }
 
 namespace Slangc {
-    auto Parser::parseBlockStmt(const std::string &name) -> std::optional<BlockStmtPtr> {
+    auto Parser::parseBlockStmt(const std::string &name, std::vector<FuncParamDecStmtPtr> *args) -> std::optional<BlockStmtPtr> {
+        analysis.enterScope();
+        if (args != nullptr) {
+            for (auto &arg : *args) {
+                analysis.insert(arg->name, arg);
+            }
+        }
         auto block = create<BlockStmtNode>(token->location, std::vector<StmtPtrVariant>());
         std::optional<StmtPtrVariant> result = std::nullopt;
         advance();
@@ -37,15 +43,18 @@ namespace Slangc {
                     errors.emplace_back(std::string("Expected end of block " + name + ", got " + endName + "."), token->location, false, false);
                 }
                 else { advance(); }
+                analysis.exitScope();
                 return block;
             } else if (token->type == TokenType::EndOfFile) {
                 errors.emplace_back("Unexpected end of file.", token->location, false, false);
                 hasError = true;
+                analysis.exitScope();
                 return block;
             } else {
                 errors.emplace_back("Unexpected token " + std::string(Lexer::getTokenName(token->type)) + ".",
                                     token->location, false, false);
                 hasError = true;
+                analysis.exitScope();
                 return block;
             }
             if (result.has_value()) {
@@ -54,6 +63,7 @@ namespace Slangc {
             else {
                 errors.emplace_back("Failed to parse statement.", token->location, false, false);
                 hasError = true;
+                analysis.exitScope();
                 return block;
             }
         }
@@ -95,6 +105,7 @@ namespace Slangc {
                 value = parseExpr();
             }
             result = createStmt<ArrayDecStatementNode>(loc, name, std::move(arrExpr), std::move(value), indicesCount);
+            analysis.insert(name, std::get<ArrayDecStatementPtr>(result.value()));
         } else if (type == "function" || type == "procedure") {
             // ...
         } else {
@@ -109,6 +120,7 @@ namespace Slangc {
                 value = parseExpr();
             }
             result = createStmt<VarDecStatementNode>(loc, name, type, std::move(value));
+            analysis.insert(name, std::get<VarDecStatementPtr>(result.value()));
         }
         consume(TokenType::Semicolon);
         return result;
@@ -195,6 +207,8 @@ namespace Slangc {
         // check if expr has value and is a call expr
         if (expr.has_value() && std::holds_alternative<CallExprPtr>(expr.value())) {
             // move expr from variant to caller
+            //auto x = std::get<CallExprPtr>(expr.value());
+            //auto t = x->getType(analysis);
             return std::move(std::get<CallExprPtr>(expr.value()));
         }
         errors.emplace_back("Failed to parse call statement.", token->location, false, false);

@@ -8,7 +8,8 @@
 #include <memory>
 #include <utility>
 #include <string>
-#include "AST.hpp"
+#include <vector>
+#include "ASTFwdDecl.hpp"
 
 namespace Slangc {
     class Scope {
@@ -17,23 +18,22 @@ namespace Slangc {
 
         Scope() = default;
         explicit Scope(std::shared_ptr<Scope> parent) : parent(std::move(parent)) {}
+        std::vector<std::pair<std::string, DeclPtrVariant>> symbols;
 
-        std::vector<std::pair<std::string_view, AST::DeclPtrVariant>> symbols;
-
-        void insert(AST::DeclPtrVariant declarationNode) {
-            symbols.emplace_back(getDeclarationName(declarationNode), std::move(declarationNode));
+        void insert(const std::string& declName, const DeclPtrVariant& declarationNode) {
+            symbols.emplace_back(declName, declarationNode);
         }
 
         bool contains(std::string_view name) {
-            return std::ranges::find(symbols, name, &std::pair<std::string_view, AST::DeclPtrVariant>::first) != symbols.end();
+            return std::ranges::find(symbols, name, &std::pair<std::string, DeclPtrVariant>::first) != symbols.end();
         }
 
-        auto get(std::string_view name) -> const AST::DeclPtrVariant* {
-            auto it = std::ranges::find(symbols, name, &std::pair<std::string_view, AST::DeclPtrVariant>::first);
+        auto get(std::string_view name) -> const DeclPtrVariant* {
+            auto it = std::ranges::find(symbols, name, &std::pair<std::string, DeclPtrVariant>::first);
             return (it == symbols.end()) ? nullptr : &(it->second);
         }
 
-        auto lookup(std::string_view name) -> const AST::DeclPtrVariant* {
+        auto lookup(std::string_view name) -> const DeclPtrVariant* {
             Scope *s = this;
             while (s) {
                 if (auto* node = s->get(name)) {
@@ -43,7 +43,6 @@ namespace Slangc {
             }
             return nullptr;
         }
-
     };
 }
 

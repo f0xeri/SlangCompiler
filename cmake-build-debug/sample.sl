@@ -1,8 +1,14 @@
 module sample
+    private function printHello(in array[] character word): integer
+        output "Hello, ";
+	    output word;
+	    return 111;
+    end printHello;
 start
     // test line comment
+    output xdd.xdd1.xdd2;
     while xdd == ad(aaa).a[5] && gg != 5 repeat
-        call gon();
+        call printHello("aaa");
         variable-xdd.Xdd xdd := 1;
         variable-Xdd xdd := 1;
         input dada;

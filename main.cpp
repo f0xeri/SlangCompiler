@@ -20,7 +20,8 @@ int main(int argc, char **argv) {
     lexer.tokenize();
     lexer.printTokens();
 
-    Slangc::Parser parser(lexer.tokens, errors, options);
+    Slangc::BasicAnalysis basicAnalysis;
+    Slangc::Parser parser(lexer.tokens, errors, options, basicAnalysis);
     parser.parse();
 
     Slangc::CodeGen codeGen(std::move(parser.moduleAST));

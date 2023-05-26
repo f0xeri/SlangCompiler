@@ -8,7 +8,6 @@
 
 
 namespace Slangc {
-    using namespace AST;
 
     auto IntExprNode::codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value> {
         return {};

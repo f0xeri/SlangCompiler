@@ -207,8 +207,8 @@ namespace Slangc {
         // check if expr has value and is a call expr
         if (expr.has_value() && std::holds_alternative<CallExprPtr>(expr.value())) {
             // move expr from variant to caller
-            auto x = std::get<CallExprPtr>(expr.value());
-            auto t = x->getType(analysis);
+            //auto x = std::get<CallExprPtr>(expr.value());
+            //auto t = x->getType(analysis);
             return std::move(std::get<CallExprPtr>(expr.value()));
         }
         errors.emplace_back("Failed to parse call statement.", token->location, false, false);

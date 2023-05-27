@@ -37,9 +37,9 @@ namespace Slangc {
                 advance();
                 expect({TokenType::Identifier, TokenType::While, TokenType::If});
                 auto endName = token->value;
-                if ((endName == "while" && token->type != TokenType::While) &&
-                    (endName == "if" && token->type != TokenType::If) &&
-                    (endName == name && token->type != TokenType::Identifier)) {
+                if ((name == "while" && token->type != TokenType::While) ||
+                    (name == "if" && token->type != TokenType::If) ||
+                    (name != endName)) {
                     errors.emplace_back(std::string("Expected end of block " + name + ", got " + endName + "."), token->location, false, false);
                 }
                 else { advance(); }
@@ -207,8 +207,8 @@ namespace Slangc {
         // check if expr has value and is a call expr
         if (expr.has_value() && std::holds_alternative<CallExprPtr>(expr.value())) {
             // move expr from variant to caller
-            //auto x = std::get<CallExprPtr>(expr.value());
-            //auto t = x->getType(analysis);
+            auto x = std::get<CallExprPtr>(expr.value());
+            auto t = x->getType(analysis);
             return std::move(std::get<CallExprPtr>(expr.value()));
         }
         errors.emplace_back("Failed to parse call statement.", token->location, false, false);

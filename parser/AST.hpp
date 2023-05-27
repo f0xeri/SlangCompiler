@@ -129,7 +129,19 @@ namespace Slangc {
             loc(loc), values(std::move(values)), type(std::move(type)), size(std::move(size)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
 
-        auto getType(const BasicAnalysis& analysis) -> Type { return {"array"}; }
+        auto getType(const BasicAnalysis& analysis) -> Type {
+            Type finalType;
+            auto sz = values.size();
+            if (type != "array") {
+                finalType.typeName = type;
+            }
+            else {
+                finalType.typeName = getExprType(values[sz - 1], analysis).typeName;
+            }
+            finalType.indicesCount = sz + 1;
+            finalType.isArray = true;
+            return finalType;
+        }
     };
 
     struct BooleanExprNode {
@@ -593,15 +605,6 @@ namespace Slangc {
             if (std::get<FieldVarDecPtr>(field)->name == name) return std::get<FieldVarDecPtr>(field)->index;
         }
         return -1;
-    }
-
-    static auto getArrayFinalType(ArrayExprNode* exprNode, const BasicAnalysis &analysis) -> Type {
-        if (exprNode->type != "array") return {exprNode->type, true, false, 1};
-        Type type;
-        for (auto &slice : exprNode->values) {
-                type = getExprType(slice, analysis);
-        }
-        return type;
     }
 }
 

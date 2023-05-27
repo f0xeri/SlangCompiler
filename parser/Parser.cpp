@@ -48,6 +48,9 @@ namespace Slangc {
     auto Parser::parseType() -> std::optional<ExprPtrVariant> {
         ExprPtrVariant result;
         SourceLoc loc = token->location;
+        if (!expect(TokenType::Identifier)) {
+            return std::nullopt;
+        }
         auto type = token->value;
         advance();
         std::string name;

@@ -125,24 +125,25 @@ namespace Slangc {
             returnType = createExpr<TypeExprNode>(loc, "void");
         }
 
-        if (!isExtern) {
-            name = moduleAST->name + "." + name;
-        }
-
         DeclPtrVariant funcDecl;
+        auto mangledName = name;
+        if (!isExtern) {
+            mangledName = moduleAST->name + "." + name;
+        }
         if (isExtern) {
-            funcDecl = createDecl<ExternFuncDecStatementNode>(loc, name, std::move(returnType), params.value());
+            funcDecl = createDecl<ExternFuncDecStatementNode>(loc, mangledName, std::move(returnType), params.value());
         }
         else {
-            funcDecl = createDecl<FuncDecStatementNode>(loc, name, std::move(returnType), params.value());
+            funcDecl = createDecl<FuncDecStatementNode>(loc, mangledName, std::move(returnType), params.value());
         }
-        analysis.insert(name, funcDecl);
+        analysis.insert(mangledName, funcDecl);
         auto block = parseBlockStmt(name, &params.value());
         if (!block.has_value()) {
             errors.emplace_back("Failed to parse function block.", token->location, false, false);
             hasError = true;
             return std::nullopt;
         }
+
         if (!isExtern) {
             auto func = std::get<FuncDecStatementPtr>(funcDecl);
             func->block = std::move(block.value());

@@ -24,4 +24,18 @@ start
         variable-boolean b := true && false;
         variable-boolean b2 := 1 != 2;
     end while;
+
+    if xdd != aaaa then
+        output "true1";
+        output "true2";
+    elseif xdd == aaa + 1 then
+        output "elseif11";
+        output "elseif12";
+    elseif xdd == aaa + 2 then
+        output "elseif21";
+        output "elseif22";
+    else
+        output "false1";
+        output "false2";
+    end if;
 end sample.

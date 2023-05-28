@@ -33,13 +33,16 @@ namespace Slangc {
             else if (token->type == TokenType::Return) result = parseReturnStmt();
             else if (token->type == TokenType::Call) result = parseCallStmt();
             else if (token->type == TokenType::Delete) result = parseDeleteStmt();
+            else if (name == "if" && (token->type == TokenType::Else || token->type == TokenType::Elseif)) {
+                analysis.exitScope();
+                return block;
+            }
             else if (token->type == TokenType::End) {
                 advance();
                 expect({TokenType::Identifier, TokenType::While, TokenType::If});
                 auto endName = token->value;
                 if ((name == "while" && token->type != TokenType::While) ||
-                    (name == "if" && token->type != TokenType::If) ||
-                    (name != endName)) {
+                    ((name == "if" || name == "else" || name == "elseif") && token->type != TokenType::If)) {
                     errors.emplace_back(std::string("Expected end of block " + name + ", got " + endName + "."), token->location, false, false);
                 }
                 else { advance(); }
@@ -127,7 +130,39 @@ namespace Slangc {
     }
 
     auto Parser::parseIfStmt() -> std::optional<StmtPtrVariant> {
-        return {};
+        auto loc = token->location;
+        consume(TokenType::If);
+        auto condition = parseExpr();
+        if (!condition.has_value()) {
+            errors.emplace_back("Expected expression.", token->location, false, false);
+            hasError = true;
+            return {};
+        }
+        expect(TokenType::Then);
+        std::optional<BlockStmtPtr> trueBlock = std::nullopt;
+        std::optional<BlockStmtPtr> falseBlock = std::nullopt;
+        auto elseIfNodes = std::vector<ElseIfStatementPtr>();
+
+        if (token->type != TokenType::End && token->type != TokenType::Else) {
+            trueBlock = parseBlockStmt("if");
+        }
+        while (token->type == TokenType::Elseif) {
+            advance();
+            auto elseIfCondition = parseExpr();
+            if (!elseIfCondition.has_value()) {
+                errors.emplace_back("Expected expression.", token->location, false, false);
+                hasError = true;
+                return {};
+            }
+            expect(TokenType::Then);
+            auto elseIfBlock = parseBlockStmt("if");
+            elseIfNodes.emplace_back(create<ElseIfStatementNode>(loc, std::move(elseIfCondition.value()), std::move(elseIfBlock.value())));
+        }
+        if (token->type == TokenType::Else) {
+            falseBlock = parseBlockStmt("else");
+        }
+        consume(TokenType::Semicolon);
+        return createStmt<IfStatementNode>(loc, std::move(condition.value()), std::move(trueBlock.value()), std::move(falseBlock.value()), std::move(elseIfNodes));
     }
 
     auto Parser::parseWhileStmt() -> std::optional<StmtPtrVariant> {

@@ -131,10 +131,10 @@ namespace Slangc {
             mangledName = moduleAST->name + "." + name;
         }
         if (isExtern) {
-            funcDecl = createDecl<ExternFuncDecStatementNode>(loc, mangledName, std::move(returnType), params.value());
+            funcDecl = createDecl<ExternFuncDecStatementNode>(loc, mangledName, std::move(returnType), params.value(), isPrivate, isFunction);
         }
         else {
-            funcDecl = createDecl<FuncDecStatementNode>(loc, mangledName, std::move(returnType), params.value());
+            funcDecl = createDecl<FuncDecStatementNode>(loc, mangledName, std::move(returnType), params.value(), std::nullopt, isPrivate, isFunction);
         }
         analysis.insert(mangledName, funcDecl);
         auto block = parseBlockStmt(name, &params.value());

@@ -69,7 +69,7 @@ namespace Slangc {
         auto parseDeleteStmt() -> std::optional<StmtPtrVariant>;
 
         auto parseVarDecl(bool isGlobal) -> std::optional<DeclPtrVariant>;
-        auto parseFuncParams() -> std::optional<std::vector<FuncParamDecStmtPtr>>;
+        auto parseFuncParams(bool named = true) -> std::optional<std::vector<FuncParamDecStmtPtr>>;
         auto parseFuncDecl() -> std::optional<DeclPtrVariant>;
 
     private:

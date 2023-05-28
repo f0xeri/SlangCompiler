@@ -142,13 +142,13 @@ namespace Slangc {
                 std::vector<ExprPtrVariant> args;
                 if (!match(TokenType::RParen)) {
                     do {
-                        auto indexExpr = parseExpr();
-                        if (!indexExpr.has_value()) {
+                        auto argExpr = parseExpr();
+                        if (!expr.has_value()) {
                             errors.emplace_back("Expected expression after '('.", opToken.location, false, false);
                             hasError = true;
                             return std::nullopt;
                         }
-                        args.push_back(std::move(indexExpr.value()));
+                        args.push_back(std::move(argExpr.value()));
                     } while (match(TokenType::Comma));
                     consume(TokenType::RParen);
                 }

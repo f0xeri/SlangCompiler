@@ -48,12 +48,11 @@ namespace Slangc {
     auto Parser::parseType() -> std::optional<ExprPtrVariant> {
         ExprPtrVariant result;
         SourceLoc loc = token->location;
-        if (!expect(TokenType::Identifier)) {
+        if (!expect({TokenType::Identifier, TokenType::Function, TokenType::Procedure})) {
             return std::nullopt;
         }
         auto type = token->value;
         advance();
-        std::string name;
         std::optional<ExprPtrVariant> value;
         if (type == "array") {
             auto indicesCount = 1;
@@ -69,9 +68,9 @@ namespace Slangc {
                 size = create<IntExprNode>(loc, 0);
             }
             consume(TokenType::RBracket);
-            auto arrayType = parseTypeName().value();
-            auto arrExpr = create<ArrayExprNode>(loc, std::vector<ExprPtrVariant>(), arrayType, std::move(size));
-            while (arrayType == "array") {
+            auto arrayType = parseType().value();
+            auto arrExpr = create<ArrayExprNode>(loc, std::nullopt, arrayType, size);
+            /*while (arrayType == "array") {
                 advance();
                 indicesCount++;
                 consume(TokenType::LBracket);
@@ -89,12 +88,31 @@ namespace Slangc {
                 if (token->type == TokenType::Identifier && token->value != "array") {
                     arrayType = parseTypeName().value();
                 }
-                arrExpr->values.emplace_back(
-                        createExpr<ArrayExprNode>(loc, std::vector<ExprPtrVariant>(), arrayType, std::move(size)));
-            }
+                arrExpr->values.emplace_back(createExpr<ArrayExprNode>(loc, std::vector<ExprPtrVariant>(), arrayType, size));
+            }*/
             result = arrExpr;
         } else if (type == "function" || type == "procedure") {
-            // ...
+            bool isFunction = type == "function";
+            auto args = parseFuncParams(false);
+            if (!args.has_value()) {
+                errors.emplace_back("Expected function parameters.", token->location, false, false);
+                hasError = true;
+            }
+            advance();
+            ExprPtrVariant returnType;
+            if (isFunction) {
+                consume(TokenType::Colon);
+                auto returnTypeOpt = parseType();
+                if (returnTypeOpt.has_value()) {
+                    returnType = std::move(returnTypeOpt.value());
+                } else {
+                    errors.emplace_back("Expected type after ':'.", token->location, false, false);
+                    hasError = true;
+                }
+            } else {
+                returnType = createExpr<TypeExprNode>(loc, "void");
+            }
+            result = createExpr<FuncExprNode>(loc, std::move(returnType), std::move(args.value()), isFunction);
         } else {
             if (token->type == TokenType::Dot) {
                 advance();
@@ -102,7 +120,6 @@ namespace Slangc {
                 type += "." + token->value;
                 advance();
             }
-            --token;
             result = createExpr<TypeExprNode>(loc, type);
         }
         return result;

@@ -29,7 +29,7 @@ namespace Slangc {
             return currScope->lookup(name);
         }
 
-        auto getVarDeclType(std::string_view name) const -> Type {
+        auto getVarDeclType(std::string_view name) const -> ExprPtrVariant {
             auto* node = currScope->lookup(name);
         }
     };

@@ -41,11 +41,14 @@ namespace Slangc {
                 advance();
                 expect({TokenType::Identifier, TokenType::While, TokenType::If});
                 auto endName = token->value;
-                if ((name == "while" && token->type != TokenType::While) ||
-                    ((name == "if" || name == "else" || name == "elseif") && token->type != TokenType::If)) {
-                    errors.emplace_back(std::string("Expected end of block " + name + ", got " + endName + "."), token->location, false, false);
+                if ((name == "while" && token->type == TokenType::While) ||
+                    ((name == "if" || name == "else" || name == "elseif") && token->type == TokenType::If) || name == endName) {
+                    advance();
                 }
-                else { advance(); }
+                else {
+                    errors.emplace_back(std::string("Expected end of block " + name + ", got " + endName + "."), token->location, false, false);
+                    hasError = true;
+                }
                 analysis.exitScope();
                 return block;
             } else if (token->type == TokenType::EndOfFile) {
@@ -77,55 +80,41 @@ namespace Slangc {
         std::optional<StmtPtrVariant> result = std::nullopt;
         consume(TokenType::Variable);
         consume(TokenType::Minus);
-        expect(TokenType::Identifier);
-        auto type = token->value;
-        advance();
-        std::string name;
+        auto type = parseType();
+        if (!type.has_value()) {
+            errors.emplace_back("Expected type.", token->location, false, false);
+            hasError = true;
+            return std::nullopt;
+        }
+        auto name = consume(TokenType::Identifier).value;
         std::optional<ExprPtrVariant> value;
-        if (type == "array") {
-            auto indicesCount = 1;
-            consume(TokenType::LBracket);
-            auto size = parseExpr().value();
-            consume(TokenType::RBracket);
-            auto arrayType = parseTypeName().value();
-            auto arrExpr = create<ArrayExprNode>(loc, std::vector<ExprPtrVariant>(), arrayType, std::move(size));
-            while (arrayType == "array") {
-                advance();
-                indicesCount++;
-                consume(TokenType::LBracket);
-                size = parseExpr().value();
-                consume(TokenType::RBracket);
-
-                if (token->type == TokenType::Identifier && token->value != "array") {
-                    arrayType = parseTypeName().value();
-                }
-                arrExpr->values.emplace_back(
-                        createExpr<ArrayExprNode>(loc, std::vector<ExprPtrVariant>(), arrayType, std::move(size)));
-            }
-            advance();
-            name = consume(TokenType::Identifier).value;
-            if (match(TokenType::Assign)) {
-                value = parseExpr();
-            }
-            result = createStmt<ArrayDecStatementNode>(loc, name, std::move(arrExpr), std::move(value), indicesCount);
-            analysis.insert(name, std::get<ArrayDecStatementPtr>(result.value()));
-        } else if (type == "function" || type == "procedure") {
-            // ...
-        } else {
-            if (token->type == TokenType::Dot) {
-                advance();
-                expect(TokenType::Identifier);
-                type += "." + token->value;
-                advance();
-            }
-            name = consume(TokenType::Identifier).value;
-            if (match(TokenType::Assign)) {
-                value = parseExpr();
-            }
-            result = createStmt<VarDecStatementNode>(loc, name, type, std::move(value));
-            analysis.insert(name, std::get<VarDecStatementPtr>(result.value()));
+        if (match(TokenType::Assign)) {
+            value = parseExpr();
         }
         consume(TokenType::Semicolon);
+
+        if (std::holds_alternative<ArrayExprPtr>(type.value())) {
+            auto arrExpr = std::get<ArrayExprPtr>(type.value());
+            auto indicesCount = arrExpr->getIndicesCount();
+            if (!hasError) {
+                result = createStmt<ArrayDecStatementNode>(loc, name, std::move(arrExpr), std::move(value), indicesCount);
+                analysis.insert(name, std::get<ArrayDecStatementPtr>(result.value()));
+            }
+        }
+        else if (std::holds_alternative<FuncExprPtr>(type.value())) {
+            auto funcExpr = std::get<FuncExprPtr>(type.value());
+            if (!hasError) {
+                result = createStmt<FuncPointerStatementNode>(loc, name, std::move(funcExpr->type), std::move(funcExpr->params), std::move(value), funcExpr->isFunction);
+                analysis.insert(name, std::get<FuncPointerStatementPtr>(result.value()));
+            }
+        }
+        else if (std::holds_alternative<TypeExprPtr>(type.value())) {
+            auto typeExpr = std::get<TypeExprPtr>(type.value());
+            if (!hasError) {
+                result = createStmt<VarDecStatementNode>(loc, name, typeExpr->type, std::move(value));
+                analysis.insert(name, std::get<VarDecStatementPtr>(result.value()));
+            }
+        }
         return result;
     }
 

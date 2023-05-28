@@ -43,37 +43,32 @@ namespace Slangc {
         return {};
     }
 
-    auto Parser::parseFuncParams() -> std::optional<std::vector<FuncParamDecStmtPtr>> {
+    auto Parser::parseFuncParams(bool named) -> std::optional<std::vector<FuncParamDecStmtPtr>> {
         auto params = std::vector<FuncParamDecStmtPtr>();
         consume(TokenType::LParen);
         while (token->type != TokenType::RParen) {
-            if (token->type == TokenType::Identifier) {
-                auto loc = token->location;
-                ParameterType parameterType{};
-                std::string ptype = consume(TokenType::Identifier).value;
-                if (ptype == "in") parameterType = ParameterType::In;
-                else if (ptype == "var") parameterType = ParameterType::Var;
-                else if (ptype == "out") parameterType = ParameterType::Out;
-                auto type = parseType();
-                if (!type.has_value()) {
-                    errors.emplace_back("Failed to parse function parameter type.", token->location, false, false);
-                    hasError = true;
-                    return std::nullopt;
-                }
-                advance();
-                auto name = consume(TokenType::Identifier).value;
-                params.emplace_back(create<FuncParamDecStatementNode>(token->location, name, parameterType, std::move(type.value())));
-                if (token->type == TokenType::Comma) {
-                    advance();
-                }
-                else if (token->type != TokenType::RParen) {
-                    errors.emplace_back("Expected comma or right parenthesis after function parameter declaration.", token->location, false, false);
-                    hasError = true;
-                    return std::nullopt;
-                }
+            auto loc = token->location;
+            ParameterType parameterType{};
+            std::string ptype = consume(TokenType::Identifier).value;
+            if (ptype == "in") parameterType = ParameterType::In;
+            else if (ptype == "var") parameterType = ParameterType::Var;
+            else if (ptype == "out") parameterType = ParameterType::Out;
+            auto type = parseType();
+            if (!type.has_value()) {
+                errors.emplace_back("Failed to parse function parameter type.", token->location, false, false);
+                hasError = true;
+                return std::nullopt;
             }
-            else {
-                errors.emplace_back("Expected identifier in function parameter declaration.", token->location, false, false);
+            std::string name;
+            if (named) {
+                name = consume(TokenType::Identifier).value;
+            }
+            params.emplace_back(create<FuncParamDecStatementNode>(token->location, name, parameterType, std::move(type.value())));
+            if (token->type == TokenType::Comma) {
+                advance();
+            }
+            else if (token->type != TokenType::RParen) {
+                errors.emplace_back("Expected comma or right parenthesis after function parameter declaration.", token->location, false, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -137,13 +132,13 @@ namespace Slangc {
             funcDecl = createDecl<FuncDecStatementNode>(loc, mangledName, std::move(returnType), params.value(), std::nullopt, isPrivate, isFunction);
         }
         analysis.insert(mangledName, funcDecl);
+        --token;
         auto block = parseBlockStmt(name, &params.value());
         if (!block.has_value()) {
             errors.emplace_back("Failed to parse function block.", token->location, false, false);
             hasError = true;
             return std::nullopt;
         }
-
         if (!isExtern) {
             auto func = std::get<FuncDecStatementPtr>(funcDecl);
             func->block = std::move(block.value());

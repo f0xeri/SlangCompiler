@@ -1,11 +1,20 @@
 module sample
-    private function printHello(in array[] character word): integer
+    private function printHello(in array[] array[] character word): array[] procedure(in real)
         output "Hello, ";
 	    output word;
 	    return 111;
     end printHello;
 start
+    variable-array[2] array[3] array[4] function(in integer, in integer): integer arr3d2;
+    output arr3d2;
     // test line comment
+    variable-xdd.Xdd xdd := 1;
+    variable-procedure(in integer, in integer) procPointer := testProc;
+    variable-procedure(in integer) procPointer2 := testProc;
+    variable-procedure(in real) procPointer3 := testProc;
+    variable-procedure() procPointer4 := testProc;
+    variable-procedure(out function(in integer, in integer): integer) procPointer5 := testProc;
+
     output xdd.xdd1.xdd2;
     while xdd == ad(aaa).a[5] && gg != 5 repeat
         call printHello("aaa");

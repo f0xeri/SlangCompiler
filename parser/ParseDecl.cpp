@@ -104,10 +104,10 @@ namespace Slangc {
             return std::nullopt;
         }
 
+        advance();
+        consume(TokenType::Colon);
         ExprPtrVariant returnType;
         if (isFunction) {
-            advance();
-            consume(TokenType::Colon);
             auto returnTypeOpt = parseType();
             if (!returnTypeOpt.has_value()) {
                 errors.emplace_back("Failed to parse function return type.", token->location, false, false);

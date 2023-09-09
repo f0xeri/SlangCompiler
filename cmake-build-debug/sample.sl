@@ -15,11 +15,17 @@ module sample
         end p1;
     end A;
 
-    private function printHello(in array[] array[] character word): array[] procedure(in real)
+    private procedure printHelloProc(in array[] array[] character word)
         output "Hello, ";
 	    output word;
-	    return 111;
-    end printHello;
+    end printHelloProc;
+
+    private function printHelloFunc(in array[] array[] character word): array[] array[] character
+        output "Hello, ";
+	    output word;
+	    return word;
+    end printHelloFunc;
+
 start
     variable-array[2] array[3] array[4] function(in integer, in integer): integer arr3d2;
     output arr3d2;

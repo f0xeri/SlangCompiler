@@ -27,8 +27,8 @@ namespace Slangc {
         explicit Parser(std::vector<Token> tokens, std::vector<ErrorMessage> &errors, const CompilerOptions &options, BasicAnalysis &analysis)
                 : analysis(analysis), options(options), errors(errors), tokens(std::move(tokens)) {
             token = this->tokens.cbegin();
-            currentScope = std::make_shared<Scope>();
-
+            analysis.enterScope();
+            analysis.insert("Object", createDecl<TypeDecStatementNode>(SourceLoc{0, 0}, "Object", std::vector<DeclPtrVariant>{}, std::vector<MethodDecPtr>{}));
         }
 
         const CompilerOptions &options;
@@ -68,13 +68,14 @@ namespace Slangc {
         auto parseCallStmt() -> std::optional<StmtPtrVariant>;
         auto parseDeleteStmt() -> std::optional<StmtPtrVariant>;
 
-        auto parseVarDecl(bool isGlobal) -> std::optional<DeclPtrVariant>;
         auto parseFuncParams(bool named = true) -> std::optional<std::vector<FuncParamDecStmtPtr>>;
         auto parseFuncDecl() -> std::optional<DeclPtrVariant>;
+        auto parseFieldDecl(const std::string& typeName, uint32_t fieldId) -> std::optional<DeclPtrVariant>;
+        auto parseMethodDecl(const std::string& typeName) -> std::optional<DeclPtrVariant>;
+        auto parseClassDecl() -> std::optional<DeclPtrVariant>;
 
     private:
         std::vector<Token> tokens;
-        std::shared_ptr<Scope> currentScope;
         std::vector<Token>::const_iterator token;
 
         auto advance() -> Token {

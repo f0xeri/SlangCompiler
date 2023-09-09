@@ -423,11 +423,11 @@ namespace Slangc {
         std::string name;
         std::string typeName;
         bool isPrivate;
-        int index;
+        uint32_t index;
         std::string type;
-        ExprPtrVariant expr;
+        std::optional<ExprPtrVariant> expr;
 
-        FieldVarDecNode(SourceLoc loc, std::string name, std::string typeName, bool isPrivate, int index, std::string type, ExprPtrVariant expr)
+        FieldVarDecNode(SourceLoc loc, std::string name, std::string typeName, bool isPrivate, int index, std::string type, std::optional<ExprPtrVariant> expr = std::nullopt)
             : loc(loc), name(std::move(name)), typeName(std::move(typeName)), isPrivate(isPrivate), index(index), type(std::move(type)), expr(std::move(expr)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
         auto getType(const BasicAnalysis& analysis) -> ExprPtrVariant { return std::make_unique<TypeExprNode>(type); }
@@ -437,15 +437,43 @@ namespace Slangc {
         SourceLoc loc{0, 0};
         std::string name;
         std::string typeName;
-        bool isPrivate;
-        int index;
-        ArrayDecStatementPtr var;
+        uint32_t index;
+        ArrayExprPtr expr;
+        std::optional<ExprPtrVariant> assignExpr;
+        uint32_t indicesCount = 1;
+        bool isPrivate = false;
+        bool isConst = false;
 
-        FieldArrayVarDecNode(SourceLoc loc, std::string name, std::string typeName, bool isPrivate, int index, ArrayDecStatementPtr var)
-            : loc(loc), name(std::move(name)), typeName(std::move(typeName)), isPrivate(isPrivate), index(index), var(std::move(var)) {};
+        FieldArrayVarDecNode(SourceLoc loc, std::string name, std::string typeName, uint32_t index, ArrayExprPtr expr,
+                             std::optional<ExprPtrVariant> assignExpr = std::nullopt, uint32_t indicesCount = 1,
+                             bool isPrivate = false, bool isConst = false)
+            : loc(loc), name(std::move(name)), typeName(std::move(typeName)), index(index), expr(std::move(expr)),
+            assignExpr(std::move(assignExpr)), indicesCount(indicesCount),
+            isPrivate(isPrivate), isConst(isConst) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const BasicAnalysis& analysis) -> ExprPtrVariant { return var->expr; }
+        auto getType(const BasicAnalysis& analysis) -> ExprPtrVariant { return getExprType(expr, analysis); }
+    };
+
+    struct FieldFuncPointerStatementNode {
+        SourceLoc loc{0, 0};
+        std::string name;
+        std::string typeName;
+        uint32_t index;
+        ExprPtrVariant type;
+        std::vector<FuncParamDecStmtPtr> args;
+        bool isFunction = false;
+        bool isPrivate = false;
+        std::optional<ExprPtrVariant> expr;
+
+        FieldFuncPointerStatementNode(SourceLoc loc, std::string name, std::string typeName, uint32_t index,
+                                      ExprPtrVariant type, std::vector<FuncParamDecStmtPtr> args,
+                                      bool isFunction = false, bool isPrivate = false, std::optional<ExprPtrVariant> expr = std::nullopt)
+            : loc(loc), name(std::move(name)), typeName(std::move(typeName)), index(index), type(std::move(type)),
+            args(std::move(args)), isFunction(isFunction), isPrivate(isPrivate), expr(std::move(expr)) {};
+
+        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto getType(const BasicAnalysis& analysis) -> ExprPtrVariant { return type; }
     };
 
     struct MethodDecNode {

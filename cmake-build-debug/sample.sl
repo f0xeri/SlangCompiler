@@ -1,4 +1,20 @@
 module sample
+    private class A inherits Object
+        // something goes wrong with debug info, when we have an array as field
+        public field-array[11] character str := "test"; // inline init for array doesn't work
+        public field-array[2] array[3] array[4] integer arr3d;
+        public field-integer i := 1;
+        private field-integer ip := 11;
+        public method p1(A a)(in integer i2, in float f): integer
+            output "A class\ni2 = ";
+            output i2;
+            output ", f = ";
+            output f;
+            output "\n\n";
+            return i2;
+        end p1;
+    end A;
+
     private function printHello(in array[] array[] character word): array[] procedure(in real)
         output "Hello, ";
 	    output word;

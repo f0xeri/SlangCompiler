@@ -13,10 +13,18 @@ namespace Slangc {
         advance();
         while (token->type != TokenType::Start)
         {
-            if (token->type == TokenType::Function || token->type == TokenType::Procedure) {
+            if (token->type == TokenType::Function || token->type == TokenType::Procedure || (token->type == TokenType::Extern && ((token + 1)->type == TokenType::Procedure || (token + 1)->type == TokenType::Function))) {
                 auto funcDecl = parseFuncDecl();
                 if (!funcDecl.has_value()) {
                     errors.emplace_back("Failed to parse function declaration.", token->location, false, false);
+                    hasError = true;
+                    return std::nullopt;
+                }
+            }
+            else if (token->type == TokenType::Class || (token->type == TokenType::Extern && (token + 1)->type == TokenType::Class)) {
+                auto type = parseClassDecl();
+                if (!type.has_value()) {
+                    errors.emplace_back("Failed to parse class declaration.", token->location, false, false);
                     hasError = true;
                     return std::nullopt;
                 }
@@ -37,10 +45,6 @@ namespace Slangc {
             return std::nullopt;
         }
         return moduleDecl;
-    }
-
-    auto Parser::parseVarDecl(bool isGlobal) -> std::optional<DeclPtrVariant> {
-        return {};
     }
 
     auto Parser::parseFuncParams(bool named) -> std::optional<std::vector<FuncParamDecStmtPtr>> {
@@ -104,10 +108,10 @@ namespace Slangc {
             return std::nullopt;
         }
 
+        advance();
+        consume(TokenType::Colon);
         ExprPtrVariant returnType;
         if (isFunction) {
-            advance();
-            consume(TokenType::Colon);
             auto returnTypeOpt = parseType();
             if (!returnTypeOpt.has_value()) {
                 errors.emplace_back("Failed to parse function return type.", token->location, false, false);
@@ -149,5 +153,174 @@ namespace Slangc {
             return std::nullopt;
         }
         return funcDecl;
+    }
+
+    auto Parser::parseFieldDecl(const std::string& typeName, uint32_t fieldId) -> std::optional<DeclPtrVariant> {
+        --token;
+        std::optional<DeclPtrVariant> result = std::nullopt;
+        SourceLoc loc = token->location;
+        bool isPrivate = consume(TokenType::VisibilityType).value == "private";
+        consume(TokenType::Field);
+        consume(TokenType::Minus);
+        auto type = parseType();
+        if (!type.has_value()) {
+            errors.emplace_back("Failed to parse field type.", token->location, false, false);
+            hasError = true;
+            return std::nullopt;
+        }
+        std::string name = consume(TokenType::Identifier).value;
+        std::optional<ExprPtrVariant> value;
+        if (match(TokenType::Assign)) {
+            value = parseExpr();
+        }
+        consume(TokenType::Semicolon);
+
+        if (std::holds_alternative<ArrayExprPtr>(type.value())) {
+            auto arrExpr = std::get<ArrayExprPtr>(type.value());
+            auto indicesCount = arrExpr->getIndicesCount();
+            if (!hasError) {
+                result = createDecl<FieldArrayVarDecNode>(loc, name, typeName, fieldId, std::move(arrExpr), std::move(value), indicesCount, isPrivate);
+                analysis.insert(name, std::get<FieldArrayVarDecPtr>(result.value()));
+            }
+        }
+        else if (std::holds_alternative<FuncExprPtr>(type.value())) {
+            auto funcExpr = std::get<FuncExprPtr>(type.value());
+            if (!hasError) {
+                result = createDecl<FieldFuncPointerStatementNode>(loc, name, typeName, fieldId, std::move(funcExpr->type), std::move(funcExpr->params), funcExpr->isFunction, isPrivate, std::move(value));
+                analysis.insert(name, std::get<FieldFuncPointerStatementPtr>(result.value()));
+            }
+        }
+        else if (std::holds_alternative<TypeExprPtr>(type.value())) {
+            auto typeExpr = std::get<TypeExprPtr>(type.value());
+            if (!hasError) {
+                result = createDecl<FieldVarDecNode>(loc, name, typeName, isPrivate, fieldId, typeExpr->type, std::move(value));
+                analysis.insert(name, std::get<FieldVarDecPtr>(result.value()));
+            }
+        }
+        return result;
+    }
+
+    auto Parser::parseMethodDecl(const std::string& typeName) -> std::optional<DeclPtrVariant> {
+        --token;
+        SourceLoc loc = token->location;
+        analysis.enterScope();
+        bool isPrivate = consume(TokenType::VisibilityType).value == "private";
+        consume(TokenType::Method);
+        bool isFunction = false;
+        std::string basicName = consume(TokenType::Identifier).value;
+        std::string name = moduleAST->name + "." + typeName + "." + basicName;
+        consume(TokenType::LParen);
+        auto tok = consume(TokenType::Identifier).value;
+        if (tok != typeName) {
+            errors.emplace_back(std::string("\"this\" should have \"" + typeName + "\" type, not " + tok), token->location, false, false);
+            hasError = true;
+            return std::nullopt;
+        }
+        auto thisName = consume(TokenType::Identifier).value;
+        consume(TokenType::RParen);
+        auto args = parseFuncParams();
+        if (!args.has_value()) {
+            errors.emplace_back("Failed to parse method arguments.", token->location, false, false);
+            hasError = true;
+            return std::nullopt;
+        }
+        args.value().insert(args.value().begin(), create<FuncParamDecStatementNode>(loc, thisName, ParameterType::Out, createExpr<TypeExprNode>(loc, typeName)));
+        for (auto& arg : args.value()) {
+            analysis.insert(arg->name, arg);
+        }
+        advance();
+        std::optional<ExprPtrVariant> returnType;
+        if (token->type == TokenType::Colon) {
+            advance();
+            returnType = parseType();
+            isFunction = true;
+            if (!returnType.has_value()) {
+                errors.emplace_back("Failed to parse method return type.", token->location, false, false);
+                hasError = true;
+                return std::nullopt;
+            }
+        }
+        else {
+            returnType = createExpr<TypeExprNode>(loc, "void");
+        }
+        loc = token->location;
+        std::vector<StmtPtrVariant> statements;
+        auto block = create<BlockStmtNode>(loc, statements);
+        auto funcDecl = create<MethodDecNode>(loc, name, std::move(returnType.value()), thisName, args.value(), block, isFunction, isPrivate);
+        analysis.insert(name, funcDecl);
+        --token;
+        auto parsedBlock = parseBlockStmt(basicName);
+        if (parsedBlock.has_value()) {
+            block = std::move(parsedBlock.value());
+        }
+        else {
+            errors.emplace_back("Failed to parse method body.", token->location, false, false);
+            hasError = true;
+            return std::nullopt;
+        }
+        consume(TokenType::Semicolon);
+        funcDecl->block = std::move(block);
+        analysis.exitScope();
+        return funcDecl;
+    }
+
+    auto Parser::parseClassDecl() -> std::optional<DeclPtrVariant> {
+        --token;
+        SourceLoc loc = token->location;
+        bool isPrivate = consume(TokenType::VisibilityType).value == "private";
+        bool isExtern = false;
+        if (token->type == TokenType::Extern) {
+            isExtern = true;
+            advance();
+        }
+        consume(TokenType::Class);
+        std::string name = consume(TokenType::Identifier).value;
+        consume(TokenType::Inherits);
+        auto parent = analysis.lookup(parseTypeName().value());
+        if (parent == nullptr || !std::holds_alternative<TypeDecStatementPtr>(*parent)) {
+            errors.emplace_back("Parent class is not declared.", token->location, false, false);
+            hasError = true;
+            return std::nullopt;
+        }
+        auto classNode = createDecl<TypeDecStatementNode>(loc, name, std::vector<DeclPtrVariant>{}, std::vector<MethodDecPtr>{}, std::get<TypeDecStatementPtr>(*parent), isPrivate, isExtern);
+        analysis.insert(name, classNode);
+        uint32_t fieldIndex = 0;
+        std::vector<DeclPtrVariant> fields;
+        std::vector<MethodDecPtr> methods;
+        advance();
+        while (token->type != TokenType::End) {
+            consume(TokenType::VisibilityType);
+            if (token->type == TokenType::Field) {
+                auto field = parseFieldDecl(name, fieldIndex);
+                ++fieldIndex;
+                if (!field.has_value()) {
+                    errors.emplace_back("Failed to parse field declaration.", token->location, false, false);
+                    hasError = true;
+                    return std::nullopt;
+                }
+                fields.emplace_back(field.value());
+            }
+            else if (token->type == TokenType::Method) {
+                auto method = parseMethodDecl(name);
+                if (!method.has_value()) {
+                    errors.emplace_back("Failed to parse method declaration.", token->location, false, false);
+                    hasError = true;
+                    return std::nullopt;
+                }
+                methods.emplace_back(std::get<MethodDecPtr>(method.value()));
+            }
+        }
+        advance();
+        analysis.exitScope();
+        if (token->type == TokenType::Identifier && token->value == name) {
+            std::get<TypeDecStatementPtr>(classNode)->fields = std::move(fields);
+            std::get<TypeDecStatementPtr>(classNode)->methods = std::move(methods);
+        }
+        else {
+            errors.emplace_back(std::string("Expected end of " + name + ", got " + token->value + "."), token->location, false, false);
+            hasError = true;
+            return std::nullopt;
+        }
+        return classNode;
     }
 } // Slangc

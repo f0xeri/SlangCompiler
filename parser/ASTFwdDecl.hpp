@@ -57,6 +57,7 @@ namespace Slangc {
     struct ExternFuncDecStatementNode;
     struct FieldArrayVarDecNode;
     struct FieldVarDecNode;
+    struct FieldFuncPointerStatementNode;
     struct FuncDecStatementNode;
     struct FuncParamDecStatementNode;
     struct FuncPointerStatementNode;
@@ -69,6 +70,7 @@ namespace Slangc {
     using ExternFuncDecStatementPtr = std::shared_ptr<ExternFuncDecStatementNode>;
     using FieldArrayVarDecPtr = std::shared_ptr<FieldArrayVarDecNode>;
     using FieldVarDecPtr = std::shared_ptr<FieldVarDecNode>;
+    using FieldFuncPointerStatementPtr = std::shared_ptr<FieldFuncPointerStatementNode>;
     using FuncDecStatementPtr = std::shared_ptr<FuncDecStatementNode>;
     using FuncParamDecStmtPtr = std::shared_ptr<FuncParamDecStatementNode>;
     using FuncPointerStatementPtr = std::shared_ptr<FuncPointerStatementNode>;
@@ -78,7 +80,7 @@ namespace Slangc {
     using ModuleDeclPtr = std::shared_ptr<ModuleDeclNode>;
 
     using DeclPtrVariant
-            = std::variant<ArrayDecStatementPtr, ExternFuncDecStatementPtr, FieldArrayVarDecPtr, FieldVarDecPtr,
+            = std::variant<ArrayDecStatementPtr, ExternFuncDecStatementPtr, FieldArrayVarDecPtr, FieldVarDecPtr, FieldFuncPointerStatementPtr,
             FuncDecStatementPtr, FuncParamDecStmtPtr, FuncPointerStatementPtr, MethodDecPtr,
             TypeDecStatementPtr, VarDecStatementPtr, ModuleDeclPtr>;
 

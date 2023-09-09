@@ -68,8 +68,13 @@ namespace Slangc {
                 size = create<IntExprNode>(loc, 0);
             }
             consume(TokenType::RBracket);
-            auto arrayType = parseType().value();
-            auto arrExpr = create<ArrayExprNode>(loc, std::nullopt, arrayType, size);
+            auto arrayType = parseType();
+            if (!arrayType.has_value()) {
+                errors.emplace_back("Failed to parse array type.", token->location, false, false);
+                hasError = true;
+                return std::nullopt;
+            }
+            auto arrExpr = create<ArrayExprNode>(loc, std::nullopt, arrayType.value(), size);
             /*while (arrayType == "array") {
                 advance();
                 indicesCount++;

@@ -14,10 +14,10 @@
 
 namespace Slangc {
     auto Parser::parseBlockStmt(const std::string &name, std::vector<FuncParamDecStmtPtr> *args) -> std::optional<BlockStmtPtr> {
-        analysis.enterScope();
+        //context.enterScope();
         if (args != nullptr) {
             for (auto &arg : *args) {
-                analysis.insert(arg->name, arg);
+                //context.insert(arg->name, arg);
             }
         }
         auto block = create<BlockStmtNode>(token->location, std::vector<StmtPtrVariant>());
@@ -34,7 +34,7 @@ namespace Slangc {
             else if (token->type == TokenType::Call) result = parseCallStmt();
             else if (token->type == TokenType::Delete) result = parseDeleteStmt();
             else if (name == "if" && (token->type == TokenType::Else || token->type == TokenType::Elseif)) {
-                analysis.exitScope();
+                //context.exitScope();
                 return block;
             }
             else if (token->type == TokenType::End) {
@@ -49,18 +49,18 @@ namespace Slangc {
                     errors.emplace_back(std::string("Expected end of block " + name + ", got " + endName + "."), token->location, false, false);
                     hasError = true;
                 }
-                analysis.exitScope();
+                //context.exitScope();
                 return block;
             } else if (token->type == TokenType::EndOfFile) {
                 errors.emplace_back("Unexpected end of file.", token->location, false, false);
                 hasError = true;
-                analysis.exitScope();
+                //context.exitScope();
                 return block;
             } else {
                 errors.emplace_back("Unexpected token " + std::string(Lexer::getTokenName(token->type)) + ".",
                                     token->location, false, false);
                 hasError = true;
-                analysis.exitScope();
+                //context.exitScope();
                 return block;
             }
             if (result.has_value()) {
@@ -69,7 +69,7 @@ namespace Slangc {
             else {
                 errors.emplace_back("Failed to parse statement.", token->location, false, false);
                 hasError = true;
-                analysis.exitScope();
+                //context.exitScope();
                 return block;
             }
         }
@@ -82,7 +82,7 @@ namespace Slangc {
         consume(TokenType::Minus);
         auto type = parseType();
         if (!type.has_value()) {
-            errors.emplace_back("Expected type.", token->location, false, false);
+            errors.emplace_back("Expected typeExpr.", token->location, false, false);
             hasError = true;
             return std::nullopt;
         }
@@ -98,21 +98,21 @@ namespace Slangc {
             auto indicesCount = arrExpr->getIndicesCount();
             if (!hasError) {
                 result = createStmt<ArrayDecStatementNode>(loc, name, std::move(arrExpr), std::move(value), indicesCount);
-                analysis.insert(name, std::get<ArrayDecStatementPtr>(result.value()));
+                //context.insert(name, std::get<ArrayDecStatementPtr>(result.value()));
             }
         }
         else if (std::holds_alternative<FuncExprPtr>(type.value())) {
             auto funcExpr = std::get<FuncExprPtr>(type.value());
             if (!hasError) {
                 result = createStmt<FuncPointerStatementNode>(loc, name, std::move(funcExpr->type), std::move(funcExpr->params), std::move(value), funcExpr->isFunction);
-                analysis.insert(name, std::get<FuncPointerStatementPtr>(result.value()));
+                //context.insert(name, std::get<FuncPointerStatementPtr>(result.value()));
             }
         }
         else if (std::holds_alternative<TypeExprPtr>(type.value())) {
             auto typeExpr = std::get<TypeExprPtr>(type.value());
             if (!hasError) {
                 result = createStmt<VarDecStatementNode>(loc, name, typeExpr->type, std::move(value));
-                analysis.insert(name, std::get<VarDecStatementPtr>(result.value()));
+                //context.insert(name, std::get<VarDecStatementPtr>(result.value()));
             }
         }
         return result;
@@ -160,7 +160,6 @@ namespace Slangc {
         auto condition = parseExpr();
         expect(TokenType::Repeat);
         auto block = parseBlockStmt("while");
-        std::cout << block.value()->statements.size() << std::endl;
         consume(TokenType::Semicolon);
         if (condition.has_value() && block.has_value()) {
             return createStmt<WhileStatementNode>(loc, std::move(condition.value()), std::move(block.value()));

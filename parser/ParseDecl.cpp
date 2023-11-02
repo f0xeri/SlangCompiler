@@ -59,7 +59,7 @@ namespace Slangc {
             else if (ptype == "out") parameterType = ParameterType::Out;
             auto type = parseType();
             if (!type.has_value()) {
-                errors.emplace_back("Failed to parse function parameter type.", token->location, false, false);
+                errors.emplace_back("Failed to parse function parameter typeExpr.", token->location, false, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -114,7 +114,7 @@ namespace Slangc {
             consume(TokenType::Colon);
             auto returnTypeOpt = parseType();
             if (!returnTypeOpt.has_value()) {
-                errors.emplace_back("Failed to parse function return type.", token->location, false, false);
+                errors.emplace_back("Failed to parse function return typeExpr.", token->location, false, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -131,11 +131,13 @@ namespace Slangc {
         }
         if (isExtern) {
             funcDecl = createDecl<ExternFuncDecStatementNode>(loc, mangledName, std::move(returnType), params.value(), isPrivate, isFunction);
+            //context.extern_funcs.emplace_back(std::get<ExternFuncDecStatementPtr>(funcDecl));
         }
         else {
             funcDecl = createDecl<FuncDecStatementNode>(loc, mangledName, std::move(returnType), params.value(), std::nullopt, isPrivate, isFunction);
+            //context.funcs.emplace_back(std::get<FuncDecStatementPtr>(funcDecl));
         }
-        analysis.insert(mangledName, funcDecl);
+        //context.insert(mangledName, funcDecl);
         --token;
         auto block = parseBlockStmt(name, &params.value());
         if (!block.has_value()) {
@@ -164,7 +166,7 @@ namespace Slangc {
         consume(TokenType::Minus);
         auto type = parseType();
         if (!type.has_value()) {
-            errors.emplace_back("Failed to parse field type.", token->location, false, false);
+            errors.emplace_back("Failed to parse field typeExpr.", token->location, false, false);
             hasError = true;
             return std::nullopt;
         }
@@ -180,21 +182,21 @@ namespace Slangc {
             auto indicesCount = arrExpr->getIndicesCount();
             if (!hasError) {
                 result = createDecl<FieldArrayVarDecNode>(loc, name, typeName, fieldId, std::move(arrExpr), std::move(value), indicesCount, isPrivate);
-                analysis.insert(name, std::get<FieldArrayVarDecPtr>(result.value()));
+                //context.insert(name, std::get<FieldArrayVarDecPtr>(result.value()));
             }
         }
         else if (std::holds_alternative<FuncExprPtr>(type.value())) {
             auto funcExpr = std::get<FuncExprPtr>(type.value());
             if (!hasError) {
                 result = createDecl<FieldFuncPointerStatementNode>(loc, name, typeName, fieldId, std::move(funcExpr->type), std::move(funcExpr->params), funcExpr->isFunction, isPrivate, std::move(value));
-                analysis.insert(name, std::get<FieldFuncPointerStatementPtr>(result.value()));
+                //context.insert(name, std::get<FieldFuncPointerStatementPtr>(result.value()));
             }
         }
         else if (std::holds_alternative<TypeExprPtr>(type.value())) {
             auto typeExpr = std::get<TypeExprPtr>(type.value());
             if (!hasError) {
                 result = createDecl<FieldVarDecNode>(loc, name, typeName, isPrivate, fieldId, typeExpr->type, std::move(value));
-                analysis.insert(name, std::get<FieldVarDecPtr>(result.value()));
+                //context.insert(name, std::get<FieldVarDecPtr>(result.value()));
             }
         }
         return result;
@@ -203,7 +205,7 @@ namespace Slangc {
     auto Parser::parseMethodDecl(const std::string& typeName) -> std::optional<DeclPtrVariant> {
         --token;
         SourceLoc loc = token->location;
-        analysis.enterScope();
+        //context.enterScope();
         bool isPrivate = consume(TokenType::VisibilityType).value == "private";
         consume(TokenType::Method);
         bool isFunction = false;
@@ -212,7 +214,7 @@ namespace Slangc {
         consume(TokenType::LParen);
         auto tok = consume(TokenType::Identifier).value;
         if (tok != typeName) {
-            errors.emplace_back(std::string("\"this\" should have \"" + typeName + "\" type, not " + tok), token->location, false, false);
+            errors.emplace_back(std::string("\"this\" should have \"" + typeName + "\" typeExpr, not " + tok), token->location, false, false);
             hasError = true;
             return std::nullopt;
         }
@@ -226,7 +228,7 @@ namespace Slangc {
         }
         args.value().insert(args.value().begin(), create<FuncParamDecStatementNode>(loc, thisName, ParameterType::Out, createExpr<TypeExprNode>(loc, typeName)));
         for (auto& arg : args.value()) {
-            analysis.insert(arg->name, arg);
+            //context.insert(arg->name, arg);
         }
         advance();
         std::optional<ExprPtrVariant> returnType;
@@ -235,7 +237,7 @@ namespace Slangc {
             returnType = parseType();
             isFunction = true;
             if (!returnType.has_value()) {
-                errors.emplace_back("Failed to parse method return type.", token->location, false, false);
+                errors.emplace_back("Failed to parse method return typeExpr.", token->location, false, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -247,7 +249,7 @@ namespace Slangc {
         std::vector<StmtPtrVariant> statements;
         auto block = create<BlockStmtNode>(loc, statements);
         auto funcDecl = create<MethodDecNode>(loc, name, std::move(returnType.value()), thisName, args.value(), block, isFunction, isPrivate);
-        analysis.insert(name, funcDecl);
+        //context.insert(name, funcDecl);
         --token;
         auto parsedBlock = parseBlockStmt(basicName);
         if (parsedBlock.has_value()) {
@@ -260,7 +262,7 @@ namespace Slangc {
         }
         consume(TokenType::Semicolon);
         funcDecl->block = std::move(block);
-        analysis.exitScope();
+        //context.exitScope();
         return funcDecl;
     }
 
@@ -276,14 +278,10 @@ namespace Slangc {
         consume(TokenType::Class);
         std::string name = consume(TokenType::Identifier).value;
         consume(TokenType::Inherits);
-        auto parent = analysis.lookup(parseTypeName().value());
-        if (parent == nullptr || !std::holds_alternative<TypeDecStatementPtr>(*parent)) {
-            errors.emplace_back("Parent class is not declared.", token->location, false, false);
-            hasError = true;
-            return std::nullopt;
-        }
-        auto classNode = createDecl<TypeDecStatementNode>(loc, name, std::vector<DeclPtrVariant>{}, std::vector<MethodDecPtr>{}, std::get<TypeDecStatementPtr>(*parent), isPrivate, isExtern);
-        analysis.insert(name, classNode);
+        auto parentTypeName = parseTypeName().value();
+        auto classNode = createDecl<TypeDecStatementNode>(loc, name, std::vector<DeclPtrVariant>{}, std::vector<MethodDecPtr>{}, parentTypeName, isPrivate, isExtern);
+        //context.insert(name, classNode);
+        //context.types.emplace_back(std::get<TypeDecStatementPtr>(classNode));
         uint32_t fieldIndex = 0;
         std::vector<DeclPtrVariant> fields;
         std::vector<MethodDecPtr> methods;
@@ -311,7 +309,7 @@ namespace Slangc {
             }
         }
         advance();
-        analysis.exitScope();
+        //context.exitScope();
         if (token->type == TokenType::Identifier && token->value == name) {
             std::get<TypeDecStatementPtr>(classNode)->fields = std::move(fields);
             std::get<TypeDecStatementPtr>(classNode)->methods = std::move(methods);

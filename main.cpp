@@ -6,6 +6,7 @@
 #include "parser/Parser.hpp"
 #include "parser/AST.hpp"
 #include "parser/Scope.hpp"
+#include "analysis/Check.hpp"
 #include <codegen/CodeGen.hpp>
 
 int main(int argc, char **argv) {
@@ -18,11 +19,13 @@ int main(int argc, char **argv) {
     }
     Slangc::Lexer lexer(std::move(buffer.get()), errors);
     lexer.tokenize();
-    lexer.printTokens();
+    // lexer.printTokens();
 
-    Slangc::BasicAnalysis basicAnalysis;
-    Slangc::Parser parser(lexer.tokens, errors, options, basicAnalysis);
+    Slangc::Context basicAnalysis;
+    Slangc::Parser parser(lexer.tokens, options, basicAnalysis, errors);
     parser.parse();
+
+    Slangc::Check::checkAST(parser.moduleAST, basicAnalysis, errors);
 
     Slangc::CodeGen codeGen(std::move(parser.moduleAST));
     codeGen.process();

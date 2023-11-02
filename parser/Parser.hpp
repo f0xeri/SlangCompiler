@@ -12,7 +12,7 @@
 #include "Scope.hpp"
 #include "lexer/Lexer.hpp"
 #include "AST.hpp"
-#include "analysis/BasicAnalysis.hpp"
+#include "analysis/Context.hpp"
 #include <CompilerOptions.hpp>
 
 namespace Slangc {
@@ -22,13 +22,13 @@ namespace Slangc {
     using ParserDeclResult = std::optional<DeclPtrVariant>;
 
     class Parser {
-        BasicAnalysis &analysis;
+        //Context &context;
     public:
-        explicit Parser(std::vector<Token> tokens, std::vector<ErrorMessage> &errors, const CompilerOptions &options, BasicAnalysis &analysis)
-                : analysis(analysis), options(options), errors(errors), tokens(std::move(tokens)) {
+        explicit Parser(std::vector<Token> tokens, const CompilerOptions &options, Context &context, std::vector<ErrorMessage> &errors)
+                : /*context(context),*/ options(options), errors(errors), tokens(std::move(tokens)) {
             token = this->tokens.cbegin();
-            analysis.enterScope();
-            analysis.insert("Object", createDecl<TypeDecStatementNode>(SourceLoc{0, 0}, "Object", std::vector<DeclPtrVariant>{}, std::vector<MethodDecPtr>{}));
+            //context.enterScope();
+            //context.insert("Object", createDecl<TypeDecStatementNode>(SourceLoc{0, 0}, "Object", std::vector<DeclPtrVariant>{}, std::vector<MethodDecPtr>{}));
         }
 
         const CompilerOptions &options;

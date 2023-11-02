@@ -13,7 +13,7 @@ namespace Slangc {
         moduleAST = create<ModuleDeclNode>(loc, "test", create<BlockStmtNode>(loc, std::vector<StmtPtrVariant>()));
         auto moduleNode = parseModuleDecl();
         if (moduleNode.has_value()) {
-            std::cout << moduleNode.value()->block->statements.size() << std::endl;
+            //std::cout << moduleNode.value()->block->statements.size() << std::endl;
             moduleAST = std::move(moduleNode.value());
         }
         else {
@@ -29,7 +29,7 @@ namespace Slangc {
 
     auto Parser::parseTypeName() -> std::optional<std::string> {
         if (token->type != TokenType::Identifier) {
-            errors.emplace_back("Expected type name.", token->location, false, false);
+            errors.emplace_back("Expected typeExpr name.", token->location, false, false);
             hasError = true;
             return std::nullopt;
         }
@@ -70,7 +70,7 @@ namespace Slangc {
             consume(TokenType::RBracket);
             auto arrayType = parseType();
             if (!arrayType.has_value()) {
-                errors.emplace_back("Failed to parse array type.", token->location, false, false);
+                errors.emplace_back("Failed to parse array typeExpr.", token->location, false, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -79,7 +79,7 @@ namespace Slangc {
                 advance();
                 indicesCount++;
                 consume(TokenType::LBracket);
-                if (token->type != TokenType::RBracket) {
+                if (token->typeExpr != TokenType::RBracket) {
                     auto sizeExpr = parseExpr();
                     if (sizeExpr.has_value()) {
                         size = sizeExpr.value();
@@ -90,7 +90,7 @@ namespace Slangc {
                 }
                 consume(TokenType::RBracket);
 
-                if (token->type == TokenType::Identifier && token->value != "array") {
+                if (token->typeExpr == TokenType::Identifier && token->value != "array") {
                     arrayType = parseTypeName().value();
                 }
                 arrExpr->values.emplace_back(createExpr<ArrayExprNode>(loc, std::vector<ExprPtrVariant>(), arrayType, size));
@@ -111,7 +111,7 @@ namespace Slangc {
                 if (returnTypeOpt.has_value()) {
                     returnType = std::move(returnTypeOpt.value());
                 } else {
-                    errors.emplace_back("Expected type after ':'.", token->location, false, false);
+                    errors.emplace_back("Expected typeExpr after ':'.", token->location, false, false);
                     hasError = true;
                 }
             } else {

@@ -2,17 +2,20 @@
 // Created by f0xeri on 26.05.2023.
 //
 
-#ifndef SLANGCREFACTORED_BASICANALYSIS_HPP
-#define SLANGCREFACTORED_BASICANALYSIS_HPP
+#ifndef SLANGCREFACTORED_CONTEXT_HPP
+#define SLANGCREFACTORED_CONTEXT_HPP
 
 #include <memory>
 #include "parser/Scope.hpp"
 
 namespace Slangc {
-    class BasicAnalysis {
+    class Context {
         std::shared_ptr<Scope> currScope = std::make_unique<Scope>();
-
     public:
+        std::vector<TypeDecStatementPtr> types;
+        std::vector<VarDecStatementPtr> global_vars;
+        std::vector<FuncDecStatementPtr> funcs;
+        std::vector<ExternFuncDecStatementPtr> extern_funcs;
         auto enterScope() -> void {
             currScope = std::make_unique<Scope>(std::move(currScope));
         }
@@ -32,7 +35,11 @@ namespace Slangc {
         auto getVarDeclType(std::string_view name) const -> ExprPtrVariant {
             auto* node = currScope->lookup(name);
         }
+
+        static bool isBuiltInType(std::string_view name) {
+            return name == "integer" || name == "float" || name == "real" || name == "boolean" || name == "string" || name == "character";
+        }
     };
 }
 
-#endif //SLANGCREFACTORED_BASICANALYSIS_HPP
+#endif //SLANGCREFACTORED_CONTEXT_HPP

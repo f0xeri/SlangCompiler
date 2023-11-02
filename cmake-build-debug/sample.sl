@@ -1,7 +1,6 @@
 module sample
     private class A inherits Object
-        // something goes wrong with debug info, when we have an array as field
-        public field-array[11] character str := "test"; // inline init for array doesn't work
+        public field-array[11] character str := "test";
         public field-array[2] array[3] array[4] integer arr3d;
         public field-integer i := 1;
         private field-integer ip := 11;
@@ -26,11 +25,19 @@ module sample
 	    return word;
     end printHelloFunc;
 
+    private function getFloat(): float
+        return 3.14f;
+    end getFloat;
+
 start
     variable-array[2] array[3] array[4] function(in integer, in integer): integer arr3d2;
     output arr3d2;
     // test line comment
+    variable-real r1 := 3.14;
+    variable-real r2 := 1 + r1;
     variable-xdd.Xdd xdd := 1;
+    variable-xddd xdd := 1;
+    variable-integer i := 1.0f;
     variable-procedure(in integer, in integer) procPointer := testProc;
     variable-procedure(in integer) procPointer2 := testProc;
     variable-procedure(in real) procPointer3 := testProc;

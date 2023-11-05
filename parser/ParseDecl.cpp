@@ -10,6 +10,8 @@ namespace Slangc {
         consume(TokenType::Module);
         expect(TokenType::Identifier);
         auto moduleName = token->value;
+        context.moduleName = moduleName;
+        moduleAST = create<ModuleDeclNode>(loc, moduleName, create<BlockStmtNode>(loc, std::vector<StmtPtrVariant>()));
         advance();
         while (token->type != TokenType::Start)
         {
@@ -323,6 +325,7 @@ namespace Slangc {
             hasError = true;
             return std::nullopt;
         }
+        context.types[name] = std::get<TypeDecStatementPtr>(classNode);
         return classNode;
     }
 } // Slangc

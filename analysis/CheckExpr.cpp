@@ -78,8 +78,13 @@ namespace Slangc::Check {
     auto checkExpr(const VarExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) -> bool {
         bool result = true;
         if (!context.lookup(expr->name)) {
-            errors.emplace_back("Variable, type, or function with name '" + expr->name + "' does not exist.", expr->loc, false, false);
-            result = false;
+            if (context.lookup(context.moduleName + "." + expr->name)) {
+                expr->name = context.moduleName + "." + expr->name;
+            }
+            else {
+                errors.emplace_back("Variable, type, or function with name '" + expr->name + "' does not exist.", expr->loc, false, false);
+                result = false;
+            }
         }
         return result;
     }
@@ -93,7 +98,10 @@ namespace Slangc::Check {
     }
 
     auto checkExpr(const CallExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) -> bool {
-        return true;
+        bool result = true;
+        result = checkExpr(expr->name, context, errors);
+        auto type = getExprType(expr, context);
+        return result;
     }
 
     auto checkExpr(const AccessExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) -> bool {

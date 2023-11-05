@@ -10,7 +10,8 @@ namespace Slangc {
         parseImports();
 
         auto loc = SourceLoc{0, 0};
-        moduleAST = create<ModuleDeclNode>(loc, "test", create<BlockStmtNode>(loc, std::vector<StmtPtrVariant>()));
+
+        context.insert("Object", create<TypeDecStatementNode>(loc, std::string("Object"), std::vector<DeclPtrVariant>(), std::vector<MethodDecPtr>()));
         auto moduleNode = parseModuleDecl();
         if (moduleNode.has_value()) {
             //std::cout << moduleNode.assignExpr()->block->statements.size() << std::endl;

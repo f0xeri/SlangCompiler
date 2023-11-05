@@ -1,4 +1,12 @@
 module sample
+    private function getFloat(): float
+        return 3.14f;
+    end getFloat;
+
+    private function getInt(): integer
+        return getFloat();
+    end getInt;
+
     private class A inherits Object
         public field-array[11] character str := "test";
         public field-array[2] array[3] array[4] integer arr3d;
@@ -12,6 +20,9 @@ module sample
             output "\n\n";
             return i2;
         end p1;
+        public method getFloat(A a)(): float
+            return 1.2f;
+        end getFloat;
     end A;
 
     private procedure printHelloProc(in array[] array[] character word)
@@ -26,10 +37,6 @@ module sample
 	    output word;
 	    return word;
     end printHelloFunc;
-
-    private function getFloat(): float
-        return 3.14f;
-    end getFloat;
 
     public procedure testProc(in integer x, in integer y)
         output 1;
@@ -59,7 +66,7 @@ start
     variable-xdd.Xdd xdd := 1;
     variable-xddd xdd := 1;
     variable-integer i := 1.0f;
-    variable-real r := 1.1;
+    variable-real r := xdd.getFloat();
     variable-procedure(in integer, in integer) procPointer := testProc;
     variable-procedure(in integer) procPointer2 := testProc;
     variable-procedure(in real) procPointer3 := testProc;

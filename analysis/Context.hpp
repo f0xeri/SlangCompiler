@@ -7,7 +7,9 @@
 
 #include <memory>
 #include <map>
+#include <optional>
 #include "parser/Scope.hpp"
+#include "common.hpp"
 
 namespace Slangc {
     class Context {
@@ -17,6 +19,9 @@ namespace Slangc {
         std::map<std::string, VarDecStatementPtr> global_vars;
         std::vector<FuncDecStatementPtr> funcs;
         std::map<std::string, ExternFuncDecStatementPtr> extern_funcs;
+
+        std::vector<std::pair<ExprPtrVariant, SourceLoc>> currFuncReturnTypes;
+        std::string moduleName;
         auto enterScope() -> void {
             currScope = std::make_unique<Scope>(std::move(currScope));
         }

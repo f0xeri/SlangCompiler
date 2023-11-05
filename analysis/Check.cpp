@@ -6,6 +6,9 @@
 
 namespace Slangc::Check {
     auto checkAST(const ModuleDeclPtr& moduleAST, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+        for (const auto &decl: context.types) {
+            checkDecl(decl.second, context, errors);
+        }
         for (const auto &decl: context.funcs) {
             checkDecl(decl, context, errors);
         }

@@ -119,11 +119,11 @@ namespace Slangc {
     };
 
     auto compareTypes(const ExprPtrVariant &type1, const ExprPtrVariant &type2) -> bool;
-    auto compareFuncSignatures(FuncExprPtr &func1, FuncExprPtr &func2) -> bool;
-    auto compareFuncSignatures(FuncDecStatementPtr &func1, FuncDecStatementPtr &func2) -> bool;
-    auto compareFuncSignatures(ExternFuncDecStatementPtr &func1, ExternFuncDecStatementPtr &func2) -> bool;
-    auto compareFuncSignatures(MethodDecPtr &func1, MethodDecPtr &func2) -> bool;
-    auto compareFuncSignatures(FuncDecStatementPtr &func1, FuncExprPtr &func2) -> bool;
+    auto compareFuncSignatures(const FuncExprPtr &func1, const FuncExprPtr &func2) -> bool;
+    auto compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncDecStatementPtr &func2) -> bool;
+    auto compareFuncSignatures(const ExternFuncDecStatementPtr &func1, const ExternFuncDecStatementPtr &func2) -> bool;
+    auto compareFuncSignatures(const MethodDecPtr &func1, const MethodDecPtr &func2) -> bool;
+    auto compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncExprPtr &func2) -> bool;
 }
 
 #endif //SLANGCREFACTORED_ASTFWDDECL_HPP

@@ -213,6 +213,10 @@ namespace Slangc {
     auto Parser::parseReturnStmt() -> std::optional<StmtPtrVariant> {
         auto loc = token->location;
         consume(TokenType::Return);
+        if (token->type == TokenType::Semicolon) {
+            advance();
+            return createStmt<ReturnStatementNode>(loc, create<TypeExprNode>(loc, "void"));
+        }
         auto expr = parseExpr();
         consume(TokenType::Semicolon);
         if (expr.has_value()) {

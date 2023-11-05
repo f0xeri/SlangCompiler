@@ -61,9 +61,15 @@ namespace Slangc::Check {
         if (stmt->assignExpr.has_value()) {
             result &= checkExpr(stmt->assignExpr.value(), context, errors);
             if (result) {
-                auto leftType = stmt->expr->getType(context);
+                auto leftType = stmt->expr;
                 auto rightType = getExprType(stmt->assignExpr.value(), context);
-                if (leftType != rightType) {
+                // searching for overloaded function
+                if (auto varExpr = std::get_if<VarExprPtr>(&stmt->assignExpr.value())) {
+                    if (auto func = context.lookupFunc(varExpr->get()->name, stmt->expr)) {
+                        rightType = std::get<FuncDecStatementPtr>(*func)->expr;
+                    }
+                }
+                if (!compareFuncSignatures(leftType, std::get<FuncExprPtr>(rightType))) {
                     errors.emplace_back("Type mismatch: cannot assign.", stmt->loc, false, false);
                     result = false;
                 }
@@ -93,7 +99,10 @@ namespace Slangc::Check {
     }
 
     auto checkStmt(const ReturnStatementPtr &stmt, Context &context, std::vector<ErrorMessage> &errors) -> bool {
-        return true;
+        auto result = checkExpr(stmt->expr, context, errors);
+        auto type = getExprType(stmt->expr, context);
+        context.currFuncReturnTypes.emplace_back(type, stmt->loc);
+        return result;
     }
 
     auto checkStmt(const CallExprPtr &stmt, Context &context, std::vector<ErrorMessage> &errors) -> bool {

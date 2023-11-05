@@ -22,10 +22,10 @@ namespace Slangc {
     using ParserDeclResult = std::optional<DeclPtrVariant>;
 
     class Parser {
-        //Context &context;
+        Context &context;
     public:
         explicit Parser(std::vector<Token> tokens, const CompilerOptions &options, Context &context, std::vector<ErrorMessage> &errors)
-                : /*context(context),*/ options(options), errors(errors), tokens(std::move(tokens)) {
+                : context(context), options(options), errors(errors), tokens(std::move(tokens)) {
             token = this->tokens.cbegin();
             //context.enterScope();
             //context.insert("Object", createDecl<TypeDecStatementNode>(SourceLoc{0, 0}, "Object", std::vector<DeclPtrVariant>{}, std::vector<MethodDecPtr>{}));

@@ -17,6 +17,8 @@ module sample
     private procedure printHelloProc(in array[] array[] character word)
         output "Hello, ";
 	    output word;
+	    variable-integer2 xxx;
+	    variable-xdd xxx;
     end printHelloProc;
 
     private function printHelloFunc(in array[] array[] character word): array[] array[] character
@@ -29,15 +31,35 @@ module sample
         return 3.14f;
     end getFloat;
 
+    public procedure testProc(in integer x, in integer y)
+        output 1;
+    end testProc;
+
+    public procedure testProc(out function(in integer, in integer): integer func)
+        output func(1, 2);
+        output "\n";
+    end testProc;
+
+    public procedure testProc(in integer x)
+        output 2;
+    end testProc;
+
+    public procedure testProc(in real x)
+        output 3;
+    end testProc;
+
+    public procedure testProc()
+        output 4;
+    end testProc;
+
 start
     variable-array[2] array[3] array[4] function(in integer, in integer): integer arr3d2;
     output arr3d2;
     // test line comment
-    variable-real r1 := 3.14;
-    variable-real r2 := 1 + r1;
     variable-xdd.Xdd xdd := 1;
     variable-xddd xdd := 1;
     variable-integer i := 1.0f;
+    variable-real r := 1.1;
     variable-procedure(in integer, in integer) procPointer := testProc;
     variable-procedure(in integer) procPointer2 := testProc;
     variable-procedure(in real) procPointer3 := testProc;

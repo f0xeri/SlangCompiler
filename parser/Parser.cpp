@@ -13,7 +13,7 @@ namespace Slangc {
         moduleAST = create<ModuleDeclNode>(loc, "test", create<BlockStmtNode>(loc, std::vector<StmtPtrVariant>()));
         auto moduleNode = parseModuleDecl();
         if (moduleNode.has_value()) {
-            //std::cout << moduleNode.value()->block->statements.size() << std::endl;
+            //std::cout << moduleNode.assignExpr()->block->statements.size() << std::endl;
             moduleAST = std::move(moduleNode.value());
         }
         else {
@@ -82,7 +82,7 @@ namespace Slangc {
                 if (token->typeExpr != TokenType::RBracket) {
                     auto sizeExpr = parseExpr();
                     if (sizeExpr.has_value()) {
-                        size = sizeExpr.value();
+                        size = sizeExpr.assignExpr();
                     }
                 }
                 else {
@@ -90,8 +90,8 @@ namespace Slangc {
                 }
                 consume(TokenType::RBracket);
 
-                if (token->typeExpr == TokenType::Identifier && token->value != "array") {
-                    arrayType = parseTypeName().value();
+                if (token->typeExpr == TokenType::Identifier && token->assignExpr != "array") {
+                    arrayType = parseTypeName().assignExpr();
                 }
                 arrExpr->values.emplace_back(createExpr<ArrayExprNode>(loc, std::vector<ExprPtrVariant>(), arrayType, size));
             }*/
@@ -102,6 +102,7 @@ namespace Slangc {
             if (!args.has_value()) {
                 errors.emplace_back("Expected function parameters.", token->location, false, false);
                 hasError = true;
+                return std::nullopt;
             }
             advance();
             ExprPtrVariant returnType;
@@ -113,6 +114,7 @@ namespace Slangc {
                 } else {
                     errors.emplace_back("Expected typeExpr after ':'.", token->location, false, false);
                     hasError = true;
+                    return std::nullopt;
                 }
             } else {
                 returnType = createExpr<TypeExprNode>(loc, "void");

@@ -17,6 +17,7 @@
 #include "ASTFwdDecl.hpp"
 #include "analysis/Context.hpp"
 
+
 namespace Slangc {
     enum ParameterType {
         In,
@@ -364,21 +365,20 @@ namespace Slangc {
     struct FuncPointerStatementNode {
         SourceLoc loc{0, 0};
         std::string name;
-        ExprPtrVariant type;
-        std::vector<FuncParamDecStmtPtr> args;
+        FuncExprPtr expr;
         bool isFunction = false;
         bool isGlobal = false;
         bool isPrivate = false;
         bool isExtern = false;
-        std::optional<ExprPtrVariant> expr;
+        std::optional<ExprPtrVariant> assignExpr;
 
-        FuncPointerStatementNode(SourceLoc loc, std::string name, ExprPtrVariant type, std::vector<FuncParamDecStmtPtr> args,
-                                 std::optional<ExprPtrVariant> expr = std::nullopt, bool isFunction = false, bool isGlobal = false,
+        FuncPointerStatementNode(SourceLoc loc, std::string name, FuncExprPtr expr,
+                                 std::optional<ExprPtrVariant> value = std::nullopt, bool isFunction = false, bool isGlobal = false,
                                  bool isPrivate = false, bool isExtern = false)
-            : loc(loc), name(std::move(name)), type(std::move(type)), args(std::move(args)), isFunction(isFunction),
-            isGlobal(isGlobal), isPrivate(isPrivate), isExtern(isExtern), expr(std::move(expr)) {};
+            : loc(loc), name(std::move(name)), expr(std::move(expr)), assignExpr(std::move(value)), isFunction(isFunction),
+              isGlobal(isGlobal), isPrivate(isPrivate), isExtern(isExtern) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant { return type; }
+        auto getType(const Context& analysis) -> ExprPtrVariant { return expr; }
     };
 
     struct ArrayDecStatementNode {
@@ -405,17 +405,16 @@ namespace Slangc {
     struct FuncDecStatementNode {
         SourceLoc loc{0, 0};
         std::string name;
-        ExprPtrVariant type;
-        std::vector<FuncParamDecStmtPtr> args;
+        FuncExprPtr expr;
         std::optional<BlockStmtPtr> block;
         bool isPrivate = false;
         bool isFunction = false;
 
-        FuncDecStatementNode(SourceLoc loc, std::string name, ExprPtrVariant type, std::vector<FuncParamDecStmtPtr> args, std::optional<BlockStmtPtr> block = std::nullopt, bool isPrivate = false, bool isFunction = false)
-            : loc(loc), name(std::move(name)), type(std::move(type)), args(std::move(args)), block(std::move(block)), isPrivate(isPrivate), isFunction(isFunction) {};
+        FuncDecStatementNode(SourceLoc loc, std::string name, FuncExprPtr expr, std::optional<BlockStmtPtr> block = std::nullopt, bool isPrivate = false, bool isFunction = false)
+            : loc(loc), name(std::move(name)), expr(std::move(expr)), block(std::move(block)), isPrivate(isPrivate), isFunction(isFunction) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant { return getExprType(type, analysis); }
+        auto getType(const Context& analysis) -> ExprPtrVariant { return expr; }
     };
 
     struct FieldVarDecNode {
@@ -479,20 +478,19 @@ namespace Slangc {
     struct MethodDecNode {
         SourceLoc loc{0, 0};
         std::string name;
-        ExprPtrVariant type;
+        FuncExprPtr expr;
         std::string thisName;
-        std::vector<FuncParamDecStmtPtr> args;
         BlockStmtPtr block;
         bool isPrivate = false;
         bool isFunction = false;
 
-        MethodDecNode(SourceLoc loc, std::string name, ExprPtrVariant type, std::string thisName, std::vector<FuncParamDecStmtPtr> args,
+        MethodDecNode(SourceLoc loc, std::string name, FuncExprPtr expr, std::string thisName,
                       BlockStmtPtr block, bool isPrivate = false, bool isFunction = false)
-            : loc(loc), name(std::move(name)), type(std::move(type)), thisName(std::move(thisName)), args(std::move(args)),
+            : loc(loc), name(std::move(name)), expr(std::move(expr)), thisName(std::move(thisName)),
               block(std::move(block)), isPrivate(isPrivate), isFunction(isFunction) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant { return type; }
+        auto getType(const Context& analysis) -> ExprPtrVariant { return expr->type; }
     };
 
     struct TypeDecStatementNode {
@@ -517,18 +515,17 @@ namespace Slangc {
     struct ExternFuncDecStatementNode {
         SourceLoc loc{0, 0};
         std::string name;
-        ExprPtrVariant type;
-        std::vector<FuncParamDecStmtPtr> args;
+        FuncExprPtr expr;
         bool isPrivate = false;
         bool isFunction = false;
 
-        ExternFuncDecStatementNode(SourceLoc loc, std::string name, ExprPtrVariant type, std::vector<FuncParamDecStmtPtr> args,
+        ExternFuncDecStatementNode(SourceLoc loc, std::string name, FuncExprPtr expr,
                                    bool isPrivate = false, bool isFunction = false)
-                                   : loc(loc), name(std::move(name)), type(std::move(type)), args(std::move(args)),
+                                   : loc(loc), name(std::move(name)), expr(std::move(expr)),
                                      isPrivate(isPrivate), isFunction(isFunction) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant { return type; }
+        auto getType(const Context& analysis) -> ExprPtrVariant { return expr->type; }
     };
 
     struct ElseIfStatementNode {
@@ -642,6 +639,45 @@ namespace Slangc {
             if (std::get<FieldVarDecPtr>(field)->name == name) return std::get<FieldVarDecPtr>(field)->index;
         }
         return -1;
+    }
+
+    static auto compareTypes(const ExprPtrVariant &type1, const ExprPtrVariant &type2) -> bool {
+        if (auto type1Ptr = std::get_if<TypeExprPtr>(&type1)) {
+            if (auto type2Ptr = std::get_if<TypeExprPtr>(&type2)) {
+                return type1Ptr->get()->type == type2Ptr->get()->type;
+            }
+        }
+        if (auto type1Ptr = std::get_if<ArrayExprPtr>(&type1)) {
+            if (auto type2Ptr = std::get_if<ArrayExprPtr>(&type2)) {
+                return compareTypes(type1Ptr->get()->type, type2Ptr->get()->type);
+            }
+        }
+        return false;
+    }
+
+    // checks signatures without return type
+    static auto compareFuncSignatures(FuncExprPtr &func1, FuncExprPtr &func2) -> bool {
+        if (func1->params.size() != func2->params.size()) return false;
+        for (int i = 0; i < func1->params.size(); i++) {
+            if (!compareTypes(func1->params[i]->type, func2->params[i]->type) || func1->params[i]->parameterType != func2->params[i]->parameterType) return false;
+        }
+        return true;
+    }
+
+    static auto compareFuncSignatures(FuncDecStatementPtr &func1, FuncDecStatementPtr &func2) -> bool {
+        return compareFuncSignatures(func1->expr, func2->expr);
+    }
+
+    static auto compareFuncSignatures(ExternFuncDecStatementPtr &func1, ExternFuncDecStatementPtr &func2) -> bool {
+        return compareFuncSignatures(func1->expr, func2->expr);
+    }
+
+    static auto compareFuncSignatures(MethodDecPtr &func1, MethodDecPtr &func2) -> bool {
+        return compareFuncSignatures(func1->expr, func2->expr);
+    }
+
+    static auto compareFuncSignatures(FuncDecStatementPtr &func1, FuncExprPtr &func2) -> bool {
+        return compareFuncSignatures(func1->expr, func2);
     }
 }
 

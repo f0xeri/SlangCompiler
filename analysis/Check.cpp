@@ -5,7 +5,10 @@
 #include "Check.hpp"
 
 namespace Slangc::Check {
-    auto checkAST(const ModuleDeclPtr& moduleAST, const Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    auto checkAST(const ModuleDeclPtr& moduleAST, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+        for (const auto &decl: context.funcs) {
+            checkDecl(decl, context, errors);
+        }
         checkBlockStmt(moduleAST->block, context, errors);
         return true;
     }

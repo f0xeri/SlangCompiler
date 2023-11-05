@@ -117,6 +117,13 @@ namespace Slangc {
         bool isPointer = false;
         uint64_t indicesCount = 0;
     };
+
+    auto compareTypes(const ExprPtrVariant &type1, const ExprPtrVariant &type2) -> bool;
+    auto compareFuncSignatures(FuncExprPtr &func1, FuncExprPtr &func2) -> bool;
+    auto compareFuncSignatures(FuncDecStatementPtr &func1, FuncDecStatementPtr &func2) -> bool;
+    auto compareFuncSignatures(ExternFuncDecStatementPtr &func1, ExternFuncDecStatementPtr &func2) -> bool;
+    auto compareFuncSignatures(MethodDecPtr &func1, MethodDecPtr &func2) -> bool;
+    auto compareFuncSignatures(FuncDecStatementPtr &func1, FuncExprPtr &func2) -> bool;
 }
 
 #endif //SLANGCREFACTORED_ASTFWDDECL_HPP

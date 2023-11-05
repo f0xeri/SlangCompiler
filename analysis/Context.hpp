@@ -6,16 +6,17 @@
 #define SLANGCREFACTORED_CONTEXT_HPP
 
 #include <memory>
+#include <map>
 #include "parser/Scope.hpp"
 
 namespace Slangc {
     class Context {
         std::shared_ptr<Scope> currScope = std::make_unique<Scope>();
     public:
-        std::vector<TypeDecStatementPtr> types;
-        std::vector<VarDecStatementPtr> global_vars;
+        std::map<std::string, TypeDecStatementPtr> types;
+        std::map<std::string, VarDecStatementPtr> global_vars;
         std::vector<FuncDecStatementPtr> funcs;
-        std::vector<ExternFuncDecStatementPtr> extern_funcs;
+        std::map<std::string, ExternFuncDecStatementPtr> extern_funcs;
         auto enterScope() -> void {
             currScope = std::make_unique<Scope>(std::move(currScope));
         }
@@ -28,8 +29,16 @@ namespace Slangc {
             currScope->insert(declName, declarationNode);
         }
 
+        auto remove(const std::string& declName) -> void {
+            currScope->remove(declName);
+        }
+
         auto lookup(std::string_view name) const -> const DeclPtrVariant* {
             return currScope->lookup(name);
+        }
+
+        auto lookupFunc(std::string_view name, FuncExprPtr expr) const -> const DeclPtrVariant* {
+            return currScope->lookupFunc(name, expr);
         }
 
         auto getVarDeclType(std::string_view name) const -> ExprPtrVariant {
@@ -37,7 +46,7 @@ namespace Slangc {
         }
 
         static bool isBuiltInType(std::string_view name) {
-            return name == "integer" || name == "float" || name == "real" || name == "boolean" || name == "string" || name == "character";
+            return name == "integer" || name == "float" || name == "real" || name == "boolean" || name == "string" || name == "character" || name == "void";
         }
     };
 }

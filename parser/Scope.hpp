@@ -24,6 +24,10 @@ namespace Slangc {
             symbols.emplace_back(declName, declarationNode);
         }
 
+        void remove(const std::string& declName) {
+            symbols.erase(std::ranges::find(symbols, declName, &std::pair<std::string, DeclPtrVariant>::first));
+        }
+
         bool contains(std::string_view name) {
             return std::ranges::find(symbols, name, &std::pair<std::string, DeclPtrVariant>::first) != symbols.end();
         }
@@ -38,6 +42,24 @@ namespace Slangc {
             while (s) {
                 if (auto* node = s->get(name)) {
                     return node;
+                }
+                s = s->parent.get();
+            }
+            return nullptr;
+        }
+
+        auto lookupFunc(std::string_view name, FuncExprPtr& expr) -> const DeclPtrVariant* {
+            Scope *s = this;
+            while (s) {
+                for (auto &decl : s->symbols) {
+                    if (std::holds_alternative<FuncDecStatementPtr>(decl.second)) {
+                        auto func = std::get<FuncDecStatementPtr>(decl.second);
+                        if (decl.first == name) {
+                            if (compareFuncSignatures(func, expr)) {
+                                return &decl.second;
+                            }
+                        }
+                    }
                 }
                 s = s->parent.get();
             }

@@ -130,14 +130,17 @@ namespace Slangc {
             mangledName = moduleAST->name + "." + name;
         }
         if (isExtern) {
-            funcDecl = createDecl<ExternFuncDecStatementNode>(loc, mangledName, std::move(returnType), params.value(), isPrivate, isFunction);
+            auto funcExpr = create<FuncExprNode>(loc, returnType, params.value(), isFunction);
+            funcDecl = createDecl<ExternFuncDecStatementNode>(loc, mangledName, funcExpr, isPrivate, isFunction);
             //context.extern_funcs.emplace_back(std::get<ExternFuncDecStatementPtr>(funcDecl));
         }
         else {
-            funcDecl = createDecl<FuncDecStatementNode>(loc, mangledName, std::move(returnType), params.value(), std::nullopt, isPrivate, isFunction);
+            auto funcExpr = create<FuncExprNode>(loc, returnType, params.value(), isFunction);
+            funcDecl = createDecl<FuncDecStatementNode>(loc, mangledName, funcExpr, std::nullopt, isPrivate, isFunction);
             //context.funcs.emplace_back(std::get<FuncDecStatementPtr>(funcDecl));
         }
         //context.insert(mangledName, funcDecl);
+        context.funcs.emplace_back(std::get<FuncDecStatementPtr>(funcDecl));
         --token;
         auto block = parseBlockStmt(name, &params.value());
         if (!block.has_value()) {
@@ -182,21 +185,21 @@ namespace Slangc {
             auto indicesCount = arrExpr->getIndicesCount();
             if (!hasError) {
                 result = createDecl<FieldArrayVarDecNode>(loc, name, typeName, fieldId, std::move(arrExpr), std::move(value), indicesCount, isPrivate);
-                //context.insert(name, std::get<FieldArrayVarDecPtr>(result.value()));
+                //context.insert(name, std::get<FieldArrayVarDecPtr>(result.assignExpr()));
             }
         }
         else if (std::holds_alternative<FuncExprPtr>(type.value())) {
             auto funcExpr = std::get<FuncExprPtr>(type.value());
             if (!hasError) {
                 result = createDecl<FieldFuncPointerStatementNode>(loc, name, typeName, fieldId, std::move(funcExpr->type), std::move(funcExpr->params), funcExpr->isFunction, isPrivate, std::move(value));
-                //context.insert(name, std::get<FieldFuncPointerStatementPtr>(result.value()));
+                //context.insert(name, std::get<FieldFuncPointerStatementPtr>(result.assignExpr()));
             }
         }
         else if (std::holds_alternative<TypeExprPtr>(type.value())) {
             auto typeExpr = std::get<TypeExprPtr>(type.value());
             if (!hasError) {
                 result = createDecl<FieldVarDecNode>(loc, name, typeName, isPrivate, fieldId, typeExpr->type, std::move(value));
-                //context.insert(name, std::get<FieldVarDecPtr>(result.value()));
+                //context.insert(name, std::get<FieldVarDecPtr>(result.assignExpr()));
             }
         }
         return result;
@@ -248,7 +251,8 @@ namespace Slangc {
         loc = token->location;
         std::vector<StmtPtrVariant> statements;
         auto block = create<BlockStmtNode>(loc, statements);
-        auto funcDecl = create<MethodDecNode>(loc, name, std::move(returnType.value()), thisName, args.value(), block, isFunction, isPrivate);
+        auto funcExpr = create<FuncExprNode>(loc, returnType.value(), args.value(), isFunction);
+        auto funcDecl = create<MethodDecNode>(loc, name, funcExpr, thisName, block, isFunction, isPrivate);
         //context.insert(name, funcDecl);
         --token;
         auto parsedBlock = parseBlockStmt(basicName);

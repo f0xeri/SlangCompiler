@@ -53,8 +53,8 @@ namespace Slangc::Check {
         if (!checkExpr(expr->right, context, errors)) {
             result = false;
         }
-        auto leftType = std::get<TypeExprPtr>(getExprType(expr->left, context))->type;
-        auto rightType = std::get<TypeExprPtr>(getExprType(expr->right, context))->type;
+        auto leftType = std::get<TypeExprPtr>(getExprType(expr->left, context, errors).value())->type;
+        auto rightType = std::get<TypeExprPtr>(getExprType(expr->right, context, errors).value())->type;
         // TODO: check if conversion is possible
         if (leftType != rightType) {
             errors.emplace_back(std::string("Type mismatch: cannot apply operator '") + "' to '" + leftType + "' and '" + rightType + "'.", expr->loc, false, false);
@@ -100,12 +100,55 @@ namespace Slangc::Check {
     bool checkExpr(const CallExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         result = checkExpr(expr->name, context, errors);
-        auto type = getExprType(expr, context);
+        if (result) {
+            auto type = getExprType(expr, context, errors);
+        }
         return result;
     }
 
     bool checkExpr(const AccessExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
-        return true;
+        bool result = true;
+        result = checkExpr(expr->expr, context, errors);
+        if (!result) return result;
+        auto exprType = getExprType(expr->expr, context, errors);
+        if (!exprType.has_value()) {
+            errors.emplace_back("Failed to get type of expression.", expr->loc, false, false);
+            return false;
+        }
+        if (std::holds_alternative<TypeExprPtr>(exprType.value())) {
+            if (context.types.contains(std::get<TypeExprPtr>(exprType.value())->type)) {
+                auto type = context.types.at(std::get<TypeExprPtr>(exprType.value())->type);
+                auto found = false;
+                for (const auto &field: type->fields) {
+                    if (auto fieldVar = std::get_if<FieldVarDecPtr>(&field)) {
+                        found = ((*fieldVar)->name == expr->name);
+                    } else if (const auto &fieldArrayVar = std::get_if<FieldArrayVarDecPtr>(&field)) {
+                        found = ((*fieldArrayVar)->name == expr->name);
+                    } else if (auto fieldFuncPointer = std::get_if<FieldFuncPointerStmtPtr>(&field)) {
+                        found = ((*fieldFuncPointer)->name == expr->name);
+                    }
+
+                    if (found) break;
+                }
+                if (!found) {
+                    for (const auto &method: type->methods) {
+                        if (method->name == expr->name) {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                if (!found) {
+                    errors.emplace_back("Type '" + std::get<TypeExprPtr>(exprType.value())->type + "' does not have field or method called '" + expr->name + "'.", expr->loc, false,false);
+                    result = false;
+                }
+            }
+        }
+        else {
+            errors.emplace_back("Type of expression is not accessible.", expr->loc, false, false);
+            result = false;
+        }
+        return result;
     }
 
     bool checkExpr(const TypeExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {

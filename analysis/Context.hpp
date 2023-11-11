@@ -15,10 +15,10 @@ namespace Slangc {
     class Context {
         std::shared_ptr<Scope> currScope = std::make_unique<Scope>();
     public:
-        std::map<std::string, TypeDecStatementPtr> types;
-        std::map<std::string, VarDecStatementPtr> global_vars;
+        std::map<std::string, TypeDecStmtPtr> types;
+        std::map<std::string, VarDecStmtPtr> global_vars;
         std::vector<FuncDecStatementPtr> funcs;
-        std::map<std::string, ExternFuncDecStatementPtr> extern_funcs;
+        std::map<std::string, ExternFuncDecStmtPtr> extern_funcs;
 
         std::vector<std::pair<ExprPtrVariant, SourceLoc>> currFuncReturnTypes;
         std::string moduleName;

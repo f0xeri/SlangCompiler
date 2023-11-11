@@ -27,24 +27,26 @@ namespace Slangc {
 
     struct ExprTypeVisitor {
         const Context &analysis;
-        auto operator()(const auto &x) const -> ExprPtrVariant {
-            return x->getType(analysis);
+        std::vector<ErrorMessage>& errors;
+        auto operator()(const auto &x) const -> std::optional<ExprPtrVariant> {
+            return x->getType(analysis, errors);
         }
     };
 
-    static auto getExprType(const ExprPtrVariant &expr, const Context &analysis) -> ExprPtrVariant {
-        return std::visit(ExprTypeVisitor{analysis}, expr);
+    static auto getExprType(const ExprPtrVariant &expr, const Context &analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> {
+        return std::visit(ExprTypeVisitor{analysis, errors}, expr);
     }
 
     struct DeclTypeVisitor {
         const Context &analysis;
-        auto operator()(const auto &x) const -> ExprPtrVariant {
-            return x->getType(analysis);
+        std::vector<ErrorMessage>& errors;
+        auto operator()(const auto &x) const -> std::optional<ExprPtrVariant> {
+            return x->getType(analysis, errors);
         }
     };
 
-    static auto getDeclType(const DeclPtrVariant &expr, const Context &analysis) -> ExprPtrVariant {
-        return std::visit(DeclTypeVisitor{analysis}, expr);
+    static auto getDeclType(const DeclPtrVariant &expr, const Context &analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> {
+        return std::visit(DeclTypeVisitor{analysis, errors}, expr);
     }
 
 #pragma region Nodes declarations
@@ -57,7 +59,7 @@ namespace Slangc {
         TypeExprNode(SourceLoc loc, std::string type) : loc(loc), type(std::move(type)) {};
         TypeExprNode(std::string type) : type(std::move(type)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant { return std::make_unique<TypeExprNode>(*this); }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>(*this); }
     };
 
     struct IntExprNode {
@@ -67,7 +69,7 @@ namespace Slangc {
 
         IntExprNode(SourceLoc loc, int value) : loc(loc), value(value) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant  { return std::make_unique<TypeExprNode>("integer"); }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant>  { return std::make_unique<TypeExprNode>("integer"); }
     };
 
     struct FloatExprNode {
@@ -77,7 +79,7 @@ namespace Slangc {
 
         FloatExprNode(SourceLoc loc, float value) : loc(loc), value(value) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant { return std::make_unique<TypeExprNode>("float"); }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>("float"); }
     };
 
     struct RealExprNode {
@@ -87,7 +89,7 @@ namespace Slangc {
 
         RealExprNode(SourceLoc loc, double value) : loc(loc), value(value) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant { return std::make_unique<TypeExprNode>("real"); }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>("real"); }
     };
 
     struct CharExprNode {
@@ -97,7 +99,7 @@ namespace Slangc {
 
         CharExprNode(SourceLoc loc, char value) : loc(loc), value(value) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant { return std::make_unique<TypeExprNode>("character"); }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>("character"); }
     };
 
     struct StringExprNode {
@@ -107,7 +109,7 @@ namespace Slangc {
 
         StringExprNode(SourceLoc loc, std::string value) : loc(loc), value(std::move(value)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant {
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> {
             return std::make_unique<ArrayExprNode>(loc, std::nullopt,
                                                    std::make_unique<TypeExprNode>("character"),
                                                    std::make_unique<IntExprNode>(loc, value.size()));
@@ -121,7 +123,7 @@ namespace Slangc {
 
         NilExprNode(SourceLoc loc, ExprPtrVariant type) : loc(loc), type(type) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant { return type; }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return type; }
     };
 
     struct ArrayExprNode {
@@ -135,7 +137,7 @@ namespace Slangc {
             loc(loc), values(std::move(values)), type(std::move(type)), size(std::move(size)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
 
-        auto getType(const Context& analysis) -> ExprPtrVariant { return std::make_unique<ArrayExprNode>(*this); }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<ArrayExprNode>(*this); }
         [[nodiscard]] auto getIndicesCount() const -> uint64_t {
             auto finalType = type;
             auto sz = 1;
@@ -155,7 +157,7 @@ namespace Slangc {
         BooleanExprNode(SourceLoc loc, bool value) : loc(loc), value(value) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
 
-        auto getType(const Context& analysis) -> ExprPtrVariant { return std::make_unique<TypeExprNode>("boolean"); }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>("boolean"); }
     };
 
     struct VarExprNode {
@@ -171,7 +173,7 @@ namespace Slangc {
             : loc(loc), name(std::move(name)), dotClass(dotClass), dotModule(dotModule), isPointer(isPointer), index(index) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
 
-        auto getType(const Context& analysis) -> ExprPtrVariant { return getDeclType(*analysis.lookup(name), analysis); }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return getDeclType(*analysis.lookup(name), analysis, errors); }
     };
 
     struct IndexExprNode {
@@ -191,7 +193,7 @@ namespace Slangc {
               dotModule(dotModule), isPointer(isPointer), index(index) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
 
-        auto getType(const Context& analysis) -> ExprPtrVariant { return getExprType(expr, analysis); }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return getExprType(expr, analysis, errors); }
     };
 
     struct IndexesExprNode {
@@ -204,7 +206,7 @@ namespace Slangc {
             : loc(loc), indexes(std::move(indexes)), assign(std::move(assign)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
 
-        auto getType(const Context& analysis) -> ExprPtrVariant { return getExprType(indexes.back(), analysis); }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return getExprType(indexes.back(), analysis, errors); }
     };
 
     struct UnaryOperatorExprNode {
@@ -217,7 +219,7 @@ namespace Slangc {
             : loc(loc), op(op), expr(std::move(expr)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
 
-        auto getType(const Context& analysis) -> ExprPtrVariant { return getExprType(expr, analysis); }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return getExprType(expr, analysis, errors); }
     };
 
     struct OperatorExprNode {
@@ -230,12 +232,12 @@ namespace Slangc {
             : loc(loc), op(op), left(std::move(left)), right(std::move(right)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
 
-        auto getType(const Context& analysis) -> ExprPtrVariant {
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> {
             if (op == TokenType::Less || op == TokenType::LessOrEqual || op == TokenType::Greater || op == TokenType::GreaterOrEqual ||
                 op == TokenType::Equal || op == TokenType::NotEqual || op == TokenType::And || op == TokenType::Or) {
                 return std::make_unique<TypeExprNode>("boolean");
             }
-            return getExprType(left, analysis);
+            return getExprType(left, analysis, errors);
         }
     };
 
@@ -250,7 +252,7 @@ namespace Slangc {
                 : loc(loc), type(std::move(type)), isFunction(isFunction), params(std::move(params)) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant { return getExprType(type, analysis); }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return getExprType(type, analysis, errors); }
     };
 
     struct CallExprNode {
@@ -263,13 +265,107 @@ namespace Slangc {
             : loc(loc), name(std::move(name)), args(std::move(args)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
 
-        auto getType(const Context& analysis) -> ExprPtrVariant {
-            auto type = getExprType(name, analysis);
-            if (auto funcType = std::get_if<FuncExprPtr>(&type)) {
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> {
+            auto type = getExprType(name, analysis, errors);
+            if (!type.has_value()) return std::nullopt;
+            if (auto funcType = std::get_if<FuncExprPtr>(&type.value())) {
                 return (*funcType)->type;
             }
-            return getExprType(name, analysis);
+            return getExprType(name, analysis, errors);
         }
+    };
+
+    struct TypeDecStatementNode {
+        SourceLoc loc{0, 0};
+        std::string name;
+        std::vector<DeclPtrVariant> fields;
+        std::vector<MethodDecPtr> methods;
+        std::optional<std::string> parentTypeName = std::nullopt;
+        bool isExtern = false;
+        bool isPrivate = false;
+
+        TypeDecStatementNode(SourceLoc loc, std::string name, std::vector<DeclPtrVariant> fields,
+                             std::vector<MethodDecPtr> methods, std::optional<std::string> parentTypeName = std::nullopt,
+                             bool isExtern = false, bool isPrivate = false)
+                : loc(loc), name(std::move(name)), fields(std::move(fields)), methods(std::move(methods)),
+                  parentTypeName(std::move(parentTypeName)), isExtern(isExtern), isPrivate(isPrivate) {};
+
+        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>(name); }
+    };
+
+    struct FieldVarDecNode {
+        SourceLoc loc{0, 0};
+        std::string name;
+        TypeExprNode typeName;
+        bool isPrivate;
+        uint32_t index;
+        TypeExprNode typeExpr;
+        std::optional<ExprPtrVariant> expr;
+
+        FieldVarDecNode(SourceLoc loc, std::string name, std::string typeName, bool isPrivate, int index, std::string type, std::optional<ExprPtrVariant> expr = std::nullopt)
+                : loc(loc), name(std::move(name)), typeName(std::move(typeName)), isPrivate(isPrivate), index(index), typeExpr(std::move(type)), expr(std::move(expr)) {};
+        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>(typeExpr); }
+    };
+
+    struct FieldArrayVarDecNode {
+        SourceLoc loc{0, 0};
+        std::string name;
+        TypeExprNode typeName;
+        uint32_t index;
+        ArrayExprPtr expr;
+        std::optional<ExprPtrVariant> assignExpr;
+        uint32_t indicesCount = 1;
+        bool isPrivate = false;
+        bool isConst = false;
+
+        FieldArrayVarDecNode(SourceLoc loc, std::string name, std::string typeName, uint32_t index, ArrayExprPtr expr,
+                             std::optional<ExprPtrVariant> assignExpr = std::nullopt, uint32_t indicesCount = 1,
+                             bool isPrivate = false, bool isConst = false)
+                : loc(loc), name(std::move(name)), typeName(std::move(typeName)), index(index), expr(std::move(expr)),
+                  assignExpr(std::move(assignExpr)), indicesCount(indicesCount),
+                  isPrivate(isPrivate), isConst(isConst) {};
+
+        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return getExprType(expr, analysis, errors); }
+    };
+
+    struct FieldFuncPointerStatementNode {
+        SourceLoc loc{0, 0};
+        std::string name;
+        TypeExprNode typeName;
+        uint32_t index;
+        FuncExprPtr expr;
+        bool isFunction = false;
+        bool isPrivate = false;
+        std::optional<ExprPtrVariant> assignExpr;
+
+        FieldFuncPointerStatementNode(SourceLoc loc, std::string name, std::string typeName, uint32_t index, FuncExprPtr expr,
+                                      bool isFunction = false, bool isPrivate = false, std::optional<ExprPtrVariant> assignExpr = std::nullopt)
+                : loc(loc), name(std::move(name)), typeName(std::move(typeName)), index(index), expr(std::move(expr)),
+                  isFunction(isFunction), isPrivate(isPrivate), assignExpr(std::move(assignExpr)) {};
+
+        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return expr; }
+    };
+
+    struct MethodDecNode {
+        SourceLoc loc{0, 0};
+        std::string name;
+        FuncExprPtr expr;
+        std::string thisName;
+        std::optional<BlockStmtPtr> block;
+        bool isPrivate = false;
+        bool isFunction = false;
+
+        MethodDecNode(SourceLoc loc, std::string name, FuncExprPtr expr, std::string thisName,
+                      std::optional<BlockStmtPtr> block = std::nullopt, bool isPrivate = false, bool isFunction = false)
+                : loc(loc), name(std::move(name)), expr(std::move(expr)), thisName(std::move(thisName)),
+                  block(std::move(block)), isPrivate(isPrivate), isFunction(isFunction) {};
+
+        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return expr->type; }
     };
 
     struct AccessExprNode {
@@ -282,9 +378,51 @@ namespace Slangc {
             : loc(loc), expr(std::move(expr)), name(std::move(name)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
 
-        auto getType(const Context& analysis) -> ExprPtrVariant {
-            //auto type = getExprType(expr, analysis);
-            return getExprType(expr, analysis);
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> {
+            auto exprType = getExprType(expr, analysis, errors);
+            std::optional<ExprPtrVariant> result;
+            if (!exprType.has_value()) {
+                errors.emplace_back("Failed to get type of expression.", loc, false, true);
+                return std::nullopt;
+            }
+            if (std::holds_alternative<TypeExprPtr>(exprType.value())) {
+                if (analysis.types.contains(std::get<TypeExprPtr>(exprType.value())->type)) {
+                    auto type = analysis.types.at(std::get<TypeExprPtr>(exprType.value())->type);
+                    auto found = false;
+                    for (const auto &field: type->fields) {
+                        if (auto fieldVar = std::get_if<FieldVarDecPtr>(&field)) {
+                            found = ((*fieldVar)->name == name);
+                        } else if (const auto &fieldArrayVar = std::get_if<FieldArrayVarDecPtr>(&field)) {
+                            found = ((*fieldArrayVar)->name == name);
+                        } else if (auto fieldFuncPointer = std::get_if<FieldFuncPointerStmtPtr>(&field)) {
+                            found = ((*fieldFuncPointer)->name == name);
+                        }
+
+                        if (found) {
+                            result = getDeclType(field, analysis, errors);
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        for (const auto &method: type->methods) {
+                            if (method->name == name) {
+                                found = true;
+                                result = getDeclType(method, analysis, errors);
+                                break;
+                            }
+                        }
+                    }
+                    if (!found) {
+                        errors.emplace_back("Type '" + std::get<TypeExprPtr>(exprType.value())->type + "' does not have field or method called '" + name + "'.", loc, false, true);
+                        return std::nullopt;
+                    }
+                }
+            }
+            else {
+                errors.emplace_back("Type of expression is not accessible.", loc, false, true);
+                return std::nullopt;
+            }
+            return result;
         }
     };
 
@@ -326,7 +464,7 @@ namespace Slangc {
         FuncParamDecStatementNode(SourceLoc loc, std::string name, ParameterType parameterType, ExprPtrVariant type, std::optional<ExprPtrVariant> expr = std::nullopt)
             : loc(loc), name(std::move(name)), parameterType(parameterType), type(std::move(type)), expr(std::move(expr)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant { return type; }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return type; }
     };
 
     struct ReturnStatementNode {
@@ -368,7 +506,7 @@ namespace Slangc {
             : loc(loc), name(std::move(name)), typeExpr(std::move(type)), expr(std::move(expr)), isGlobal(isGlobal), isPrivate(isPrivate), isExtern(isExtern) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant { return std::make_unique<TypeExprNode>(typeExpr); }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>(typeExpr); }
     };
 
     struct FuncPointerStatementNode {
@@ -387,7 +525,7 @@ namespace Slangc {
             : loc(loc), name(std::move(name)), expr(std::move(expr)), assignExpr(std::move(value)), isFunction(isFunction),
               isGlobal(isGlobal), isPrivate(isPrivate), isExtern(isExtern) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant { return expr; }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return expr; }
     };
 
     struct ArrayDecStatementNode {
@@ -408,7 +546,7 @@ namespace Slangc {
             isGlobal(isGlobal), isPrivate(isPrivate), isExtern(isExtern), isConst(isConst) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant { return getExprType(expr, analysis); }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return getExprType(expr, analysis, errors); }
     };
 
     struct FuncDecStatementNode {
@@ -423,100 +561,7 @@ namespace Slangc {
             : loc(loc), name(std::move(name)), expr(std::move(expr)), block(std::move(block)), isPrivate(isPrivate), isFunction(isFunction) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant { return expr; }
-    };
-
-    struct FieldVarDecNode {
-        SourceLoc loc{0, 0};
-        std::string name;
-        TypeExprNode typeName;
-        bool isPrivate;
-        uint32_t index;
-        TypeExprNode typeExpr;
-        std::optional<ExprPtrVariant> expr;
-
-        FieldVarDecNode(SourceLoc loc, std::string name, std::string typeName, bool isPrivate, int index, std::string type, std::optional<ExprPtrVariant> expr = std::nullopt)
-            : loc(loc), name(std::move(name)), typeName(std::move(typeName)), isPrivate(isPrivate), index(index), typeExpr(std::move(type)), expr(std::move(expr)) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant { return std::make_unique<TypeExprNode>(typeExpr); }
-    };
-
-    struct FieldArrayVarDecNode {
-        SourceLoc loc{0, 0};
-        std::string name;
-        TypeExprNode typeName;
-        uint32_t index;
-        ArrayExprPtr expr;
-        std::optional<ExprPtrVariant> assignExpr;
-        uint32_t indicesCount = 1;
-        bool isPrivate = false;
-        bool isConst = false;
-
-        FieldArrayVarDecNode(SourceLoc loc, std::string name, std::string typeName, uint32_t index, ArrayExprPtr expr,
-                             std::optional<ExprPtrVariant> assignExpr = std::nullopt, uint32_t indicesCount = 1,
-                             bool isPrivate = false, bool isConst = false)
-            : loc(loc), name(std::move(name)), typeName(std::move(typeName)), index(index), expr(std::move(expr)),
-            assignExpr(std::move(assignExpr)), indicesCount(indicesCount),
-            isPrivate(isPrivate), isConst(isConst) {};
-
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant { return getExprType(expr, analysis); }
-    };
-
-    struct FieldFuncPointerStatementNode {
-        SourceLoc loc{0, 0};
-        std::string name;
-        TypeExprNode typeName;
-        uint32_t index;
-        FuncExprPtr expr;
-        bool isFunction = false;
-        bool isPrivate = false;
-        std::optional<ExprPtrVariant> assignExpr;
-
-        FieldFuncPointerStatementNode(SourceLoc loc, std::string name, std::string typeName, uint32_t index, FuncExprPtr expr,
-                                      bool isFunction = false, bool isPrivate = false, std::optional<ExprPtrVariant> assignExpr = std::nullopt)
-            : loc(loc), name(std::move(name)), typeName(std::move(typeName)), index(index), expr(std::move(expr)),
-            isFunction(isFunction), isPrivate(isPrivate), assignExpr(std::move(assignExpr)) {};
-
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant { return expr; }
-    };
-
-    struct MethodDecNode {
-        SourceLoc loc{0, 0};
-        std::string name;
-        FuncExprPtr expr;
-        std::string thisName;
-        std::optional<BlockStmtPtr> block;
-        bool isPrivate = false;
-        bool isFunction = false;
-
-        MethodDecNode(SourceLoc loc, std::string name, FuncExprPtr expr, std::string thisName,
-                      std::optional<BlockStmtPtr> block = std::nullopt, bool isPrivate = false, bool isFunction = false)
-            : loc(loc), name(std::move(name)), expr(std::move(expr)), thisName(std::move(thisName)),
-              block(std::move(block)), isPrivate(isPrivate), isFunction(isFunction) {};
-
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant { return expr->type; }
-    };
-
-    struct TypeDecStatementNode {
-        SourceLoc loc{0, 0};
-        std::string name;
-        std::vector<DeclPtrVariant> fields;
-        std::vector<MethodDecPtr> methods;
-        std::optional<std::string> parentTypeName = std::nullopt;
-        bool isExtern = false;
-        bool isPrivate = false;
-
-        TypeDecStatementNode(SourceLoc loc, std::string name, std::vector<DeclPtrVariant> fields,
-                             std::vector<MethodDecPtr> methods, std::optional<std::string> parentTypeName = std::nullopt,
-                             bool isExtern = false, bool isPrivate = false)
-                             : loc(loc), name(std::move(name)), fields(std::move(fields)), methods(std::move(methods)),
-                               parentTypeName(std::move(parentTypeName)), isExtern(isExtern), isPrivate(isPrivate) {};
-
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant { return std::make_unique<TypeExprNode>(name); }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return expr; }
     };
 
     struct ExternFuncDecStatementNode {
@@ -532,7 +577,7 @@ namespace Slangc {
                                      isPrivate(isPrivate), isFunction(isFunction) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant { return expr->type; }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return expr->type; }
     };
 
     struct ElseIfStatementNode {
@@ -580,7 +625,7 @@ namespace Slangc {
             : loc(loc), name(std::move(name)), block(std::move(block)) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis) -> ExprPtrVariant { return std::make_unique<TypeExprNode>(name); }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>(name); }
     };
 
 #pragma endregion
@@ -681,7 +726,7 @@ namespace Slangc {
         return compareFuncSignatures(func1->expr, func2->expr);
     }
 
-    static bool compareFuncSignatures(const ExternFuncDecStatementPtr &func1, const ExternFuncDecStatementPtr &func2) {
+    static bool compareFuncSignatures(const ExternFuncDecStmtPtr &func1, const ExternFuncDecStmtPtr &func2) {
         return compareFuncSignatures(func1->expr, func2->expr);
     }
 

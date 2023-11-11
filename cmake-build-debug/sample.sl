@@ -25,6 +25,11 @@ module sample
         end getFloat;
     end A;
 
+    private function getA(): A
+        variable-A a;
+        return a;
+    end getA;
+
     private procedure printHelloProc(in array[] array[] character word)
         output "Hello, ";
 	    output word;
@@ -63,8 +68,9 @@ start
     variable-array[2] array[3] array[4] function(in integer, in integer): integer arr3d2;
     output arr3d2;
     // test line comment
-    variable-xdd.Xdd xdd := 1;
-    variable-xddd xdd := 1;
+    variable-A a;
+    variable-integer ai := a.i;
+    variable-float ai2 := getA().ip;
     variable-integer i := 1.0f;
     variable-real r := xdd.getFloat();
     variable-procedure(in integer, in integer) procPointer := testProc;
@@ -72,7 +78,6 @@ start
     variable-procedure(in real) procPointer3 := testProc;
     variable-procedure() procPointer4 := testProc;
     variable-procedure(out function(in integer, in integer): integer) procPointer5 := testProc;
-
     output xdd.xdd1.xdd2;
     while xdd == ad(aaa).a[5] && gg != 5 repeat
         call printHello("aaa");

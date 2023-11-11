@@ -67,22 +67,22 @@ namespace Slangc {
     struct ModuleDeclNode;
 
     using ArrayDecStatementPtr = std::shared_ptr<ArrayDecStatementNode>;
-    using ExternFuncDecStatementPtr = std::shared_ptr<ExternFuncDecStatementNode>;
+    using ExternFuncDecStmtPtr = std::shared_ptr<ExternFuncDecStatementNode>;
     using FieldArrayVarDecPtr = std::shared_ptr<FieldArrayVarDecNode>;
     using FieldVarDecPtr = std::shared_ptr<FieldVarDecNode>;
-    using FieldFuncPointerStatementPtr = std::shared_ptr<FieldFuncPointerStatementNode>;
+    using FieldFuncPointerStmtPtr = std::shared_ptr<FieldFuncPointerStatementNode>;
     using FuncDecStatementPtr = std::shared_ptr<FuncDecStatementNode>;
     using FuncParamDecStmtPtr = std::shared_ptr<FuncParamDecStatementNode>;
-    using FuncPointerStatementPtr = std::shared_ptr<FuncPointerStatementNode>;
+    using FuncPointerStmtPtr = std::shared_ptr<FuncPointerStatementNode>;
     using MethodDecPtr = std::shared_ptr<MethodDecNode>;
-    using TypeDecStatementPtr = std::shared_ptr<TypeDecStatementNode>;
-    using VarDecStatementPtr = std::shared_ptr<VarDecStatementNode>;
+    using TypeDecStmtPtr = std::shared_ptr<TypeDecStatementNode>;
+    using VarDecStmtPtr = std::shared_ptr<VarDecStatementNode>;
     using ModuleDeclPtr = std::shared_ptr<ModuleDeclNode>;
 
     using DeclPtrVariant
-            = std::variant<ArrayDecStatementPtr, ExternFuncDecStatementPtr, FieldArrayVarDecPtr, FieldVarDecPtr, FieldFuncPointerStatementPtr,
-            FuncDecStatementPtr, FuncParamDecStmtPtr, FuncPointerStatementPtr, MethodDecPtr,
-            TypeDecStatementPtr, VarDecStatementPtr, ModuleDeclPtr>;
+            = std::variant<ArrayDecStatementPtr, ExternFuncDecStmtPtr, FieldArrayVarDecPtr, FieldVarDecPtr, FieldFuncPointerStmtPtr,
+            FuncDecStatementPtr, FuncParamDecStmtPtr, FuncPointerStmtPtr, MethodDecPtr,
+            TypeDecStmtPtr, VarDecStmtPtr, ModuleDeclPtr>;
 
     struct AssignExprNode;
     struct DeleteStmtNode;
@@ -105,16 +105,16 @@ namespace Slangc {
     using BlockStmtPtr = std::shared_ptr<BlockStmtNode>;
 
     using StmtPtrVariant
-            = std::variant<AssignExprPtr, CallExprPtr, ArrayDecStatementPtr, ExternFuncDecStatementPtr,
-            FieldArrayVarDecPtr, FieldVarDecPtr, FuncDecStatementPtr, FuncParamDecStmtPtr, FuncPointerStatementPtr,
-            MethodDecPtr, TypeDecStatementPtr, VarDecStatementPtr, DeleteStmtPtr, ElseIfStatementPtr, IfStatementPtr,
+            = std::variant<AssignExprPtr, CallExprPtr, ArrayDecStatementPtr, ExternFuncDecStmtPtr,
+            FieldArrayVarDecPtr, FieldVarDecPtr, FuncDecStatementPtr, FuncParamDecStmtPtr, FuncPointerStmtPtr,
+            MethodDecPtr, TypeDecStmtPtr, VarDecStmtPtr, DeleteStmtPtr, ElseIfStatementPtr, IfStatementPtr,
             InputStatementPtr, OutputStatementPtr, ReturnStatementPtr, VarExprPtr,
             IndexesExprPtr, IndexExprPtr, WhileStatementPtr, BlockStmtPtr>;
 
     bool compareTypes(const ExprPtrVariant &type1, const ExprPtrVariant &type2);
     bool compareFuncSignatures(const FuncExprPtr &func1, const FuncExprPtr &func2);
     bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncDecStatementPtr &func2);
-    bool compareFuncSignatures(const ExternFuncDecStatementPtr &func1, const ExternFuncDecStatementPtr &func2);
+    bool compareFuncSignatures(const ExternFuncDecStmtPtr &func1, const ExternFuncDecStmtPtr &func2);
     bool compareFuncSignatures(const MethodDecPtr &func1, const MethodDecPtr &func2);
     bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncExprPtr &func2);
 }

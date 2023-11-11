@@ -14,7 +14,7 @@ namespace Slangc::Check {
         return result;
     }
 
-    bool checkStmt(const VarDecStatementPtr &stmt, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkStmt(const VarDecStmtPtr &stmt, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         if (!context.lookup(stmt->typeExpr.type) && !Context::isBuiltInType(stmt->typeExpr.type)) {
             errors.emplace_back("Type '" + stmt->typeExpr.type + "' does not exist.", stmt->loc, false, false);
@@ -29,7 +29,7 @@ namespace Slangc::Check {
             if (!checkExpr(stmt->expr.value(), context, errors)) {
                 return false;
             }
-            auto exprType = std::get<TypeExprPtr>(getExprType(stmt->expr.value(), context))->type;
+            auto exprType = std::get<TypeExprPtr>(getExprType(stmt->expr.value(), context, errors).value())->type;
             // TODO: check if conversion is possible
             if (stmt->typeExpr.type != exprType) {
                 errors.emplace_back("Type mismatch: cannot assign '" + exprType + "' to '" + stmt->typeExpr.type + "'.", stmt->loc, false, false);
@@ -50,7 +50,7 @@ namespace Slangc::Check {
         return result;
     }
 
-    bool checkStmt(const FuncPointerStatementPtr &stmt, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkStmt(const FuncPointerStmtPtr &stmt, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         if (context.lookup(stmt->name)) {
             errors.emplace_back("Variable with name '" + stmt->name + "' already exists.", stmt->loc, false, false);
@@ -62,7 +62,7 @@ namespace Slangc::Check {
             result &= checkExpr(stmt->assignExpr.value(), context, errors);
             if (result) {
                 auto leftType = stmt->expr;
-                auto rightType = getExprType(stmt->assignExpr.value(), context);
+                auto rightType = getExprType(stmt->assignExpr.value(), context, errors).value();
                 // searching for overloaded function
                 if (auto varExpr = std::get_if<VarExprPtr>(&stmt->assignExpr.value())) {
                     if (auto func = context.lookupFunc(varExpr->get()->name, stmt->expr)) {
@@ -100,13 +100,19 @@ namespace Slangc::Check {
 
     bool checkStmt(const ReturnStatementPtr &stmt, Context &context, std::vector<ErrorMessage> &errors) {
         auto result = checkExpr(stmt->expr, context, errors);
-        auto type = getExprType(stmt->expr, context);
+        if (!result) return result;
+        auto type = getExprType(stmt->expr, context, errors).value();
         context.currFuncReturnTypes.emplace_back(type, stmt->loc);
         return result;
     }
 
     bool checkStmt(const CallExprPtr &stmt, Context &context, std::vector<ErrorMessage> &errors) {
-        return true;
+        bool result = true;
+        result = checkExpr(stmt->name, context, errors);
+        if (result) {
+            auto type = getExprType(stmt, context, errors);
+        }
+        return result;
     }
 
     bool checkStmt(const DeleteStmtPtr &stmt, Context &context, std::vector<ErrorMessage> &errors) {

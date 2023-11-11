@@ -134,7 +134,7 @@ namespace Slangc {
         if (isExtern) {
             auto funcExpr = create<FuncExprNode>(loc, returnType, params.value(), isFunction);
             funcDecl = createDecl<ExternFuncDecStatementNode>(loc, mangledName, funcExpr, isPrivate, isFunction);
-            //context.extern_funcs.emplace_back(std::get<ExternFuncDecStatementPtr>(funcDecl));
+            //context.extern_funcs.emplace_back(std::get<ExternFuncDecStmtPtr>(funcDecl));
         }
         else {
             auto funcExpr = create<FuncExprNode>(loc, returnType, params.value(), isFunction);
@@ -194,7 +194,7 @@ namespace Slangc {
             auto funcExpr = std::get<FuncExprPtr>(type.value());
             if (!hasError) {
                 result = createDecl<FieldFuncPointerStatementNode>(loc, name, typeName, fieldId, funcExpr, funcExpr->isFunction, isPrivate, std::move(value));
-                //context.insert(name, std::get<FieldFuncPointerStatementPtr>(result.assignExpr()));
+                //context.insert(name, std::get<FieldFuncPointerStmtPtr>(result.assignExpr()));
             }
         }
         else if (std::holds_alternative<TypeExprPtr>(type.value())) {
@@ -287,7 +287,7 @@ namespace Slangc {
         auto parentTypeName = parseTypeName().value();
         auto classNode = createDecl<TypeDecStatementNode>(loc, name, std::vector<DeclPtrVariant>{}, std::vector<MethodDecPtr>{}, parentTypeName, isPrivate, isExtern);
         //context.insert(name, classNode);
-        //context.types.emplace_back(std::get<TypeDecStatementPtr>(classNode));
+        //context.types.emplace_back(std::get<TypeDecStmtPtr>(classNode));
         uint32_t fieldIndex = 0;
         std::vector<DeclPtrVariant> fields;
         std::vector<MethodDecPtr> methods;
@@ -317,15 +317,15 @@ namespace Slangc {
         advance();
         //context.exitScope();
         if (token->type == TokenType::Identifier && token->value == name) {
-            std::get<TypeDecStatementPtr>(classNode)->fields = std::move(fields);
-            std::get<TypeDecStatementPtr>(classNode)->methods = std::move(methods);
+            std::get<TypeDecStmtPtr>(classNode)->fields = std::move(fields);
+            std::get<TypeDecStmtPtr>(classNode)->methods = std::move(methods);
         }
         else {
             errors.emplace_back(std::string("Expected end of " + name + ", got " + token->value + "."), token->location, false, false);
             hasError = true;
             return std::nullopt;
         }
-        context.types[name] = std::get<TypeDecStatementPtr>(classNode);
+        context.types[name] = std::get<TypeDecStmtPtr>(classNode);
         return classNode;
     }
 } // Slangc

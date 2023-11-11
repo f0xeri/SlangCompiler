@@ -21,11 +21,11 @@ int main(int argc, char **argv) {
     lexer.tokenize();
     // lexer.printTokens();
 
-    Slangc::Context basicAnalysis;
-    Slangc::Parser parser(lexer.tokens, options, basicAnalysis, errors);
+    Slangc::Context context;
+    Slangc::Parser parser(lexer.tokens, options, context, errors);
     parser.parse();
 
-    Slangc::Check::checkAST(parser.moduleAST, basicAnalysis, errors);
+    Slangc::Check::checkAST(parser.moduleAST, context, errors);
 
     Slangc::CodeGen codeGen(std::move(parser.moduleAST));
     codeGen.process();

@@ -11,7 +11,7 @@ namespace Slangc::Check {
         return checkStmt(decl, context, errors);
     }
 
-    bool checkDecl(const ExternFuncDecStatementPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkDecl(const ExternFuncDecStmtPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
         return checkStmt(decl, context, errors);
     }
 
@@ -25,7 +25,7 @@ namespace Slangc::Check {
         return result;
     }
 
-    bool checkDecl(const FieldFuncPointerStatementPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkDecl(const FieldFuncPointerStmtPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         /*if (context.lookup(decl->name)) {
             errors.emplace_back("Variable with name '" + decl->name + "' already exists.", decl->loc, false, false);
@@ -98,7 +98,7 @@ namespace Slangc::Check {
         return result;
     }
 
-    bool checkDecl(const FuncPointerStatementPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkDecl(const FuncPointerStmtPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         return result;
     }
@@ -140,7 +140,7 @@ namespace Slangc::Check {
         return result;
     }
 
-    bool checkDecl(const TypeDecStatementPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkDecl(const TypeDecStmtPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         if (context.lookup(decl->name)) {
             errors.emplace_back("Variable, type, or function with name '" + decl->name + "' already exists.", decl->loc, false, false);
@@ -164,7 +164,7 @@ namespace Slangc::Check {
         return result;
     }
 
-    bool checkDecl(const VarDecStatementPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkDecl(const VarDecStmtPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         return result;
     }

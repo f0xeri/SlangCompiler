@@ -5,32 +5,55 @@
 #include "Check.hpp"
 
 namespace Slangc::Check {
-    auto checkDecl(const DeclPtrVariant &decl, Context &context, std::vector<ErrorMessage> &errors) -> bool;
+    bool checkDecl(const DeclPtrVariant &decl, Context &context, std::vector<ErrorMessage> &errors);
 
-    auto checkDecl(const ArrayDecStatementPtr &decl, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkDecl(const ArrayDecStatementPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
         return checkStmt(decl, context, errors);
     }
 
-    auto checkDecl(const ExternFuncDecStatementPtr &decl, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkDecl(const ExternFuncDecStatementPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
         return checkStmt(decl, context, errors);
     }
 
-    auto checkDecl(const FieldArrayVarDecPtr &decl, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkDecl(const FieldArrayVarDecPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         return result;
     }
 
-    auto checkDecl(const FieldVarDecPtr &decl, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkDecl(const FieldVarDecPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         return result;
     }
 
-    auto checkDecl(const FieldFuncPointerStatementPtr &decl, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkDecl(const FieldFuncPointerStatementPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
+        /*if (context.lookup(decl->name)) {
+            errors.emplace_back("Variable with name '" + decl->name + "' already exists.", decl->loc, false, false);
+            result = false;
+        }
+        result &= checkExpr(decl->expr, context, errors);
+        context.insert(decl->name, decl);
+        if (decl->assignExpr.has_value()) {
+            result &= checkExpr(decl->assignExpr.value(), context, errors);
+            if (result) {
+                auto leftType = decl->expr;
+                auto rightType = getExprType(decl->assignExpr.value(), context);
+                // searching for overloaded function
+                if (auto varExpr = std::get_if<VarExprPtr>(&decl->assignExpr.value())) {
+                    if (auto func = context.lookupFunc(varExpr->get()->name, decl->expr)) {
+                        rightType = std::get<FuncDecStatementPtr>(*func)->expr;
+                    }
+                }
+                if (!compareFuncSignatures(leftType, std::get<FuncExprPtr>(rightType))) {
+                    errors.emplace_back("Type mismatch: cannot assign: function signatures do not match.", decl->loc, false, false);
+                    result = false;
+                }
+            }
+        }*/
         return result;
     }
 
-    auto checkDecl(const FuncDecStatementPtr &decl, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkDecl(const FuncDecStatementPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         result = checkExpr(decl->expr->type, context, errors);
         if (result) {
@@ -69,18 +92,18 @@ namespace Slangc::Check {
         return result;
     }
 
-    auto checkDecl(const FuncParamDecStmtPtr &decl, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkDecl(const FuncParamDecStmtPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         result &= checkExpr(decl->type, context, errors);
         return result;
     }
 
-    auto checkDecl(const FuncPointerStatementPtr &decl, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkDecl(const FuncPointerStatementPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         return result;
     }
 
-    auto checkDecl(const MethodDecPtr &decl, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkDecl(const MethodDecPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         result = checkExpr(decl->expr->type, context, errors);
         if (result) {
@@ -117,7 +140,7 @@ namespace Slangc::Check {
         return result;
     }
 
-    auto checkDecl(const TypeDecStatementPtr &decl, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkDecl(const TypeDecStatementPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         if (context.lookup(decl->name)) {
             errors.emplace_back("Variable, type, or function with name '" + decl->name + "' already exists.", decl->loc, false, false);
@@ -141,12 +164,12 @@ namespace Slangc::Check {
         return result;
     }
 
-    auto checkDecl(const VarDecStatementPtr &decl, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkDecl(const VarDecStatementPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         return result;
     }
 
-    auto checkDecl(const ModuleDeclPtr &decl, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkDecl(const ModuleDeclPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         for (auto &stmt : decl->block->statements) {
             result &= checkStmt(stmt, context, errors);
@@ -154,7 +177,7 @@ namespace Slangc::Check {
         return result;
     }
 
-    auto checkDecl(const DeclPtrVariant &expr, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkDecl(const DeclPtrVariant &expr, Context &context, std::vector<ErrorMessage> &errors) {
         return std::visit([&](const auto &expr) {
             return checkDecl(expr, context, errors);
         }, expr);

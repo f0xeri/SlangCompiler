@@ -193,7 +193,7 @@ namespace Slangc {
         else if (std::holds_alternative<FuncExprPtr>(type.value())) {
             auto funcExpr = std::get<FuncExprPtr>(type.value());
             if (!hasError) {
-                result = createDecl<FieldFuncPointerStatementNode>(loc, name, typeName, fieldId, std::move(funcExpr->type), std::move(funcExpr->params), funcExpr->isFunction, isPrivate, std::move(value));
+                result = createDecl<FieldFuncPointerStatementNode>(loc, name, typeName, fieldId, funcExpr, funcExpr->isFunction, isPrivate, std::move(value));
                 //context.insert(name, std::get<FieldFuncPointerStatementPtr>(result.assignExpr()));
             }
         }

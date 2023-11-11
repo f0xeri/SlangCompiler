@@ -5,9 +5,9 @@
 #include "Check.hpp"
 
 namespace Slangc::Check {
-    auto checkExpr(const ExprPtrVariant &expr, Context &context, std::vector<ErrorMessage> &errors) -> bool;
+    bool checkExpr(const ExprPtrVariant &expr, Context &context, std::vector<ErrorMessage> &errors);
 
-    auto checkExpr(const ArrayExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkExpr(const ArrayExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         auto type = expr->type;
         while (std::holds_alternative<ArrayExprPtr>(type)) {
@@ -16,19 +16,19 @@ namespace Slangc::Check {
         return checkExpr(type, context, errors);
     }
 
-    auto checkExpr(const BooleanExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkExpr(const BooleanExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
         return true;
     }
 
-    auto checkExpr(const CharExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkExpr(const CharExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
         return true;
     }
 
-    auto checkExpr(const FloatExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkExpr(const FloatExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
         return true;
     }
 
-    auto checkExpr(const FuncExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkExpr(const FuncExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         result = checkExpr(expr->type, context, errors);
         for (const auto &param: expr->params) {
@@ -37,15 +37,15 @@ namespace Slangc::Check {
         return result;
     }
 
-    auto checkExpr(const IntExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkExpr(const IntExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
         return true;
     }
 
-    auto checkExpr(const NilExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkExpr(const NilExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
         return true;
     }
 
-    auto checkExpr(const OperatorExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkExpr(const OperatorExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         if (!checkExpr(expr->left, context, errors)) {
             result = false;
@@ -63,19 +63,19 @@ namespace Slangc::Check {
         return result;
     }
 
-    auto checkExpr(const RealExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkExpr(const RealExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
         return true;
     }
 
-    auto checkExpr(const StringExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkExpr(const StringExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
         return true;
     }
 
-    auto checkExpr(const UnaryOperatorExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkExpr(const UnaryOperatorExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
         return true;
     }
 
-    auto checkExpr(const VarExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkExpr(const VarExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         if (!context.lookup(expr->name)) {
             if (context.lookup(context.moduleName + "." + expr->name)) {
@@ -89,26 +89,26 @@ namespace Slangc::Check {
         return result;
     }
 
-    auto checkExpr(const IndexesExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkExpr(const IndexesExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
         return true;
     }
 
-    auto checkExpr(const IndexExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkExpr(const IndexExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
         return true;
     }
 
-    auto checkExpr(const CallExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkExpr(const CallExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         result = checkExpr(expr->name, context, errors);
         auto type = getExprType(expr, context);
         return result;
     }
 
-    auto checkExpr(const AccessExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkExpr(const AccessExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
         return true;
     }
 
-    auto checkExpr(const TypeExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkExpr(const TypeExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         if (!context.lookup(expr->type) && !Context::isBuiltInType(expr->type)) {
             errors.emplace_back("Type '" + expr->type + "' does not exist.", expr->loc, false, false);
@@ -117,7 +117,7 @@ namespace Slangc::Check {
         return result;
     }
 
-    auto checkExpr(const ExprPtrVariant &expr, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    bool checkExpr(const ExprPtrVariant &expr, Context &context, std::vector<ErrorMessage> &errors) {
         return std::visit([&](const auto &expr) {
             return checkExpr(expr, context, errors);
         }, expr);

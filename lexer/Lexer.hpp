@@ -23,11 +23,11 @@ namespace Slangc {
         uint64_t currentLine = 1;
         uint64_t currentColumn = 1;
 
-        auto skipWhitespaces(std::string_view &sourceText) -> bool;
-        auto lexSymbol(std::string_view &sourceText) -> bool;
-        auto lexWordOrIdentifier(std::string_view &sourceText) -> bool;
-        auto lexNumber(std::string_view &sourceText) -> bool;
-        auto lexString(std::string_view &sourceText) -> bool;
+        bool skipWhitespaces(std::string_view &sourceText);
+        bool lexSymbol(std::string_view &sourceText);
+        bool lexWordOrIdentifier(std::string_view &sourceText);
+        bool lexNumber(std::string_view &sourceText);
+        bool lexString(std::string_view &sourceText);
 
         void addToken(TokenType type, std::string_view value, uint64_t column) {
             tokens.emplace_back(Token{type, std::string(value), SourceLoc{currentLine, column}});

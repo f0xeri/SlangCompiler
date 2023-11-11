@@ -111,19 +111,12 @@ namespace Slangc {
             InputStatementPtr, OutputStatementPtr, ReturnStatementPtr, VarExprPtr,
             IndexesExprPtr, IndexExprPtr, WhileStatementPtr, BlockStmtPtr>;
 
-    struct Type {
-        std::string_view typeName;
-        bool isArray = false;
-        bool isPointer = false;
-        uint64_t indicesCount = 0;
-    };
-
-    auto compareTypes(const ExprPtrVariant &type1, const ExprPtrVariant &type2) -> bool;
-    auto compareFuncSignatures(const FuncExprPtr &func1, const FuncExprPtr &func2) -> bool;
-    auto compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncDecStatementPtr &func2) -> bool;
-    auto compareFuncSignatures(const ExternFuncDecStatementPtr &func1, const ExternFuncDecStatementPtr &func2) -> bool;
-    auto compareFuncSignatures(const MethodDecPtr &func1, const MethodDecPtr &func2) -> bool;
-    auto compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncExprPtr &func2) -> bool;
+    bool compareTypes(const ExprPtrVariant &type1, const ExprPtrVariant &type2);
+    bool compareFuncSignatures(const FuncExprPtr &func1, const FuncExprPtr &func2);
+    bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncDecStatementPtr &func2);
+    bool compareFuncSignatures(const ExternFuncDecStatementPtr &func1, const ExternFuncDecStatementPtr &func2);
+    bool compareFuncSignatures(const MethodDecPtr &func1, const MethodDecPtr &func2);
+    bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncExprPtr &func2);
 }
 
 #endif //SLANGCREFACTORED_ASTFWDDECL_HPP

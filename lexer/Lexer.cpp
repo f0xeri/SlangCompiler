@@ -90,7 +90,7 @@ namespace Slangc {
         addToken(TokenType::EndOfFile, currentColumn);
     }
 
-    auto Lexer::skipWhitespaces(std::string_view &sourceText) -> bool {
+    bool Lexer::skipWhitespaces(std::string_view &sourceText) {
         auto whitespaceStart = sourceText.begin();
 
         while (!sourceText.empty()) {
@@ -126,7 +126,7 @@ namespace Slangc {
         return false;
     }
 
-    auto Lexer::lexSymbol(std::string_view &sourceText) -> bool {
+    bool Lexer::lexSymbol(std::string_view &sourceText) {
         std::string_view symbol = sourceText.substr(0, 1);
         auto symbolCol = currentColumn;
 
@@ -144,7 +144,7 @@ namespace Slangc {
         return false;
     }
 
-    auto Lexer::lexWordOrIdentifier(std::string_view &sourceText) -> bool {
+    bool Lexer::lexWordOrIdentifier(std::string_view &sourceText) {
         if (!std::isalpha(sourceText.front()) && sourceText.front() != '_') {
             return false;
         }
@@ -165,7 +165,7 @@ namespace Slangc {
         return true;
     }
 
-    auto Lexer::lexNumber(std::string_view &sourceText) -> bool {
+    bool Lexer::lexNumber(std::string_view &sourceText) {
         bool isInt = true;
         bool isFloat = false;
         int i = 1;
@@ -206,7 +206,7 @@ namespace Slangc {
         return true;
     }
 
-    auto Lexer::lexString(std::string_view &sourceText) -> bool {
+    bool Lexer::lexString(std::string_view &sourceText) {
         if (sourceText.front() != '"') {
             return false;
         }

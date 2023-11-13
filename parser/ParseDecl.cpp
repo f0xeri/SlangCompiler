@@ -134,15 +134,15 @@ namespace Slangc {
         if (isExtern) {
             auto funcExpr = create<FuncExprNode>(loc, returnType, params.value(), isFunction);
             funcDecl = createDecl<ExternFuncDecStatementNode>(loc, mangledName, funcExpr, isPrivate, isFunction);
-            //context.extern_funcs.emplace_back(std::get<ExternFuncDecStmtPtr>(funcDecl));
+            context.extern_funcs[name] = std::get<ExternFuncDecStmtPtr>(funcDecl);
         }
         else {
             auto funcExpr = create<FuncExprNode>(loc, returnType, params.value(), isFunction);
             funcDecl = createDecl<FuncDecStatementNode>(loc, mangledName, funcExpr, std::nullopt, isPrivate, isFunction);
-            //context.funcs.emplace_back(std::get<FuncDecStatementPtr>(funcDecl));
+            context.funcs.emplace_back(std::get<FuncDecStatementPtr>(funcDecl));
         }
         //context.insert(mangledName, funcDecl);
-        context.funcs.emplace_back(std::get<FuncDecStatementPtr>(funcDecl));
+
         --token;
         auto block = parseBlockStmt(name, &params.value());
         if (!block.has_value()) {
@@ -215,9 +215,9 @@ namespace Slangc {
         consume(TokenType::Method);
         bool isFunction = false;
         std::string basicName = consume(TokenType::Identifier).value;
-        std::string name = moduleAST->name + "." + typeName + "." + basicName;
+        std::string name = typeName + "." + basicName;
         consume(TokenType::LParen);
-        auto tok = consume(TokenType::Identifier).value;
+        auto tok = moduleAST->name + "." + consume(TokenType::Identifier).value;
         if (tok != typeName) {
             errors.emplace_back(std::string("\"this\" should have \"" + typeName + "\" typeExpr, not " + tok), token->location, false, false);
             hasError = true;
@@ -283,9 +283,13 @@ namespace Slangc {
         }
         consume(TokenType::Class);
         std::string name = consume(TokenType::Identifier).value;
+        auto mangledName = name;
+        if (!isExtern) {
+            mangledName = moduleAST->name + "." + name;
+        }
         consume(TokenType::Inherits);
         auto parentTypeName = parseTypeName().value();
-        auto classNode = createDecl<TypeDecStatementNode>(loc, name, std::vector<DeclPtrVariant>{}, std::vector<MethodDecPtr>{}, parentTypeName, isPrivate, isExtern);
+        auto classNode = createDecl<TypeDecStatementNode>(loc, mangledName, std::vector<DeclPtrVariant>{}, std::vector<MethodDecPtr>{}, parentTypeName, isPrivate, isExtern);
         //context.insert(name, classNode);
         //context.types.emplace_back(std::get<TypeDecStmtPtr>(classNode));
         uint32_t fieldIndex = 0;
@@ -295,7 +299,7 @@ namespace Slangc {
         while (token->type != TokenType::End) {
             consume(TokenType::VisibilityType);
             if (token->type == TokenType::Field) {
-                auto field = parseFieldDecl(name, fieldIndex);
+                auto field = parseFieldDecl(mangledName, fieldIndex);
                 ++fieldIndex;
                 if (!field.has_value()) {
                     errors.emplace_back("Failed to parse field declaration.", token->location, false, false);
@@ -305,7 +309,7 @@ namespace Slangc {
                 fields.emplace_back(field.value());
             }
             else if (token->type == TokenType::Method) {
-                auto method = parseMethodDecl(name);
+                auto method = parseMethodDecl(mangledName);
                 if (!method.has_value()) {
                     errors.emplace_back("Failed to parse method declaration.", token->location, false, false);
                     hasError = true;
@@ -325,7 +329,7 @@ namespace Slangc {
             hasError = true;
             return std::nullopt;
         }
-        context.types[name] = std::get<TypeDecStmtPtr>(classNode);
+        context.types[mangledName] = std::get<TypeDecStmtPtr>(classNode);
         return classNode;
     }
 } // Slangc

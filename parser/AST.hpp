@@ -22,7 +22,8 @@ namespace Slangc {
     enum ParameterType {
         In,
         Out,
-        Var
+        Var,
+        None
     };
 
     struct ExprTypeVisitor {
@@ -386,8 +387,8 @@ namespace Slangc {
                 return std::nullopt;
             }
             if (std::holds_alternative<TypeExprPtr>(exprType.value())) {
-                if (analysis.types.contains(std::get<TypeExprPtr>(exprType.value())->type)) {
-                    auto type = analysis.types.at(std::get<TypeExprPtr>(exprType.value())->type);
+                if (auto typeOpt = analysis.lookupType(std::get<TypeExprPtr>(exprType.value())->type)) {
+                    auto type = typeOpt.value();
                     auto found = false;
                     for (const auto &field: type->fields) {
                         if (auto fieldVar = std::get_if<FieldVarDecPtr>(&field)) {
@@ -405,7 +406,7 @@ namespace Slangc {
                     }
                     if (!found) {
                         for (const auto &method: type->methods) {
-                            if (method->name == name) {
+                            if (method->name == type->name + "." + name) {
                                 found = true;
                                 result = getDeclType(method, analysis, errors);
                                 break;
@@ -582,37 +583,37 @@ namespace Slangc {
 
     struct ElseIfStatementNode {
         SourceLoc loc{0, 0};
-        ExprPtrVariant condExpr;
+        ExprPtrVariant condition;
         BlockStmtPtr trueBlock;
 
         ElseIfStatementNode(SourceLoc loc, ExprPtrVariant condExpr, BlockStmtPtr trueBlock)
-            : loc(loc), condExpr(std::move(condExpr)), trueBlock(std::move(trueBlock)) {};
+            : loc(loc), condition(std::move(condExpr)), trueBlock(std::move(trueBlock)) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct IfStatementNode {
         SourceLoc loc{0, 0};
-        ExprPtrVariant condExpr;
+        ExprPtrVariant condition;
         BlockStmtPtr trueBlock;
         BlockStmtPtr falseBlock;
         std::vector<ElseIfStatementPtr> elseIfNodes;
 
         IfStatementNode(SourceLoc loc, ExprPtrVariant condExpr, BlockStmtPtr trueBlock, BlockStmtPtr falseBlock,
                         std::vector<ElseIfStatementPtr> elseIfNodes)
-            : loc(loc), condExpr(std::move(condExpr)), trueBlock(std::move(trueBlock)),
-            falseBlock(std::move(falseBlock)), elseIfNodes(std::move(elseIfNodes)) {};
+            : loc(loc), condition(std::move(condExpr)), trueBlock(std::move(trueBlock)),
+              falseBlock(std::move(falseBlock)), elseIfNodes(std::move(elseIfNodes)) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
     struct WhileStatementNode {
         SourceLoc loc{0, 0};
-        ExprPtrVariant whileExpr;
+        ExprPtrVariant condition;
         BlockStmtPtr block;
 
         WhileStatementNode(SourceLoc loc, ExprPtrVariant whileExpr, BlockStmtPtr block)
-            : loc(loc), whileExpr(std::move(whileExpr)), block(std::move(block)) {};
+            : loc(loc), condition(std::move(whileExpr)), block(std::move(block)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
     };
 
@@ -717,7 +718,11 @@ namespace Slangc {
     static bool compareFuncSignatures(const FuncExprPtr &func1, const FuncExprPtr &func2) {
         if (func1->params.size() != func2->params.size()) return false;
         for (int i = 0; i < func1->params.size(); i++) {
-            if (!compareTypes(func1->params[i]->type, func2->params[i]->type) || func1->params[i]->parameterType != func2->params[i]->parameterType) return false;
+            if (!compareTypes(func1->params[i]->type, func2->params[i]->type)) return false;
+            // if parameterType is None, it means that it is not specified and we can cast
+            if (func1->params[i]->parameterType != None && func2->params[i]->parameterType != None) {
+                if (func1->params[i]->parameterType != func2->params[i]->parameterType) return false;
+            }
         }
         return true;
     }
@@ -736,6 +741,45 @@ namespace Slangc {
 
     static bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncExprPtr &func2) {
         return compareFuncSignatures(func1->expr, func2);
+    }
+
+    static std::string parameterTypeToString(ParameterType parameterType) {
+        switch (parameterType) {
+            case In:
+                return "in ";
+            case Out:
+                return "out ";
+            case Var:
+                return "var ";
+            case None:
+                return "";
+        }
+    }
+
+    static std::string typeToString(ExprPtrVariant type, ParameterType parameterType = ParameterType::None) {
+        std::string result = parameterTypeToString(parameterType);
+        if (auto typePtr = std::get_if<TypeExprPtr>(&type)) {
+            return result + typePtr->get()->type;
+        }
+        if (auto typePtr = std::get_if<ArrayExprPtr>(&type)) {
+            result += "array[] ";
+            return result + typeToString(typePtr->get()->type);
+        }
+        if (std::holds_alternative<FuncExprPtr>(type)) {
+            auto funcExpr = std::get<FuncExprPtr>(type);
+            result += "function(";
+            for (int i = 0; i < funcExpr->params.size(); i++) {
+                result += typeToString(funcExpr->params[i]->type, funcExpr->params[i]->parameterType);
+                if (i != funcExpr->params.size() - 1) result += ", ";
+            }
+            result += "): " + typeToString(funcExpr->type);
+            return result;
+        }
+        return "unknown";
+    }
+
+    static std::string typeToString(TypeExprNode &type, ParameterType parameterType = ParameterType::None) {
+        return parameterTypeToString(parameterType) + type.type;
     }
 }
 

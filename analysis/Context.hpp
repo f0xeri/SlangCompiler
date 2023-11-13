@@ -46,6 +46,16 @@ namespace Slangc {
             return currScope->lookupFunc(name, expr);
         }
 
+        auto lookupType(std::string name) const -> std::optional<TypeDecStmtPtr> {
+            if (types.contains(name)) {
+                return types.at(name);
+            }
+            else if (types.contains(moduleName + "." + name)) {
+                return types.at(moduleName + "." + name);
+            }
+            return std::nullopt;
+        }
+
         auto getVarDeclType(std::string_view name) const -> ExprPtrVariant {
             auto* node = currScope->lookup(name);
         }

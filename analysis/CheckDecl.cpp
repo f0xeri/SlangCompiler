@@ -80,12 +80,12 @@ namespace Slangc::Check {
             result &= checkBlockStmt(decl->block.value(), context, errors);
             for (auto &type : context.currFuncReturnTypes) {
                 if (!compareTypes(type.first, decl->expr->type)) {
-                    errors.emplace_back("Function '" + decl->name + "' returns incorrect type.", type.second, false, false);
+                    errors.emplace_back("Function '" + decl->name + "' returns incorrect type '" + typeToString(type.first) + "' instead of '" +
+                                                typeToString(decl->expr->type) + "'.", type.second, false, false);
                     result = false;
                 }
             }
             context.currFuncReturnTypes.clear();
-
             context.exitScope();
         }
 
@@ -147,7 +147,7 @@ namespace Slangc::Check {
             result = false;
         }
         if (decl->parentTypeName.has_value()) {
-            if (!context.lookup(decl->parentTypeName.value())) {
+            if (!context.lookupType(decl->parentTypeName.value())) {
                 errors.emplace_back("Parent type with name '" + decl->parentTypeName.value() + "' does not exist.", decl->loc, false, false);
                 result = false;
             }

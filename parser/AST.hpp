@@ -11,6 +11,7 @@
 #include <memory>
 #include <vector>
 #include <optional>
+#include <iostream>
 #include "llvm/IR/Value.h"
 #include "lexer/TokenType.hpp"
 #include "codegen/CodeGenContext.hpp"
@@ -19,13 +20,6 @@
 
 
 namespace Slangc {
-    enum ParameterType {
-        In,
-        Out,
-        Var,
-        None
-    };
-
     struct ExprTypeVisitor {
         const Context &analysis;
         std::vector<ErrorMessage>& errors;
@@ -194,7 +188,13 @@ namespace Slangc {
               dotModule(dotModule), isPointer(isPointer), index(index) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
 
-        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return getExprType(expr, analysis, errors); }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> {
+            ExprPtrVariant tmp = getExprType(expr, analysis, errors).value();
+            if (std::holds_alternative<ArrayExprPtr>(tmp))
+                return std::get<ArrayExprPtr>(tmp)->type;
+            else
+                return std::nullopt;
+        }
     };
 
     struct IndexesExprNode {
@@ -756,7 +756,7 @@ namespace Slangc {
         }
     }
 
-    static std::string typeToString(ExprPtrVariant type, ParameterType parameterType = ParameterType::None) {
+    static std::string typeToString(ExprPtrVariant type, ParameterType parameterType) {
         std::string result = parameterTypeToString(parameterType);
         if (auto typePtr = std::get_if<TypeExprPtr>(&type)) {
             return result + typePtr->get()->type;

@@ -141,7 +141,16 @@ namespace Slangc::Check {
     }
 
     bool checkStmt(const OutputStatementPtr &stmt, Context &context, std::vector<ErrorMessage> &errors) {
-        return true;
+        bool result = true;
+        auto x = getExprType(stmt->expr, context, errors);
+        if (x) {
+            errors.emplace_back(typeToString(x.value()), stmt->loc, true, true);
+        }
+        else {
+            result = false;
+            errors.emplace_back("getExprType failed", stmt->loc, true, true);
+        }
+        return result;
     }
 
     bool checkStmt(const InputStatementPtr &stmt, Context &context, std::vector<ErrorMessage> &errors) {

@@ -10,6 +10,13 @@
 
 namespace Slangc {
 
+    enum ParameterType {
+        In,
+        Out,
+        Var,
+        None
+    };
+
     struct ArrayExprNode;
     struct BooleanExprNode;
     struct CharExprNode;
@@ -117,6 +124,7 @@ namespace Slangc {
     bool compareFuncSignatures(const ExternFuncDecStmtPtr &func1, const ExternFuncDecStmtPtr &func2);
     bool compareFuncSignatures(const MethodDecPtr &func1, const MethodDecPtr &func2);
     bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncExprPtr &func2);
+    std::string typeToString(ExprPtrVariant type, ParameterType parameterType = ParameterType::None);
 }
 
 #endif //SLANGCREFACTORED_ASTFWDDECL_HPP

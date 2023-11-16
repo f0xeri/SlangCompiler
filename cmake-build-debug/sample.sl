@@ -67,9 +67,6 @@ module sample
     end testProc;
 
 start
-    variable-array[2] array[3] array[4] function(in integer, in integer): integer arr3d2;
-    output arr3d2[1][2][3];
-    output arr3d2;
     // test line comment
     variable-A a;
     variable-float ai2 := getA().getA().getA().getFloat();
@@ -79,6 +76,9 @@ start
     variable-procedure(in real) procPointer3 := testProc;
     variable-procedure() procPointer4 := testProc;
     variable-procedure(out function(in integer, in integer): integer) procPointer5 := testProc;
+    variable-array[2] array[3] array[4] procedure(in integer, in integer) arr3d2;
+    let arr3d2[1][2][3] := testProc;
+    output arr3d2[1][2][4](1, 2);
     //while xdd == ad(aaa).a[5] && gg != 5 repeat
         //call printHello("aaa");
         //variable-array[2] array[3] array[4] integer arr3d2;

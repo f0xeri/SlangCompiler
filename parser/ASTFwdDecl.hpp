@@ -119,11 +119,11 @@ namespace Slangc {
             IndexesExprPtr, IndexExprPtr, WhileStatementPtr, BlockStmtPtr>;
 
     bool compareTypes(const ExprPtrVariant &type1, const ExprPtrVariant &type2);
-    bool compareFuncSignatures(const FuncExprPtr &func1, const FuncExprPtr &func2);
-    bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncDecStatementPtr &func2);
-    bool compareFuncSignatures(const ExternFuncDecStmtPtr &func1, const ExternFuncDecStmtPtr &func2);
-    bool compareFuncSignatures(const MethodDecPtr &func1, const MethodDecPtr &func2);
-    bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncExprPtr &func2);
+    bool compareFuncSignatures(const FuncExprPtr &func1, const FuncExprPtr &func2, bool checkReturnTypes = true);
+    bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncDecStatementPtr &func2, bool checkReturnTypes = true);
+    bool compareFuncSignatures(const ExternFuncDecStmtPtr &func1, const ExternFuncDecStmtPtr &func2, bool checkReturnTypes = true);
+    bool compareFuncSignatures(const MethodDecPtr &func1, const MethodDecPtr &func2, bool checkReturnTypes = true);
+    bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncExprPtr &func2, bool checkReturnTypes = true);
     std::string typeToString(ExprPtrVariant type, ParameterType parameterType = ParameterType::None);
 }
 

@@ -189,11 +189,11 @@ namespace Slangc {
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
 
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> {
-            ExprPtrVariant tmp = getExprType(expr, analysis, errors).value();
-            if (std::holds_alternative<ArrayExprPtr>(tmp))
-                return std::get<ArrayExprPtr>(tmp)->type;
-            else
-                return std::nullopt;
+            auto tmp = getExprType(expr, analysis, errors);
+            if (tmp.has_value() && std::holds_alternative<ArrayExprPtr>(tmp.value())) {
+                return std::get<ArrayExprPtr>(tmp.value())->type;
+            }
+            else return std::nullopt;
         }
     };
 
@@ -694,6 +694,38 @@ namespace Slangc {
         return -1;
     }
 
+    // checks signatures WITHOUT return type
+    static bool compareFuncSignatures(const FuncExprPtr &func1, const FuncExprPtr &func2, bool checkReturnTypes) {
+        if (func1->params.size() != func2->params.size()) return false;
+        if (checkReturnTypes) {
+            if (!compareTypes(func1->type, func2->type)) return false;
+        }
+        for (int i = 0; i < func1->params.size(); i++) {
+            if (!compareTypes(func1->params[i]->type, func2->params[i]->type)) return false;
+            // if parameterType is None, it means that it is not specified and we can cast
+            if (func1->params[i]->parameterType != None && func2->params[i]->parameterType != None) {
+                if (func1->params[i]->parameterType != func2->params[i]->parameterType) return false;
+            }
+        }
+        return true;
+    }
+
+    static bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncDecStatementPtr &func2, bool checkReturnTypes) {
+        return compareFuncSignatures(func1->expr, func2->expr, checkReturnTypes);
+    }
+
+    static bool compareFuncSignatures(const ExternFuncDecStmtPtr &func1, const ExternFuncDecStmtPtr &func2, bool checkReturnTypes) {
+        return compareFuncSignatures(func1->expr, func2->expr, checkReturnTypes);
+    }
+
+    static bool compareFuncSignatures(const MethodDecPtr &func1, const MethodDecPtr &func2, bool checkReturnTypes) {
+        return compareFuncSignatures(func1->expr, func2->expr, checkReturnTypes);
+    }
+
+    static bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncExprPtr &func2, bool checkReturnTypes) {
+        return compareFuncSignatures(func1->expr, func2, checkReturnTypes);
+    }
+
     static bool compareTypes(const ExprPtrVariant &type1, const ExprPtrVariant &type2) {
         if (auto type1Ptr = std::get_if<TypeExprPtr>(&type1)) {
             if (auto type2Ptr = std::get_if<TypeExprPtr>(&type2)) {
@@ -712,35 +744,6 @@ namespace Slangc {
         }
 
         return false;
-    }
-
-    // checks signatures WITHOUT return type
-    static bool compareFuncSignatures(const FuncExprPtr &func1, const FuncExprPtr &func2) {
-        if (func1->params.size() != func2->params.size()) return false;
-        for (int i = 0; i < func1->params.size(); i++) {
-            if (!compareTypes(func1->params[i]->type, func2->params[i]->type)) return false;
-            // if parameterType is None, it means that it is not specified and we can cast
-            if (func1->params[i]->parameterType != None && func2->params[i]->parameterType != None) {
-                if (func1->params[i]->parameterType != func2->params[i]->parameterType) return false;
-            }
-        }
-        return true;
-    }
-
-    static bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncDecStatementPtr &func2) {
-        return compareFuncSignatures(func1->expr, func2->expr);
-    }
-
-    static bool compareFuncSignatures(const ExternFuncDecStmtPtr &func1, const ExternFuncDecStmtPtr &func2) {
-        return compareFuncSignatures(func1->expr, func2->expr);
-    }
-
-    static bool compareFuncSignatures(const MethodDecPtr &func1, const MethodDecPtr &func2) {
-        return compareFuncSignatures(func1->expr, func2->expr);
-    }
-
-    static bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncExprPtr &func2) {
-        return compareFuncSignatures(func1->expr, func2);
     }
 
     static std::string parameterTypeToString(ParameterType parameterType) {

@@ -76,7 +76,7 @@ namespace Slangc::Check {
                     }
                 }
                 if (!compareFuncSignatures(leftType, std::get<FuncExprPtr>(rightType))) {
-                    errors.emplace_back("Type mismatch: cannot assign: function signatures do not match.", stmt->loc, false, false);
+                    errors.emplace_back("Type mismatch: no matching function found, cannot assign '" + typeToString(rightType) + "' to '" + typeToString(leftType) + "'.", stmt->loc, false, false);
                     result = false;
                 }
             }
@@ -142,23 +142,43 @@ namespace Slangc::Check {
 
     bool checkStmt(const OutputStatementPtr &stmt, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
-        /*auto x = getExprType(stmt->expr, context, errors);
-        if (x) {
-            errors.emplace_back(typeToString(x.value()), stmt->loc, true, true);
-        }
-        else {
-            result = false;
-            errors.emplace_back("getExprType failed", stmt->loc, true, true);
-        }*/
+        result &= checkExpr(stmt->expr, context, errors);
         return result;
     }
 
     bool checkStmt(const InputStatementPtr &stmt, Context &context, std::vector<ErrorMessage> &errors) {
-        return true;
+        bool result = true;
+        result &= checkExpr(stmt->expr, context, errors);
+        if (result) {
+            result &= Context::isBuiltInType(typeToString(getExprType(stmt->expr, context, errors).value()));
+        }
+        return result;
     }
 
     bool checkStmt(const AssignExprPtr &stmt, Context &context, std::vector<ErrorMessage> &errors) {
-        return true;
+        bool result = true;
+        result &= checkExpr(stmt->left, context, errors);
+        result &= checkExpr(stmt->right, context, errors);
+        if (result) {
+            auto leftType = getExprType(stmt->left, context, errors).value();
+            auto rightType = getExprType(stmt->right, context, errors).value();
+            // check if left is func type
+            if (auto left = std::get_if<FuncExprPtr>(&leftType)) {
+                if (auto varExpr = std::get_if<VarExprPtr>(&stmt->right)) {
+                    if (auto func = context.lookupFunc(varExpr->get()->name, *left)) {
+                        rightType = std::get<FuncDecStatementPtr>(*func)->expr;
+                    }
+                }
+            }
+            // we don't need to compare function signatures here because we can just check their text representation
+            auto leftTypeStr = typeToString(leftType);
+            auto rightTypeStr = typeToString(rightType);
+            if (leftTypeStr != rightTypeStr) {
+                errors.emplace_back("Type mismatch: cannot assign '" + rightTypeStr + "' to '" + leftTypeStr + "'.", stmt->loc, false, false);
+                result = false;
+            }
+        }
+        return result;
     }
 
     bool checkStmt(const ReturnStatementPtr &stmt, Context &context, std::vector<ErrorMessage> &errors) {

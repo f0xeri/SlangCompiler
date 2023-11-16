@@ -96,7 +96,44 @@ namespace Slangc::Check {
     }
 
     bool checkExpr(const IndexExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
-        return true;
+        bool result = true;
+        result = checkExpr(expr->expr, context, errors);
+        result &= checkExpr(expr->indexExpr, context, errors);
+        if (!result) return false;
+        auto exprType = getExprType(expr->expr, context, errors);
+        auto indexType = getExprType(expr->indexExpr, context, errors);
+
+        if (!exprType.has_value() || !std::holds_alternative<ArrayExprPtr>(exprType.value())) {
+            // this code is needed simply to get final type of the array in order to display it in error message
+            // two loops is too much for just an error, but IDK how to do it better
+            auto ind = std::get_if<IndexExprPtr>(&expr->expr);
+            std::optional<ExprPtrVariant> type = exprType;
+            std::optional<ExprPtrVariant> typeOpt;
+            while (ind) {
+                typeOpt = getExprType(ind->get()->expr, context, errors);
+                ind = std::get_if<IndexExprPtr>(&ind->get()->expr);
+                if (typeOpt) type = typeOpt.value();
+                else break;
+            }
+            while (type.has_value() && std::holds_alternative<ArrayExprPtr>(type.value())) {
+                typeOpt = std::get<ArrayExprPtr>(type.value())->type;
+                if (typeOpt) type = typeOpt.value();
+                else break;
+            }
+            if (type.has_value())
+                errors.emplace_back("Cannot apply indexing with [] to an expression of type '" + typeToString(type.value()) + "'.",expr->loc, false, false);
+            else
+                errors.emplace_back("Cannot apply indexing with [] to an expression of unknown type.", expr->loc, false,false);
+            return false;
+        }
+        if (indexType.has_value()) {
+            auto typeStr = typeToString(indexType.value());
+            if (typeStr != "integer") {
+                errors.emplace_back("Index must be of type 'integer, not '" + typeStr + "'.", expr->loc, false, false);
+                result = false;
+            }
+        }
+        return result;
     }
 
     bool checkExpr(const CallExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
@@ -107,6 +144,7 @@ namespace Slangc::Check {
         }
         if (!result) return false;
         std::optional<DeclPtrVariant> func = std::nullopt;
+        std::optional<IndexExprPtr> funcPtrsArrIndex = std::nullopt;
         bool overloaded = false;
 
         // create func expr based on arg types
@@ -128,7 +166,7 @@ namespace Slangc::Check {
                 for (const auto &method: typeDecl.value()->methods) {
                     if (method->name == typeDecl.value()->name + "." + access->get()->name) {
                         overloaded = true;
-                        if (compareFuncSignatures(method->expr, funcExpr)) {
+                        if (compareFuncSignatures(method->expr, funcExpr, false)) {
                             func = method;
                             break;
                         }
@@ -139,8 +177,8 @@ namespace Slangc::Check {
         else if (auto var = std::get_if<VarExprPtr>(&expr->name)) {
             for (auto &&f : context.funcs) {
                 if (f->name == var->get()->name) {
-                    if (compareFuncSignatures(f->expr, funcExpr)) {
-                        overloaded = true;
+                    overloaded = true;
+                    if (compareFuncSignatures(f->expr, funcExpr, false)) {
                         func = f;
                         break;
                     }
@@ -155,29 +193,36 @@ namespace Slangc::Check {
                 if (funcPointer) {
                     if (std::holds_alternative<FuncPointerStmtPtr>(*funcPointer)) {
                         overloaded = true;
-                        if (compareFuncSignatures(std::get<FuncPointerStmtPtr>(*funcPointer)->expr, funcExpr)) {
+                        if (compareFuncSignatures(std::get<FuncPointerStmtPtr>(*funcPointer)->expr, funcExpr, false))
                             func = *funcPointer;
-                        }
                     }
                     else if (std::holds_alternative<FieldFuncPointerStmtPtr>(*funcPointer)) {
                         overloaded = true;
-                        if (compareFuncSignatures(std::get<FieldFuncPointerStmtPtr>(*funcPointer)->expr, funcExpr)) {
+                        if (compareFuncSignatures(std::get<FieldFuncPointerStmtPtr>(*funcPointer)->expr, funcExpr, false))
                             func = *funcPointer;
+                    }
+                    else if (std::holds_alternative<FuncParamDecStmtPtr>(*funcPointer)) {
+                        auto param = std::get<FuncParamDecStmtPtr>(*funcPointer);
+                        if (std::holds_alternative<FuncExprPtr>(param->type)) {
+                            overloaded = true;
+                            if (compareFuncSignatures(std::get<FuncExprPtr>(param->type), funcExpr, false))
+                                func = *funcPointer;
                         }
                     }
                 }
             }
         }
-        else if (auto index = std::get_if<IndexExprPtr >(&expr->name)) {
-            // TODO
+        else if (auto index = std::get_if<IndexExprPtr>(&expr->name)) {
+            auto indexType = getExprType(*index, context, errors);
+            if (indexType.has_value() && std::holds_alternative<FuncExprPtr>(indexType.value())) {
+                overloaded = true;
+                if (compareFuncSignatures(std::get<FuncExprPtr>(indexType.value()), funcExpr, false)) {
+                    funcPtrsArrIndex = *index;
+                }
+            }
         }
-        if (func == std::nullopt) {
-            if (overloaded) {
-                errors.emplace_back("No matching function for call.", expr->loc, false, false);
-            }
-            else {
-                errors.emplace_back("Expression is not callable.", expr->loc, false, false);
-            }
+        if (!func && !funcPtrsArrIndex) {
+            errors.emplace_back(overloaded ? "No matching function for call." : "Expression is not callable.", expr->loc, false, false);
             result = false;
         }
 

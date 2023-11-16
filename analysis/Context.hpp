@@ -63,6 +63,25 @@ namespace Slangc {
         static bool isBuiltInType(std::string_view name) {
             return name == "integer" || name == "float" || name == "real" || name == "boolean" || name == "string" || name == "character" || name == "void";
         }
+
+        static bool isCastable(std::string_view from, std::string_view to) {
+            if (from == to) {
+                return true;
+            }
+            if (from == "integer" && (to == "float" || to == "real")) {
+                return true;
+            }
+            if (from == "float" && to == "real") {
+                return true;
+            }
+            if (from == "boolean" && to == "integer") {
+                return true;
+            }
+            if (from == "character" && to == "integer") {
+                return true;
+            }
+            return false;
+        }
     };
 }
 

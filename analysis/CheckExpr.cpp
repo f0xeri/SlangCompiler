@@ -54,8 +54,8 @@ namespace Slangc::Check {
             result = false;
         }
         if (result) {
-            auto leftType = std::get<TypeExprPtr>(getExprType(expr->left, context, errors).value())->type;
-            auto rightType = std::get<TypeExprPtr>(getExprType(expr->right, context, errors).value())->type;
+            auto leftType = typeToString(getExprType(expr->left, context, errors).value());
+            auto rightType = typeToString(getExprType(expr->right, context, errors).value());
             // TODO: check if conversion is possible
             if (leftType != rightType) {
                 errors.emplace_back(std::string("Type mismatch: cannot apply operator '") + "' to '" + leftType + "' and '" + rightType + "'.", expr->loc, false, false);

@@ -151,7 +151,7 @@ namespace Slangc {
             falseBlock = parseBlockStmt("else");
         }
         consume(TokenType::Semicolon);
-        return createStmt<IfStatementNode>(loc, std::move(condition.value()), std::move(trueBlock.value()), std::move(falseBlock.value()), std::move(elseIfNodes));
+        return createStmt<IfStatementNode>(loc, std::move(condition.value()), std::move(trueBlock.value()), std::move(falseBlock), std::move(elseIfNodes));
     }
 
     auto Parser::parseWhileStmt() -> std::optional<StmtPtrVariant> {

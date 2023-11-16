@@ -100,9 +100,9 @@ namespace Slangc::Check {
         for (const auto &elseIf: stmt->elseIfNodes) {
             result &= checkStmt(elseIf, context, errors);
         }
-        if (stmt->falseBlock) {
+        if (stmt->falseBlock.has_value()) {
             context.enterScope();
-            result &= checkBlockStmt(stmt->falseBlock, context, errors);
+            result &= checkBlockStmt(stmt->falseBlock.value(), context, errors);
             context.exitScope();
         }
         return result;

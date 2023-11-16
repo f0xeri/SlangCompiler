@@ -225,28 +225,31 @@ namespace Slangc {
 
         auto stringValue = std::string(stringValueView);
 
-        bool sequenceError = false;
         for (int i = 0; i < stringValue.size(); ++i) {
             if (stringValue.at(i) == '\\') {
                 if (i + 1 < stringValue.size()) {
                     switch (stringValue.at(i + 1)) {
                         case 'n':
-                            stringValue.replace(i, 2, "\n");
+                            stringValue[i] = '\n';
+                            stringValue.erase(i + 1, 1);
                             break;
                         case 't':
-                            stringValue.replace(i, 2, "\t");
+                            stringValue[i] = '\t';
+                            stringValue.erase(i + 1, 1);
                             break;
                         case 'r':
-                            stringValue.replace(i, 2, "\r");
+                            stringValue[i] = '\r';
+                            stringValue.erase(i + 1, 1);
+                            break;
+                        case '0':
+                            stringValue[i] = '\0';
+                            stringValue.erase(i + 1, 1);
                             break;
                         case '\\':
-                        case '0':
-                            stringValue.replace(i, 2, "\0");
+                            stringValue[i] = '\\';
+                            stringValue.erase(i + 1, 1);
                             break;
                         default:
-                            errors.emplace_back("Unknown escape sequence", SourceLoc{currentLine, stringColumn}, false,
-                                                false);
-                            sequenceError = true;
                             break;
                     }
                 }
@@ -254,6 +257,6 @@ namespace Slangc {
         }
 
         addToken(TokenType::String, std::move(stringValue), stringColumn);
-        return !sequenceError;
+        return true;
     }
 }

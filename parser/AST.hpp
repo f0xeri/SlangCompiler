@@ -596,10 +596,10 @@ namespace Slangc {
         SourceLoc loc{0, 0};
         ExprPtrVariant condition;
         BlockStmtPtr trueBlock;
-        BlockStmtPtr falseBlock;
+        std::optional<BlockStmtPtr> falseBlock;
         std::vector<ElseIfStatementPtr> elseIfNodes;
 
-        IfStatementNode(SourceLoc loc, ExprPtrVariant condExpr, BlockStmtPtr trueBlock, BlockStmtPtr falseBlock,
+        IfStatementNode(SourceLoc loc, ExprPtrVariant condExpr, BlockStmtPtr trueBlock, std::optional<BlockStmtPtr> falseBlock,
                         std::vector<ElseIfStatementPtr> elseIfNodes)
             : loc(loc), condition(std::move(condExpr)), trueBlock(std::move(trueBlock)),
               falseBlock(std::move(falseBlock)), elseIfNodes(std::move(elseIfNodes)) {};

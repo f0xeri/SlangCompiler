@@ -17,8 +17,8 @@ namespace Slangc::Check {
 
     bool checkStmt(const VarDecStmtPtr &stmt, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
-        if (!context.types.contains(stmt->typeExpr.type) && !Context::isBuiltInType(stmt->typeExpr.type)) {
-            if (!context.types.contains(context.moduleName + "." + stmt->typeExpr.type)) {
+        if (!context.symbolTable.lookupType(stmt->typeExpr.type) && !Context::isBuiltInType(stmt->typeExpr.type)) {
+            if (!context.symbolTable.lookupType(context.moduleName + "." + stmt->typeExpr.type)) {
                 errors.emplace_back("Type '" + stmt->typeExpr.type + "' does not exist.", stmt->loc, false, false);
                 result = false;
             } else {
@@ -37,9 +37,14 @@ namespace Slangc::Check {
             }
             auto exprType = std::get<TypeExprPtr>(getExprType(stmt->expr.value(), context, errors).value())->type;
             // TODO: check if conversion is possible
-            if (stmt->typeExpr.type != exprType) {
-                errors.emplace_back("Type mismatch: cannot assign '" + exprType + "' to '" + stmt->typeExpr.type + "'.", stmt->loc, false, false);
-                result = false;
+            if (exprType != stmt->typeExpr.type) {
+                if (!Context::isCastable(exprType, stmt->typeExpr.type, context)) {
+                    errors.emplace_back("Type mismatch: cannot assign '" + exprType + "' to '" + stmt->typeExpr.type + "'.", stmt->loc, false, false);
+                    result = false;
+                }
+                else {
+                    errors.emplace_back("Implicit conversion from '" + exprType + "' to '" + stmt->typeExpr.type + "'.", stmt->loc, true, false);
+                }
             }
         }
         return result;
@@ -71,7 +76,7 @@ namespace Slangc::Check {
                 auto rightType = getExprType(stmt->assignExpr.value(), context, errors).value();
                 // searching for overloaded function
                 if (auto varExpr = std::get_if<VarExprPtr>(&stmt->assignExpr.value())) {
-                    if (auto func = context.lookupFunc(varExpr->get()->name, stmt->expr)) {
+                    if (auto func = context.symbolTable.lookupFunc(varExpr->get()->name, stmt->expr)) {
                         rightType = std::get<FuncDecStatementPtr>(*func)->expr;
                     }
                 }
@@ -88,10 +93,15 @@ namespace Slangc::Check {
         bool result = true;
         result &= checkExpr(stmt->condition, context, errors);
         if (result) {
-            auto condType = getExprType(stmt->condition, context, errors).value();
-            if (typeToString(condType) != "boolean") {
-                errors.emplace_back("Type mismatch: cannot use '" + typeToString(condType) + "' as condition.", stmt->loc, false, false);
-                result = false;
+            auto condType = typeToString(getExprType(stmt->condition, context, errors).value());
+            if (condType != "boolean") {
+                if (!Context::isCastable(condType, "boolean", context)) {
+                    errors.emplace_back("Type mismatch: cannot use '" + condType + "' as condition.", stmt->loc, false, false);
+                    result = false;
+                }
+                else {
+                    errors.emplace_back("Implicit conversion from '" + condType + "' to 'boolean'.", stmt->loc, true, false);
+                }
             }
         }
         context.enterScope();
@@ -112,10 +122,15 @@ namespace Slangc::Check {
         bool result = true;
         result &= checkExpr(stmt->condition, context, errors);
         if (result) {
-            auto condType = getExprType(stmt->condition, context, errors).value();
-            if (typeToString(condType) != "boolean") {
-                errors.emplace_back("Type mismatch: cannot use '" + typeToString(condType) + "' as condition.", stmt->loc, false, false);
-                result = false;
+            auto condType = typeToString(getExprType(stmt->condition, context, errors).value());
+            if (condType != "boolean") {
+                if (!Context::isCastable(condType, "boolean", context)) {
+                    errors.emplace_back("Type mismatch: cannot use '" + condType + "' as condition.", stmt->loc, false, false);
+                    result = false;
+                }
+                else {
+                    errors.emplace_back("Implicit conversion from '" + condType + "' to 'boolean'.", stmt->loc, true, false);
+                }
             }
         }
         context.enterScope();
@@ -128,10 +143,15 @@ namespace Slangc::Check {
         bool result = true;
         result &= checkExpr(stmt->condition, context, errors);
         if (result) {
-            auto condType = getExprType(stmt->condition, context, errors).value();
-            if (typeToString(condType) != "boolean") {
-                errors.emplace_back("Type mismatch: cannot use '" + typeToString(condType) + "' as condition.", stmt->loc, false, false);
-                result = false;
+            auto condType = typeToString(getExprType(stmt->condition, context, errors).value());
+            if (condType != "boolean") {
+                if (!Context::isCastable(condType, "boolean", context)) {
+                    errors.emplace_back("Type mismatch: cannot use '" + condType + "' as condition.", stmt->loc, false, false);
+                    result = false;
+                }
+                else {
+                    errors.emplace_back("Implicit conversion from '" + condType + "' to 'boolean'.", stmt->loc, true, false);
+                }
             }
         }
         context.enterScope();
@@ -165,7 +185,7 @@ namespace Slangc::Check {
             // check if left is func type
             if (auto left = std::get_if<FuncExprPtr>(&leftType)) {
                 if (auto varExpr = std::get_if<VarExprPtr>(&stmt->right)) {
-                    if (auto func = context.lookupFunc(varExpr->get()->name, *left)) {
+                    if (auto func = context.symbolTable.lookupFunc(varExpr->get()->name, *left)) {
                         rightType = std::get<FuncDecStatementPtr>(*func)->expr;
                     }
                 }
@@ -174,8 +194,13 @@ namespace Slangc::Check {
             auto leftTypeStr = typeToString(leftType);
             auto rightTypeStr = typeToString(rightType);
             if (leftTypeStr != rightTypeStr) {
-                errors.emplace_back("Type mismatch: cannot assign '" + rightTypeStr + "' to '" + leftTypeStr + "'.", stmt->loc, false, false);
-                result = false;
+                if (!Context::isCastable(rightTypeStr, leftTypeStr, context)) {
+                    errors.emplace_back("Type mismatch: cannot assign '" + rightTypeStr + "' to '" + leftTypeStr + "'.", stmt->loc, false, false);
+                    result = false;
+                }
+                else {
+                    errors.emplace_back("Implicit conversion from '" + rightTypeStr + "' to '" + leftTypeStr + "'.", stmt->loc, true, false);
+                }
             }
         }
         return result;

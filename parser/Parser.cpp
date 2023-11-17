@@ -12,7 +12,7 @@ namespace Slangc {
         auto loc = SourceLoc{0, 0};
 
         auto obj = create<TypeDecStatementNode>(loc, std::string("Object"), std::vector<DeclPtrVariant>(), std::vector<MethodDecPtr>());
-        context.types["Object"] = obj;
+        context.symbolTable.insert("Object", obj);
         auto moduleNode = parseModuleDecl();
         if (moduleNode.has_value()) {
             //std::cout << moduleNode.assignExpr()->block->statements.size() << std::endl;

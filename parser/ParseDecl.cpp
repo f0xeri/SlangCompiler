@@ -131,17 +131,10 @@ namespace Slangc {
         if (!isExtern) {
             mangledName = moduleAST->name + "." + name;
         }
-        if (isExtern) {
-            auto funcExpr = create<FuncExprNode>(loc, returnType, params.value(), isFunction);
-            funcDecl = createDecl<ExternFuncDecStatementNode>(loc, mangledName, funcExpr, isPrivate, isFunction);
-            context.extern_funcs[name] = std::get<ExternFuncDecStmtPtr>(funcDecl);
-        }
-        else {
-            auto funcExpr = create<FuncExprNode>(loc, returnType, params.value(), isFunction);
-            funcDecl = createDecl<FuncDecStatementNode>(loc, mangledName, funcExpr, std::nullopt, isPrivate, isFunction);
-            context.funcs.emplace_back(std::get<FuncDecStatementPtr>(funcDecl));
-        }
-        //context.insert(mangledName, funcDecl);
+
+        auto funcExpr = create<FuncExprNode>(loc, returnType, params.value(), isFunction);
+        funcDecl = createDecl<FuncDecStatementNode>(loc, mangledName, funcExpr, std::nullopt, isPrivate, isFunction, isExtern);
+        context.symbolTable.insert(mangledName, funcDecl);
 
         --token;
         auto block = parseBlockStmt(name, &params.value());
@@ -254,7 +247,7 @@ namespace Slangc {
         std::vector<StmtPtrVariant> statements;
         auto block = create<BlockStmtNode>(loc, statements);
         auto funcExpr = create<FuncExprNode>(loc, returnType.value(), args.value(), isFunction);
-        auto funcDecl = create<MethodDecNode>(loc, name, funcExpr, thisName, block, isFunction, isPrivate);
+        auto funcDecl = create<MethodDecNode>(loc, name, funcExpr, thisName, block, isPrivate, isFunction);
         //context.insert(name, funcDecl);
         --token;
         auto parsedBlock = parseBlockStmt(basicName);
@@ -329,7 +322,8 @@ namespace Slangc {
             hasError = true;
             return std::nullopt;
         }
-        context.types[mangledName] = std::get<TypeDecStmtPtr>(classNode);
+        //context.types[mangledName] = std::get<TypeDecStmtPtr>(classNode);
+        context.symbolTable.insert(mangledName, classNode);
         return classNode;
     }
 } // Slangc

@@ -58,8 +58,13 @@ namespace Slangc::Check {
             auto rightType = typeToString(getExprType(expr->right, context, errors).value());
             // TODO: check if conversion is possible
             if (leftType != rightType) {
-                errors.emplace_back(std::string("Type mismatch: cannot apply operator '") + "' to '" + leftType + "' and '" + rightType + "'.", expr->loc, false, false);
-                result = false;
+                if (!Context::isCastable(leftType, rightType, context)) {
+                    errors.emplace_back(std::string("Type mismatch: cannot apply operator '") + "' to '" + leftType + "' and '" + rightType + "'.", expr->loc, false, false);
+                    result = false;
+                }
+                else {
+                    errors.emplace_back("Implicit conversion from '" + rightType + "' to '" + leftType + "'.", expr->loc, true, false);
+                }
             }
         }
         return result;
@@ -161,11 +166,23 @@ namespace Slangc::Check {
         if (auto access = std::get_if<AccessExprPtr>(&expr->name)) {
             auto accessType = getExprType(access->get()->expr, context, errors);
             if (std::holds_alternative<TypeExprPtr>(accessType.value())) {
-                auto typeDecl = context.lookupType(std::get<TypeExprPtr>(accessType.value())->type);
+                auto typeDecl = context.symbolTable.lookupType(std::get<TypeExprPtr>(accessType.value())->type);
                 funcExpr->params.insert(funcExpr->params.begin(), create<FuncParamDecStatementNode>(zeroLoc, "", ParameterType::Out, std::get<TypeExprPtr>(accessType.value())));
                 for (const auto &method: typeDecl.value()->methods) {
                     if (method->name == typeDecl.value()->name + "." + access->get()->name) {
                         overloaded = true;
+                        // check return type of method to make sure it has fixed name
+                        // example:
+                        //    module sample
+                        //        public method getA(A a)(): A      // checked, method returns "sample.A" type
+                        //            return a.getAp();             // error, returns "A" type, not "sample.A"
+                        //        end getA;
+                        //
+                        //        private method getAp(A a)(): A    // not checked yet, method returns "A" type
+                        //            return a;
+                        //        end getAp;
+                        // check of return type fixes this possible problem
+                        checkExpr(method->expr->type, context, errors);
                         if (compareFuncSignatures(method->expr, funcExpr, false)) {
                             func = method;
                             break;
@@ -175,11 +192,12 @@ namespace Slangc::Check {
             }
         }
         else if (auto var = std::get_if<VarExprPtr>(&expr->name)) {
-            for (auto &&f : context.funcs) {
-                if (f->name == var->get()->name) {
+            for (auto &&f : context.symbolTable.symbols | std::views::filter([](const auto &s) { return std::holds_alternative<FuncDecStatementPtr>(s.second); })) {
+                auto funcDec = std::get<FuncDecStatementPtr>(f.second);
+                if (funcDec->name == var->get()->name) {
                     overloaded = true;
-                    if (compareFuncSignatures(f->expr, funcExpr, false)) {
-                        func = f;
+                    if (compareFuncSignatures(funcDec->expr, funcExpr, false)) {
+                        func = funcDec;
                         break;
                     }
                 }
@@ -239,23 +257,46 @@ namespace Slangc::Check {
             return false;
         }
         if (std::holds_alternative<TypeExprPtr>(exprType.value()) && !Context::isBuiltInType(std::get<TypeExprPtr>(exprType.value())->type)) {
-            if (auto typeOpt = context.lookupType(std::get<TypeExprPtr>(exprType.value())->type)) {
+            if (auto typeOpt = context.symbolTable.lookupType(std::get<TypeExprPtr>(exprType.value())->type)) {
                 auto type = typeOpt.value();
                 auto found = false;
                 for (const auto &field: type->fields) {
                     if (auto fieldVar = std::get_if<FieldVarDecPtr>(&field)) {
-                        found = ((*fieldVar)->name == expr->name);
+                        if ((*fieldVar)->name == expr->name) {
+                            if ((*fieldVar)->isPrivate && !Context::isPrivateAccessible(context.currType, type->name, context)) {
+                                errors.emplace_back("Cannot access private field '" + expr->name + "' of type '" + type->name + "' from '" + context.currType + "'.", expr->loc, false, false);
+                                result = false;
+                            }
+                            // found = true even if we got error, because we want to suppress final not found error
+                            found = true;
+                        }
                     } else if (const auto &fieldArrayVar = std::get_if<FieldArrayVarDecPtr>(&field)) {
-                        found = ((*fieldArrayVar)->name == expr->name);
+                        if ((*fieldArrayVar)->name == expr->name) {
+                            if ((*fieldArrayVar)->isPrivate && !Context::isPrivateAccessible(context.currType, type->name, context)) {
+                                errors.emplace_back("Cannot access private field '" + expr->name + "' of type '" + type->name + "' from '" + context.currType + "'.", expr->loc, false, false);
+                                result = false;
+                            }
+                            found = true;
+                        }
                     } else if (auto fieldFuncPointer = std::get_if<FieldFuncPointerStmtPtr>(&field)) {
-                        found = ((*fieldFuncPointer)->name == expr->name);
+                        if ((*fieldFuncPointer)->name == expr->name) {
+                            if ((*fieldFuncPointer)->isPrivate && !Context::isPrivateAccessible(context.currType, type->name, context)) {
+                                errors.emplace_back("Cannot access private field '" + expr->name + "' of type '" + type->name + "' from '" + context.currType + "'.", expr->loc, false, false);
+                                result = false;
+                            }
+                            found = true;
+                        }
                     }
 
                     if (found) break;
                 }
                 if (!found) {
                     for (const auto &method: type->methods) {
-                        if (method->name == type->name + "." + expr->name) {
+                        if ((method->name == type->name + "." + expr->name)) {
+                            if (method->isPrivate && !Context::isPrivateAccessible(context.currType, type->name, context)) {
+                                errors.emplace_back("Cannot access private method '" + expr->name + "' of type '" + type->name + "' from '" + context.currType + "'.", expr->loc, false, false);
+                                result = false;
+                            }
                             found = true;
                             break;
                         }
@@ -276,8 +317,8 @@ namespace Slangc::Check {
 
     bool checkExpr(const TypeExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
-        if (!context.types.contains(expr->type) && !Context::isBuiltInType(expr->type)) {
-            if (!context.types.contains(context.moduleName + "." + expr->type)) {
+        if (!context.symbolTable.lookupType(expr->type) && !Context::isBuiltInType(expr->type)) {
+            if (!context.symbolTable.lookupType(context.moduleName + "." + expr->type)) {
                 errors.emplace_back("Type '" + expr->type + "' does not exist.", expr->loc, false, false);
                 result = false;
             } else {

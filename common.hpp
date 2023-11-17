@@ -84,8 +84,9 @@ namespace Slangc {
         return str.substr(0, std::distance(str.begin(), endIt));
     }
 
-    static void printErrorMessages(std::vector<ErrorMessage> &errors, auto &stream, std::string_view file) {
+    static void printErrorMessages(std::vector<ErrorMessage> &errors, auto &stream, std::string_view file, bool warnings = true) {
         for (auto &error : errors) {
+            if (error.isWarning && !warnings) continue;
             error.print(stream, file);
         }
     }

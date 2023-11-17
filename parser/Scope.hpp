@@ -48,14 +48,14 @@ namespace Slangc {
             return nullptr;
         }
 
-        auto lookupFunc(std::string_view name, FuncExprPtr& expr) -> const DeclPtrVariant* {
+        auto lookupFunc(std::string_view name, FuncExprPtr& expr, bool checkReturnTypes) -> const DeclPtrVariant* {
             Scope *s = this;
             while (s) {
                 for (auto &decl : s->symbols) {
                     if (std::holds_alternative<FuncDecStatementPtr>(decl.second)) {
                         auto func = std::get<FuncDecStatementPtr>(decl.second);
                         if (decl.first == name) {
-                            if (compareFuncSignatures(func, expr)) {
+                            if (compareFuncSignatures(func, expr, checkReturnTypes)) {
                                 return &decl.second;
                             }
                         }

@@ -8,19 +8,23 @@
 #include <memory>
 #include <map>
 #include <optional>
+#include <iostream>
 #include "parser/Scope.hpp"
+#include "SymbolTable.hpp"
 #include "common.hpp"
 
 namespace Slangc {
     class Context {
         std::shared_ptr<Scope> currScope = std::make_unique<Scope>();
     public:
-        std::map<std::string, TypeDecStmtPtr> types;
+        /*std::map<std::string, TypeDecStmtPtr> types;
         std::map<std::string, VarDecStmtPtr> global_vars;
         std::vector<FuncDecStatementPtr> funcs;
-        std::map<std::string, ExternFuncDecStmtPtr> extern_funcs;
+        std::map<std::string, ExternFuncDecStmtPtr> extern_funcs;*/
+        SymbolTable symbolTable;
 
         std::vector<std::pair<ExprPtrVariant, SourceLoc>> currFuncReturnTypes;
+        std::string currType;
         std::string moduleName;
         auto enterScope() -> void {
             currScope = std::make_unique<Scope>(std::move(currScope));
@@ -42,11 +46,11 @@ namespace Slangc {
             return currScope->lookup(name);
         }
 
-        auto lookupFunc(std::string_view name, FuncExprPtr expr) const -> const DeclPtrVariant* {
-            return currScope->lookupFunc(name, expr);
+        auto lookupFuncInScope(std::string_view name, FuncExprPtr& expr, bool checkReturnTypes) const -> const DeclPtrVariant* {
+            return currScope->lookupFunc(name, expr, checkReturnTypes);
         }
 
-        auto lookupType(std::string name) const -> std::optional<TypeDecStmtPtr> {
+        /*auto lookupType(const std::string& name) const -> std::optional<TypeDecStmtPtr> {
             if (types.contains(name)) {
                 return types.at(name);
             }
@@ -54,33 +58,31 @@ namespace Slangc {
                 return types.at(moduleName + "." + name);
             }
             return std::nullopt;
-        }
-
-        auto getVarDeclType(std::string_view name) const -> ExprPtrVariant {
-            auto* node = currScope->lookup(name);
-        }
+        }*/
 
         static bool isBuiltInType(std::string_view name) {
             return name == "integer" || name == "float" || name == "real" || name == "boolean" || name == "string" || name == "character" || name == "void";
         }
 
-        static bool isCastable(std::string_view from, std::string_view to) {
-            if (from == to) {
-                return true;
+        static bool isCastable(const std::string& from, const std::string& to, Context& context) {
+            if (!isBuiltInType(from) || !isBuiltInType(to)) {
+                if (isParentType(to, from, context) ||
+                    isParentType(from, to, context)) {
+                    return true;
+                }
+                else return false;
             }
-            if (from == "integer" && (to == "float" || to == "real")) {
+            if ((from == "integer" || from == "float" || from == "real" || from == "character" || from == "boolean") &&
+                (  to == "integer" ||   to == "float" ||   to == "real" ||   to == "character" ||   to == "boolean"))
                 return true;
-            }
-            if (from == "float" && to == "real") {
-                return true;
-            }
-            if (from == "boolean" && to == "integer") {
-                return true;
-            }
-            if (from == "character" && to == "integer") {
-                return true;
-            }
             return false;
+        }
+
+        static bool isPrivateAccessible(const std::string& parent, const std::string& child, Context& context) {
+            if (isParentType(child, parent, context)) {
+                return true;
+            }
+            else return false;
         }
     };
 }

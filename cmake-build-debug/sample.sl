@@ -25,9 +25,14 @@ module sample
         end getFloat;
 
         public method getA(A a)(): A
-            return a;
+            return a.getAp();
         end getA;
+
+        private method getAp(A a)(): A
+            return a;
+        end getAp;
     end A;
+
 
     private function getA(): A
         variable-A a;
@@ -65,6 +70,29 @@ module sample
     public procedure testProc()
         output 4;
     end testProc;
+
+    private class Animal inherits Object
+        private field-integer i := 1;
+        private method getFloat(Animal a)(): float
+            return 1.2f;
+        end getFloat;
+    end Animal;
+
+    private class Dog inherits Animal
+        public method getA(Dog a)()
+            variable-Animal a2;
+            output a2.i;
+            output a2.getFloat();
+        end getA;
+    end Dog;
+
+    private class Shepherd inherits Object
+        public method getA(Shepherd a)()
+            variable-Animal a2;
+            output a2.i;
+            output a2.getFloat();
+        end getA;
+    end Shepherd;
 
 start
     // test line comment

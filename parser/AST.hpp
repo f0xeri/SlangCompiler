@@ -387,7 +387,7 @@ namespace Slangc {
                 return std::nullopt;
             }
             if (std::holds_alternative<TypeExprPtr>(exprType.value())) {
-                if (auto typeOpt = analysis.lookupType(std::get<TypeExprPtr>(exprType.value())->type)) {
+                if (auto typeOpt = analysis.symbolTable.lookupType(std::get<TypeExprPtr>(exprType.value())->type)) {
                     auto type = typeOpt.value();
                     auto found = false;
                     for (const auto &field: type->fields) {
@@ -557,15 +557,16 @@ namespace Slangc {
         std::optional<BlockStmtPtr> block;
         bool isPrivate = false;
         bool isFunction = false;
+        bool isExtern = false;
 
-        FuncDecStatementNode(SourceLoc loc, std::string name, FuncExprPtr expr, std::optional<BlockStmtPtr> block = std::nullopt, bool isPrivate = false, bool isFunction = false)
-            : loc(loc), name(std::move(name)), expr(std::move(expr)), block(std::move(block)), isPrivate(isPrivate), isFunction(isFunction) {};
+        FuncDecStatementNode(SourceLoc loc, std::string name, FuncExprPtr expr, std::optional<BlockStmtPtr> block = std::nullopt, bool isPrivate = false, bool isFunction = false, bool isExtern = false)
+            : loc(loc), name(std::move(name)), expr(std::move(expr)), block(std::move(block)), isPrivate(isPrivate), isFunction(isFunction), isExtern(isExtern) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return expr; }
     };
 
-    struct ExternFuncDecStatementNode {
+    /*struct ExternFuncDecStatementNode {
         SourceLoc loc{0, 0};
         std::string name;
         FuncExprPtr expr;
@@ -579,7 +580,7 @@ namespace Slangc {
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return expr->type; }
-    };
+    };*/
 
     struct ElseIfStatementNode {
         SourceLoc loc{0, 0};
@@ -714,9 +715,9 @@ namespace Slangc {
         return compareFuncSignatures(func1->expr, func2->expr, checkReturnTypes);
     }
 
-    static bool compareFuncSignatures(const ExternFuncDecStmtPtr &func1, const ExternFuncDecStmtPtr &func2, bool checkReturnTypes) {
+    /*static bool compareFuncSignatures(const ExternFuncDecStmtPtr &func1, const ExternFuncDecStmtPtr &func2, bool checkReturnTypes) {
         return compareFuncSignatures(func1->expr, func2->expr, checkReturnTypes);
-    }
+    }*/
 
     static bool compareFuncSignatures(const MethodDecPtr &func1, const MethodDecPtr &func2, bool checkReturnTypes) {
         return compareFuncSignatures(func1->expr, func2->expr, checkReturnTypes);
@@ -783,6 +784,18 @@ namespace Slangc {
 
     static std::string typeToString(TypeExprNode &type, ParameterType parameterType = ParameterType::None) {
         return parameterTypeToString(parameterType) + type.type;
+    }
+
+    static bool isParentType(const std::string &parentTypeName, const std::string &childTypeName, const Context &analysis) {
+        if (parentTypeName == childTypeName) return true;
+        if (auto parentType = analysis.symbolTable.lookupType(parentTypeName)) {
+            if (auto childType = analysis.symbolTable.lookupType(childTypeName)) {
+                if (childType.value()->parentTypeName.has_value()) {
+                    return isParentType(parentTypeName, childType.value()->parentTypeName.value(), analysis);
+                }
+            }
+        }
+        return false;
     }
 }
 

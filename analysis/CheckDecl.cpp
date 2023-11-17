@@ -11,9 +11,9 @@ namespace Slangc::Check {
         return checkStmt(decl, context, errors);
     }
 
-    bool checkDecl(const ExternFuncDecStmtPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
+    /*bool checkDecl(const ExternFuncDecStmtPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
         return checkStmt(decl, context, errors);
-    }
+    }*/
 
     bool checkDecl(const FieldArrayVarDecPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
@@ -62,7 +62,7 @@ namespace Slangc::Check {
             }
         }
         if (result) {
-            auto foundFunc = context.lookupFunc(decl->name, decl->expr);
+            auto foundFunc = context.lookupFuncInScope(decl->name, decl->expr, false);
             if (foundFunc) {
                 auto func = std::get<FuncDecStatementPtr>(*foundFunc);
                 auto errorMsg = std::string("Function '") + decl->name + "' with the same signature already exists.";
@@ -112,7 +112,7 @@ namespace Slangc::Check {
             }
         }
         if (result) {
-            auto foundFunc = context.lookupFunc(decl->name, decl->expr);
+            auto foundFunc = context.symbolTable.lookupFunc(decl->name, decl->expr);
             if (foundFunc) {
                 auto func = std::get<FuncDecStatementPtr>(*foundFunc);
                 auto errorMsg = std::string("Function '") + decl->name + "' with the same signature already exists.";
@@ -129,9 +129,16 @@ namespace Slangc::Check {
             }
             result &= checkBlockStmt(decl->block.value(), context, errors);
             for (auto &type : context.currFuncReturnTypes) {
-                if (!compareTypes(type.first, decl->expr->type)) {
-                    errors.emplace_back("Function '" + decl->name + "' returns incorrect type.", type.second, false, false);
-                    result = false;
+                auto retTypeStr = typeToString(type.first);
+                auto declTypeStr = typeToString(decl->expr->type);
+                if (retTypeStr != declTypeStr) {
+                    if (!Context::isCastable(retTypeStr, declTypeStr, context)) {
+                        errors.emplace_back("Function '" + decl->name + "' returns incorrect type '" + retTypeStr + "' instead of '" + declTypeStr + "'.", type.second, false, false);
+                        result = false;
+                    }
+                    else {
+                        errors.emplace_back("Implicit conversion from '" + retTypeStr + "' to '" + declTypeStr + "'.", decl->loc, true, false);
+                    }
                 }
             }
             context.currFuncReturnTypes.clear();
@@ -147,12 +154,19 @@ namespace Slangc::Check {
             result = false;
         }
         if (decl->parentTypeName.has_value()) {
-            if (!context.lookupType(decl->parentTypeName.value())) {
-                errors.emplace_back("Parent type with name '" + decl->parentTypeName.value() + "' does not exist.", decl->loc, false, false);
-                result = false;
+            if (!context.symbolTable.lookupType(decl->parentTypeName.value())) {
+                if (!context.symbolTable.lookupType(context.moduleName + "." + decl->parentTypeName.value())) {
+                    errors.emplace_back("Parent type with name '" + decl->parentTypeName.value() + "' does not exist.", decl->loc, false, false);
+                    result = false;
+                } else {
+                    // update type name
+                    decl->parentTypeName = context.moduleName + "." + decl->parentTypeName.value();
+                }
             }
         }
+
         context.insert(decl->name, decl);
+        context.currType = decl->name;
         context.enterScope();
         for (const auto &field: decl->fields) {
             result &= checkDecl(field, context, errors);
@@ -161,6 +175,7 @@ namespace Slangc::Check {
             result &= checkDecl(method, context, errors);
         }
         context.exitScope();
+        context.currType = "";
         return result;
     }
 

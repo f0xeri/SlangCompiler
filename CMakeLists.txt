@@ -40,7 +40,8 @@ add_executable(SlangcRefactored main.cpp common.hpp source/SourceBuffer.cpp sour
         analysis/Check.hpp
         analysis/CheckStmt.cpp
         analysis/CheckExpr.cpp
-        analysis/CheckDecl.cpp)
+        analysis/CheckDecl.cpp
+        analysis/SymbolTable.hpp)
 target_link_libraries(SlangcRefactored PRIVATE ${llvm_libs})
 
 #DEBUG

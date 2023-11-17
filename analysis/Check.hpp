@@ -8,6 +8,7 @@
 
 #include "parser/AST.hpp"
 #include "Context.hpp"
+#include <ranges>
 
 namespace Slangc::Check {
     bool checkAST(const ModuleDeclPtr& moduleAST, Context &context, std::vector<ErrorMessage> &errors);

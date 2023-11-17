@@ -133,9 +133,9 @@ namespace Slangc {
         return {};
     }
 
-    auto ExternFuncDecStatementNode::codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value> {
+    /*auto ExternFuncDecStatementNode::codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value> {
         return {};
-    }
+    }*/
 
     auto ElseIfStatementNode::codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value> {
         return {};

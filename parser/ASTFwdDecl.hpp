@@ -61,7 +61,7 @@ namespace Slangc {
     using VarExprPtrVariant = std::variant<VarExprPtr, IndexesExprPtr, IndexExprPtr>;
 
     struct ArrayDecStatementNode;
-    struct ExternFuncDecStatementNode;
+    //struct ExternFuncDecStatementNode;
     struct FieldArrayVarDecNode;
     struct FieldVarDecNode;
     struct FieldFuncPointerStatementNode;
@@ -74,7 +74,7 @@ namespace Slangc {
     struct ModuleDeclNode;
 
     using ArrayDecStatementPtr = std::shared_ptr<ArrayDecStatementNode>;
-    using ExternFuncDecStmtPtr = std::shared_ptr<ExternFuncDecStatementNode>;
+    //using ExternFuncDecStmtPtr = std::shared_ptr<ExternFuncDecStatementNode>;
     using FieldArrayVarDecPtr = std::shared_ptr<FieldArrayVarDecNode>;
     using FieldVarDecPtr = std::shared_ptr<FieldVarDecNode>;
     using FieldFuncPointerStmtPtr = std::shared_ptr<FieldFuncPointerStatementNode>;
@@ -87,7 +87,7 @@ namespace Slangc {
     using ModuleDeclPtr = std::shared_ptr<ModuleDeclNode>;
 
     using DeclPtrVariant
-            = std::variant<ArrayDecStatementPtr, ExternFuncDecStmtPtr, FieldArrayVarDecPtr, FieldVarDecPtr, FieldFuncPointerStmtPtr,
+            = std::variant<ArrayDecStatementPtr, /*ExternFuncDecStmtPtr,*/ FieldArrayVarDecPtr, FieldVarDecPtr, FieldFuncPointerStmtPtr,
             FuncDecStatementPtr, FuncParamDecStmtPtr, FuncPointerStmtPtr, MethodDecPtr,
             TypeDecStmtPtr, VarDecStmtPtr, ModuleDeclPtr>;
 
@@ -112,19 +112,22 @@ namespace Slangc {
     using BlockStmtPtr = std::shared_ptr<BlockStmtNode>;
 
     using StmtPtrVariant
-            = std::variant<AssignExprPtr, CallExprPtr, ArrayDecStatementPtr, ExternFuncDecStmtPtr,
+            = std::variant<AssignExprPtr, CallExprPtr, ArrayDecStatementPtr, /*ExternFuncDecStmtPtr,*/
             FieldArrayVarDecPtr, FieldVarDecPtr, FuncDecStatementPtr, FuncParamDecStmtPtr, FuncPointerStmtPtr,
             MethodDecPtr, TypeDecStmtPtr, VarDecStmtPtr, DeleteStmtPtr, ElseIfStatementPtr, IfStatementPtr,
             InputStatementPtr, OutputStatementPtr, ReturnStatementPtr, VarExprPtr,
             IndexesExprPtr, IndexExprPtr, WhileStatementPtr, BlockStmtPtr>;
 
+    class Context;
+
     bool compareTypes(const ExprPtrVariant &type1, const ExprPtrVariant &type2);
     bool compareFuncSignatures(const FuncExprPtr &func1, const FuncExprPtr &func2, bool checkReturnTypes = true);
     bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncDecStatementPtr &func2, bool checkReturnTypes = true);
-    bool compareFuncSignatures(const ExternFuncDecStmtPtr &func1, const ExternFuncDecStmtPtr &func2, bool checkReturnTypes = true);
+    //bool compareFuncSignatures(const ExternFuncDecStmtPtr &func1, const ExternFuncDecStmtPtr &func2, bool checkReturnTypes = true);
     bool compareFuncSignatures(const MethodDecPtr &func1, const MethodDecPtr &func2, bool checkReturnTypes = true);
     bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncExprPtr &func2, bool checkReturnTypes = true);
     std::string typeToString(ExprPtrVariant type, ParameterType parameterType = ParameterType::None);
+    bool isParentType(const std::string &parentTypeName, const std::string &childTypeName, const Context &analysis);
 }
 
 #endif //SLANGCREFACTORED_ASTFWDDECL_HPP

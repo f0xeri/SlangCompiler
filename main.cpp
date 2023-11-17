@@ -13,7 +13,7 @@ int main(int argc, char **argv) {
     Slangc::CompilerOptions options(argc, argv);
     std::vector<Slangc::ErrorMessage> errors;
 
-    auto buffer = Slangc::SourceBuffer::CreateFromFile("working_examples/funcOverloading.sl");
+    auto buffer = Slangc::SourceBuffer::CreateFromFile("working_examples/classes.sl");
     if (!buffer) {
         std::cout << toString(buffer.takeError()) << std::endl;
     }

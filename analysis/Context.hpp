@@ -42,6 +42,10 @@ namespace Slangc {
             currScope->remove(declName);
         }
 
+        auto clearCurrentScope() -> void {
+            currScope->clear();
+        }
+
         auto lookup(std::string_view name) const -> const DeclPtrVariant* {
             return currScope->lookup(name);
         }

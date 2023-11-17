@@ -28,6 +28,10 @@ namespace Slangc {
             symbols.erase(std::ranges::find(symbols, declName, &std::pair<std::string, DeclPtrVariant>::first));
         }
 
+        void clear() {
+            symbols.clear();
+        }
+
         bool contains(std::string_view name) {
             return std::ranges::find(symbols, name, &std::pair<std::string, DeclPtrVariant>::first) != symbols.end();
         }

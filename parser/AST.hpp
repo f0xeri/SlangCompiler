@@ -12,6 +12,7 @@
 #include <vector>
 #include <optional>
 #include <iostream>
+#include <ranges>
 #include "llvm/IR/Value.h"
 #include "lexer/TokenType.hpp"
 #include "codegen/CodeGenContext.hpp"
@@ -366,7 +367,7 @@ namespace Slangc {
                   block(std::move(block)), isPrivate(isPrivate), isFunction(isFunction) {};
 
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return expr->type; }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return expr; }
     };
 
     struct AccessExprNode {
@@ -796,6 +797,81 @@ namespace Slangc {
             }
         }
         return false;
+    }
+
+    // if there is no func with equal signature, choose the best available overload using implicit casts
+    static auto selectBestOverload(const std::string &name, const FuncExprPtr &func, bool useParamType, bool checkReturnType, Context &analysis) -> std::optional<DeclPtrVariant> {
+        std::optional<DeclPtrVariant> bestOverload = std::nullopt;
+        auto bestOverloadScore = 0;
+
+        for (auto &&f : analysis.symbolTable.symbols | std::views::filter([](const auto &s) { return std::holds_alternative<FuncDecStatementPtr>(s.second); })) {
+            auto funcDec = std::get<FuncDecStatementPtr>(f.second);
+            if (funcDec->name == name) {
+                if (compareFuncSignatures(funcDec, func, checkReturnType)) {
+                    return funcDec;
+                }
+                if (funcDec->expr->params.size() == func->params.size()) {
+                    auto score = 0;
+                    for (int i = 0; i < funcDec->expr->params.size(); i++) {
+                        auto type1 = typeToString(funcDec->expr->params[i]->type, useParamType ? funcDec->expr->params[i]->parameterType : ParameterType::None);
+                        auto type2 = typeToString(func->params[i]->type, useParamType ? func->params[i]->parameterType : ParameterType::None);
+                        if (type1 == type2) {
+                            score += 2;
+                        }
+                        else {
+                            if (Context::isCastable(type1, type2, analysis)) {
+                                score += 1;
+                            }
+                            else {
+                                score = 0;
+                                break;
+                            }
+                        }
+                    }
+                    if (score > bestOverloadScore) {
+                        bestOverloadScore = score;
+                        bestOverload = funcDec;
+                    }
+                }
+            }
+        }
+        return bestOverload;
+    }
+
+    static auto selectBestOverload(const TypeDecStmtPtr &typeDecl, const std::string &methodName, const FuncExprPtr &func, bool useParamType, bool checkReturnType, Context &analysis) -> std::optional<DeclPtrVariant> {
+        std::optional<DeclPtrVariant> bestOverload = std::nullopt;
+        auto bestOverloadScore = 0;
+        for (const auto &method: typeDecl->methods) {
+            if (method->name == methodName) {
+                if (compareFuncSignatures(method->expr, func, checkReturnType)) {
+                    return method;
+                }
+                if (method->expr->params.size() == func->params.size()) {
+                    auto score = 0;
+                    for (int i = 0; i < method->expr->params.size(); i++) {
+                        auto type1 = typeToString(method->expr->params[i]->type, useParamType ? method->expr->params[i]->parameterType : ParameterType::None);
+                        auto type2 = typeToString(func->params[i]->type, useParamType ? func->params[i]->parameterType : ParameterType::None);
+                        if (type1 == type2) {
+                            score += 2;
+                        }
+                        else {
+                            if (Context::isCastable(type1, type2, analysis)) {
+                                score += 1;
+                            }
+                            else {
+                                score = 0;
+                                break;
+                            }
+                        }
+                    }
+                    if (score > bestOverloadScore) {
+                        bestOverloadScore = score;
+                        bestOverload = method;
+                    }
+                }
+            }
+        }
+        return bestOverload;
     }
 }
 

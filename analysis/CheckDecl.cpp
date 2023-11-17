@@ -127,9 +127,14 @@ namespace Slangc::Check {
                 result &= checkBlockStmt(decl->block.value(), context, errors);
                 for (auto &type : context.currFuncReturnTypes) {
                     if (!compareTypes(type.first, decl->expr->type)) {
-                        errors.emplace_back("Function '" + decl->name + "' returns incorrect type '" + typeToString(type.first) + "' instead of '" +
-                                            typeToString(decl->expr->type) + "'.", type.second, false, false);
-                        result = false;
+                        if (!Context::isCastable(typeToString(type.first), typeToString(decl->expr->type), context)) {
+                            errors.emplace_back("Function '" + decl->name + "' returns incorrect type '" + typeToString(type.first) + "' instead of '" +
+                                                typeToString(decl->expr->type) + "'.", type.second, false, false);
+                            result = false;
+                        }
+                        else {
+                            errors.emplace_back("Implicit conversion from '" + typeToString(type.first) + "' to '" + typeToString(decl->expr->type) + "'.", decl->loc, true, false);
+                        }
                     }
                 }
                 context.currFuncReturnTypes.clear();
@@ -225,6 +230,24 @@ namespace Slangc::Check {
         context.enterScope();
         for (const auto &field: decl->fields) {
             result &= checkDecl(field, context, errors);
+        }
+        // we don't need field names in scope after checking them
+        context.clearCurrentScope();
+        // check return type of method to make sure it has mangled name
+        // we should do it before fully checking methods
+        // TODO: probably we can find better solution without two passes
+        // example:
+        //    module sample
+        //        public method getA(A a)(): A      // checked, method returns "sample.A" type
+        //            return a.getAp();             // error, returns "A" type, not "sample.A"
+        //        end getA;
+        //
+        //        private method getAp(A a)(): A    // not checked yet, method returns "A" type
+        //            return a;
+        //        end getAp;
+        // check of return type fixes this possible problem
+        for (const auto &method: decl->methods) {
+            checkExpr(method->expr->type, context, errors);
         }
         for (const auto &method: decl->methods) {
             result &= checkDecl(method, context, errors);

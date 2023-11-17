@@ -167,41 +167,16 @@ namespace Slangc::Check {
             auto accessType = getExprType(access->get()->expr, context, errors);
             if (std::holds_alternative<TypeExprPtr>(accessType.value())) {
                 auto typeDecl = context.symbolTable.lookupType(std::get<TypeExprPtr>(accessType.value())->type);
-                funcExpr->params.insert(funcExpr->params.begin(), create<FuncParamDecStatementNode>(zeroLoc, "", ParameterType::Out, std::get<TypeExprPtr>(accessType.value())));
-                for (const auto &method: typeDecl.value()->methods) {
-                    if (method->name == typeDecl.value()->name + "." + access->get()->name) {
-                        overloaded = true;
-                        // check return type of method to make sure it has fixed name
-                        // example:
-                        //    module sample
-                        //        public method getA(A a)(): A      // checked, method returns "sample.A" type
-                        //            return a.getAp();             // error, returns "A" type, not "sample.A"
-                        //        end getA;
-                        //
-                        //        private method getAp(A a)(): A    // not checked yet, method returns "A" type
-                        //            return a;
-                        //        end getAp;
-                        // check of return type fixes this possible problem
-                        checkExpr(method->expr->type, context, errors);
-                        if (compareFuncSignatures(method->expr, funcExpr, false)) {
-                            func = method;
-                            break;
-                        }
-                    }
+                if (typeDecl) {
+                    funcExpr->params.insert(funcExpr->params.begin(), create<FuncParamDecStatementNode>(zeroLoc, "", ParameterType::Out, std::get<TypeExprPtr>(accessType.value())));
+                    func = selectBestOverload(typeDecl.value(), typeDecl.value()->name + "." + access->get()->name, funcExpr, false, false, context);
+                    overloaded = true;
                 }
             }
         }
         else if (auto var = std::get_if<VarExprPtr>(&expr->name)) {
-            for (auto &&f : context.symbolTable.symbols | std::views::filter([](const auto &s) { return std::holds_alternative<FuncDecStatementPtr>(s.second); })) {
-                auto funcDec = std::get<FuncDecStatementPtr>(f.second);
-                if (funcDec->name == var->get()->name) {
-                    overloaded = true;
-                    if (compareFuncSignatures(funcDec->expr, funcExpr, false)) {
-                        func = funcDec;
-                        break;
-                    }
-                }
-            }
+            func = selectBestOverload(var->get()->name, funcExpr, false, false, context);
+            overloaded = true;
             if (!func) {
                 auto funcPointer = context.lookup(var->get()->name);
                 if (!funcPointer) {

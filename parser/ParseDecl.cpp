@@ -31,6 +31,14 @@ namespace Slangc {
                     return std::nullopt;
                 }
             }
+            else if (token->type == TokenType::Variable) {
+                auto varDecl = parseVarDecl();
+                if (!varDecl.has_value()) {
+                    errors.emplace_back("Failed to parse variable declaration.", token->location, false, false);
+                    hasError = true;
+                    return std::nullopt;
+                }
+            }
             advance();
         }
         auto block = parseBlockStmt(moduleName);
@@ -47,6 +55,54 @@ namespace Slangc {
             return std::nullopt;
         }
         return moduleDecl;
+    }
+
+    auto Parser::parseVarDecl() -> std::optional<DeclPtrVariant> {
+        token--;
+        SourceLoc loc = token->location;
+        bool isPrivate = false;
+        bool isExtern = false;
+        bool isGlobal = true;
+
+        if (token->value == "private") isPrivate = true;
+        advance();
+        std::optional<DeclPtrVariant> result = std::nullopt;
+        consume(TokenType::Variable);
+        consume(TokenType::Minus);
+        auto type = parseType();
+        if (!type.has_value()) {
+            errors.emplace_back("Expected typeExpr.", token->location, false, false);
+            hasError = true;
+            return std::nullopt;
+        }
+        auto name = consume(TokenType::Identifier).value;
+        std::optional<ExprPtrVariant> value;
+        if (match(TokenType::Assign)) {
+            value = parseExpr();
+        }
+        expect(TokenType::Semicolon);
+
+        if (std::holds_alternative<ArrayExprPtr>(type.value())) {
+            auto arrExpr = std::get<ArrayExprPtr>(type.value());
+            auto indicesCount = arrExpr->getIndicesCount();
+            if (!hasError) {
+                result = createDecl<ArrayDecStatementNode>(loc, name, std::move(arrExpr), std::move(value), indicesCount, isGlobal, isPrivate, isExtern);
+            }
+        }
+        else if (std::holds_alternative<FuncExprPtr>(type.value())) {
+            auto funcExpr = std::get<FuncExprPtr>(type.value());
+            if (!hasError) {
+                result = createDecl<FuncPointerStatementNode>(loc, name, funcExpr, std::move(value), funcExpr->isFunction, isGlobal, isPrivate, isExtern);
+            }
+        }
+        else if (std::holds_alternative<TypeExprPtr>(type.value())) {
+            auto typeExpr = std::get<TypeExprPtr>(type.value());
+            if (!hasError) {
+                result = createDecl<VarDecStatementNode>(loc, name, typeExpr->type, std::move(value), isGlobal, isPrivate, isExtern);
+            }
+        }
+        if (result.has_value()) context.symbolTable.insert(name, result.value());
+        return result;
     }
 
     auto Parser::parseFuncParams(bool named) -> std::optional<std::vector<FuncParamDecStmtPtr>> {

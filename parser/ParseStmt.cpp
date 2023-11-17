@@ -98,21 +98,18 @@ namespace Slangc {
             auto indicesCount = arrExpr->getIndicesCount();
             if (!hasError) {
                 result = createStmt<ArrayDecStatementNode>(loc, name, std::move(arrExpr), std::move(value), indicesCount);
-                //context.insert(name, std::get<ArrayDecStatementPtr>(result.assignExpr()));
             }
         }
         else if (std::holds_alternative<FuncExprPtr>(type.value())) {
             auto funcExpr = std::get<FuncExprPtr>(type.value());
             if (!hasError) {
                 result = createStmt<FuncPointerStatementNode>(loc, name, funcExpr, std::move(value), funcExpr->isFunction);
-                //context.insert(name, std::get<FuncPointerStmtPtr>(result.assignExpr()));
             }
         }
         else if (std::holds_alternative<TypeExprPtr>(type.value())) {
             auto typeExpr = std::get<TypeExprPtr>(type.value());
             if (!hasError) {
                 result = createStmt<VarDecStatementNode>(loc, name, typeExpr->type, std::move(value));
-                //context.insert(name, std::get<VarDecStmtPtr>(result.assignExpr()));
             }
         }
         return result;

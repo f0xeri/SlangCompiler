@@ -17,19 +17,65 @@ namespace Slangc::Check {
 
     bool checkDecl(const FieldArrayVarDecPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
+        if (!checkExpr(decl->expr, context, errors)) result = false;
+        auto type = context.symbolTable.lookupType(decl->typeName.type);
+        for (int i = 0; i < decl->index; ++i) {
+            if (getDeclarationName(type.value()->fields[i]) == decl->name) {
+                errors.emplace_back("Field with name '" + decl->name + "' already exists.", decl->loc, false, false);
+                result = false;
+            }
+        }
+        context.insert(decl->name, decl);
         return result;
     }
 
     bool checkDecl(const FieldVarDecPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
+        if (!context.symbolTable.lookupType(decl->typeExpr.type) && !Context::isBuiltInType(decl->typeExpr.type)) {
+            if (!context.symbolTable.lookupType(context.moduleName + "." + decl->typeExpr.type)) {
+                errors.emplace_back("Type '" + decl->typeExpr.type + "' does not exist.", decl->loc, false, false);
+                result = false;
+            } else {
+                // update type name
+                decl->typeExpr.type = context.moduleName + "." + decl->typeExpr.type;
+            }
+        }
+        auto type = context.symbolTable.lookupType(decl->typeName.type);
+        // check if field with the same name already exists
+        // check only previous field names [0; currentFieldIndex)
+        for (int i = 0; i < decl->index; ++i) {
+            if (getDeclarationName(type.value()->fields[i]) == decl->name) {
+                errors.emplace_back("Field with name '" + decl->name + "' already exists.", decl->loc, false, false);
+                result = false;
+            }
+        }
+        context.insert(decl->name, decl);
+        if (decl->expr.has_value() && result) {
+            if (!checkExpr(decl->expr.value(), context, errors)) {
+                return false;
+            }
+            auto exprType = std::get<TypeExprPtr>(getExprType(decl->expr.value(), context, errors).value())->type;
+            if (exprType != decl->typeExpr.type) {
+                if (!Context::isCastable(exprType, decl->typeExpr.type, context)) {
+                    errors.emplace_back("Type mismatch: cannot assign '" + exprType + "' to '" + decl->typeExpr.type + "'.", decl->loc, false, false);
+                    result = false;
+                }
+                else {
+                    errors.emplace_back("Implicit conversion from '" + exprType + "' to '" + decl->typeExpr.type + "'.", decl->loc, true, false);
+                }
+            }
+        }
         return result;
     }
 
     bool checkDecl(const FieldFuncPointerStmtPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
-        /*if (context.lookup(decl->name)) {
-            errors.emplace_back("Variable with name '" + decl->name + "' already exists.", decl->loc, false, false);
-            result = false;
+        auto type = context.symbolTable.lookupType(decl->typeName.type);
+        for (int i = 0; i < decl->index; ++i) {
+            if (getDeclarationName(type.value()->fields[i]) == decl->name) {
+                errors.emplace_back("Field with name '" + decl->name + "' already exists.", decl->loc, false, false);
+                result = false;
+            }
         }
         result &= checkExpr(decl->expr, context, errors);
         context.insert(decl->name, decl);
@@ -37,19 +83,19 @@ namespace Slangc::Check {
             result &= checkExpr(decl->assignExpr.value(), context, errors);
             if (result) {
                 auto leftType = decl->expr;
-                auto rightType = getExprType(decl->assignExpr.value(), context);
+                auto rightType = getExprType(decl->assignExpr.value(), context, errors).value();
                 // searching for overloaded function
                 if (auto varExpr = std::get_if<VarExprPtr>(&decl->assignExpr.value())) {
-                    if (auto func = context.lookupFunc(varExpr->get()->name, decl->expr)) {
+                    if (auto func = context.symbolTable.lookupFunc(varExpr->get()->name, decl->expr)) {
                         rightType = std::get<FuncDecStatementPtr>(*func)->expr;
                     }
                 }
                 if (!compareFuncSignatures(leftType, std::get<FuncExprPtr>(rightType))) {
-                    errors.emplace_back("Type mismatch: cannot assign: function signatures do not match.", decl->loc, false, false);
+                    errors.emplace_back("Type mismatch: no matching function found, cannot assign '" + typeToString(rightType) + "' to '" + typeToString(leftType) + "'.", decl->loc, false, false);
                     result = false;
                 }
             }
-        }*/
+        }
         return result;
     }
 
@@ -77,15 +123,17 @@ namespace Slangc::Check {
             for (const auto &param: decl->expr->params) {
                 context.insert(param->name, param);
             }
-            result &= checkBlockStmt(decl->block.value(), context, errors);
-            for (auto &type : context.currFuncReturnTypes) {
-                if (!compareTypes(type.first, decl->expr->type)) {
-                    errors.emplace_back("Function '" + decl->name + "' returns incorrect type '" + typeToString(type.first) + "' instead of '" +
-                                                typeToString(decl->expr->type) + "'.", type.second, false, false);
-                    result = false;
+            if (decl->block.has_value()) {
+                result &= checkBlockStmt(decl->block.value(), context, errors);
+                for (auto &type : context.currFuncReturnTypes) {
+                    if (!compareTypes(type.first, decl->expr->type)) {
+                        errors.emplace_back("Function '" + decl->name + "' returns incorrect type '" + typeToString(type.first) + "' instead of '" +
+                                            typeToString(decl->expr->type) + "'.", type.second, false, false);
+                        result = false;
+                    }
                 }
+                context.currFuncReturnTypes.clear();
             }
-            context.currFuncReturnTypes.clear();
             context.exitScope();
         }
 
@@ -99,8 +147,7 @@ namespace Slangc::Check {
     }
 
     bool checkDecl(const FuncPointerStmtPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
-        bool result = true;
-        return result;
+        return checkStmt(decl, context, errors);
     }
 
     bool checkDecl(const MethodDecPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
@@ -109,6 +156,14 @@ namespace Slangc::Check {
         if (result) {
             for (const auto &param: decl->expr->params) {
                 result &= checkDecl(param, context, errors);
+            }
+        }
+        auto thisType = context.symbolTable.lookupType(context.currType);
+        for (const auto& field : thisType.value()->fields) {
+            auto str = context.currType + "." + std::string(getDeclarationName(field));
+            if (str == decl->name) {
+                errors.emplace_back("Type '" + context.currType + "' already contains definition for '" + decl->name + "'.", decl->loc, false, false);
+                result = false;
             }
         }
         if (result) {
@@ -180,8 +235,7 @@ namespace Slangc::Check {
     }
 
     bool checkDecl(const VarDecStmtPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
-        bool result = true;
-        return result;
+        return checkStmt(decl, context, errors);
     }
 
     bool checkDecl(const ModuleDeclPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {

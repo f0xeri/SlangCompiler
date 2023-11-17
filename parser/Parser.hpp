@@ -73,6 +73,7 @@ namespace Slangc {
         auto parseFieldDecl(const std::string& typeName, uint32_t fieldId) -> std::optional<DeclPtrVariant>;
         auto parseMethodDecl(const std::string& typeName) -> std::optional<DeclPtrVariant>;
         auto parseClassDecl() -> std::optional<DeclPtrVariant>;
+        auto parseVarDecl() -> std::optional<DeclPtrVariant>;
 
     private:
         std::vector<Token> tokens;

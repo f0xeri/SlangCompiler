@@ -1,4 +1,7 @@
 module sample
+    private extern function system(in array[] character x): integer
+    end system;
+
     private function getFloat(): float
         return 3.14f;
     end getFloat;
@@ -6,7 +9,7 @@ module sample
     private function getFloat2(): float
         return getFloat();
     end getFloat2;
-
+    public variable-integer globalInt := 10;
     private class A inherits Object
         public field-array[11] character str := "test";
         public field-array[2] array[3] array[4] integer arr3d;
@@ -32,7 +35,6 @@ module sample
             return a;
         end getAp;
     end A;
-
 
     private function getA(): A
         variable-A a;
@@ -86,7 +88,7 @@ module sample
         end getA;
     end Dog;
 
-    private class Shepherd inherits Object
+    private class Shepherd inherits Dog
         public method getA(Shepherd a)()
             variable-Animal a2;
             output a2.i;
@@ -95,9 +97,10 @@ module sample
     end Shepherd;
 
 start
+    output globalInt;
     // test line comment
     variable-A a;
-    variable-float ai2 := getA().getA().getA().getFloat();
+    variable-integer ai2 := getA().getA().getA().arr3d[1][2][3];
     variable-integer i := 1;
     variable-procedure(in integer, in integer) procPointer := testProc;
     variable-procedure(in integer) procPointer2 := testProc;

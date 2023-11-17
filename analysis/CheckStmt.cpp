@@ -36,7 +36,6 @@ namespace Slangc::Check {
                 return false;
             }
             auto exprType = std::get<TypeExprPtr>(getExprType(stmt->expr.value(), context, errors).value())->type;
-            // TODO: check if conversion is possible
             if (exprType != stmt->typeExpr.type) {
                 if (!Context::isCastable(exprType, stmt->typeExpr.type, context)) {
                     errors.emplace_back("Type mismatch: cannot assign '" + exprType + "' to '" + stmt->typeExpr.type + "'.", stmt->loc, false, false);

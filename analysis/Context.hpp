@@ -14,18 +14,16 @@
 #include "common.hpp"
 
 namespace Slangc {
+    extern std::vector<std::string> imports;
     class Context {
         std::shared_ptr<Scope> currScope = std::make_unique<Scope>();
     public:
-        /*std::map<std::string, TypeDecStmtPtr> types;
-        std::map<std::string, VarDecStmtPtr> global_vars;
-        std::vector<FuncDecStatementPtr> funcs;
-        std::map<std::string, ExternFuncDecStmtPtr> extern_funcs;*/
         SymbolTable symbolTable;
 
         std::vector<std::pair<ExprPtrVariant, SourceLoc>> currFuncReturnTypes;
         std::string currType;
         std::string moduleName;
+        std::string filename;
         auto enterScope() -> void {
             currScope = std::make_unique<Scope>(std::move(currScope));
         }
@@ -50,8 +48,8 @@ namespace Slangc {
             return currScope->lookup(name);
         }
 
-        auto lookupFuncInScope(std::string_view name, FuncExprPtr& expr, bool checkReturnTypes) const -> const DeclPtrVariant* {
-            return currScope->lookupFunc(name, expr, checkReturnTypes);
+        auto lookupFuncInScope(std::string_view name, FuncExprPtr& expr, const Context& context, bool checkReturnTypes) const -> const DeclPtrVariant* {
+            return currScope->lookupFunc(name, expr, context, checkReturnTypes);
         }
 
         /*auto lookupType(const std::string& name) const -> std::optional<TypeDecStmtPtr> {
@@ -68,7 +66,9 @@ namespace Slangc {
             return name == "integer" || name == "float" || name == "real" || name == "boolean" || name == "string" || name == "character" || name == "void";
         }
 
-        static bool isCastable(const std::string& from, const std::string& to, Context& context) {
+        static bool isCastable(const std::string& from, const std::string& to, const Context& context) {
+            if (from == "nil" || to == "nil")
+                return true;
             if (!isBuiltInType(from) || !isBuiltInType(to)) {
                 if (isParentType(to, from, context) ||
                     isParentType(from, to, context)) {

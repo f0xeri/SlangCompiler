@@ -21,7 +21,7 @@ namespace Slangc::Check {
         auto type = context.symbolTable.lookupType(decl->typeName.type);
         for (int i = 0; i < decl->index; ++i) {
             if (getDeclarationName(type.value()->fields[i]) == decl->name) {
-                errors.emplace_back("Field with name '" + decl->name + "' already exists.", decl->loc, false, false);
+                errors.emplace_back(context.filename, "Field with name '" + decl->name + "' already exists.", decl->loc, false, false);
                 result = false;
             }
         }
@@ -33,7 +33,7 @@ namespace Slangc::Check {
         bool result = true;
         if (!context.symbolTable.lookupType(decl->typeExpr.type) && !Context::isBuiltInType(decl->typeExpr.type)) {
             if (!context.symbolTable.lookupType(context.moduleName + "." + decl->typeExpr.type)) {
-                errors.emplace_back("Type '" + decl->typeExpr.type + "' does not exist.", decl->loc, false, false);
+                errors.emplace_back(context.filename, "Type '" + decl->typeExpr.type + "' does not exist.", decl->loc, false, false);
                 result = false;
             } else {
                 // update type name
@@ -45,7 +45,7 @@ namespace Slangc::Check {
         // check only previous field names [0; currentFieldIndex)
         for (int i = 0; i < decl->index; ++i) {
             if (getDeclarationName(type.value()->fields[i]) == decl->name) {
-                errors.emplace_back("Field with name '" + decl->name + "' already exists.", decl->loc, false, false);
+                errors.emplace_back(context.filename, "Field with name '" + decl->name + "' already exists.", decl->loc, false, false);
                 result = false;
             }
         }
@@ -57,11 +57,11 @@ namespace Slangc::Check {
             auto exprType = std::get<TypeExprPtr>(getExprType(decl->expr.value(), context, errors).value())->type;
             if (exprType != decl->typeExpr.type) {
                 if (!Context::isCastable(exprType, decl->typeExpr.type, context)) {
-                    errors.emplace_back("Type mismatch: cannot assign '" + exprType + "' to '" + decl->typeExpr.type + "'.", decl->loc, false, false);
+                    errors.emplace_back(context.filename, "Type mismatch: cannot assign '" + exprType + "' to '" + decl->typeExpr.type + "'.", decl->loc, false, false);
                     result = false;
                 }
                 else {
-                    errors.emplace_back("Implicit conversion from '" + exprType + "' to '" + decl->typeExpr.type + "'.", decl->loc, true, false);
+                    errors.emplace_back(context.filename, "Implicit conversion from '" + exprType + "' to '" + decl->typeExpr.type + "'.", decl->loc, true, false);
                 }
             }
         }
@@ -73,7 +73,7 @@ namespace Slangc::Check {
         auto type = context.symbolTable.lookupType(decl->typeName.type);
         for (int i = 0; i < decl->index; ++i) {
             if (getDeclarationName(type.value()->fields[i]) == decl->name) {
-                errors.emplace_back("Field with name '" + decl->name + "' already exists.", decl->loc, false, false);
+                errors.emplace_back(context.filename, "Field with name '" + decl->name + "' already exists.", decl->loc, false, false);
                 result = false;
             }
         }
@@ -86,12 +86,12 @@ namespace Slangc::Check {
                 auto rightType = getExprType(decl->assignExpr.value(), context, errors).value();
                 // searching for overloaded function
                 if (auto varExpr = std::get_if<VarExprPtr>(&decl->assignExpr.value())) {
-                    if (auto func = context.symbolTable.lookupFunc(varExpr->get()->name, decl->expr)) {
+                    if (auto func = context.symbolTable.lookupFunc(varExpr->get()->name, decl->expr, context)) {
                         rightType = std::get<FuncDecStatementPtr>(*func)->expr;
                     }
                 }
-                if (!compareFuncSignatures(leftType, std::get<FuncExprPtr>(rightType))) {
-                    errors.emplace_back("Type mismatch: no matching function found, cannot assign '" + typeToString(rightType) + "' to '" + typeToString(leftType) + "'.", decl->loc, false, false);
+                if (!compareFuncSignatures(leftType, std::get<FuncExprPtr>(rightType), context)) {
+                    errors.emplace_back(context.filename, "Type mismatch: no matching function found, cannot assign '" + typeToString(rightType) + "' to '" + typeToString(leftType) + "'.", decl->loc, false, false);
                     result = false;
                 }
             }
@@ -108,14 +108,14 @@ namespace Slangc::Check {
             }
         }
         if (result) {
-            auto foundFunc = context.lookupFuncInScope(decl->name, decl->expr, false);
+            auto foundFunc = context.lookupFuncInScope(decl->name, decl->expr, context, false);
             if (foundFunc) {
                 auto func = std::get<FuncDecStatementPtr>(*foundFunc);
                 auto errorMsg = std::string("Function '") + decl->name + "' with the same signature already exists.";
-                if (!compareTypes(func->expr->type, decl->expr->type)) {
+                if (!compareTypes(func->expr->type, decl->expr->type, context)) {
                     errorMsg += " Functions that differ only in their return type cannot be overloaded.";
                 }
-                errors.emplace_back(errorMsg, decl->loc, false, false);
+                errors.emplace_back(context.filename, errorMsg, decl->loc, false, false);
                 result = false;
             }
             context.insert(decl->name, decl);
@@ -126,14 +126,14 @@ namespace Slangc::Check {
             if (decl->block.has_value()) {
                 result &= checkBlockStmt(decl->block.value(), context, errors);
                 for (auto &type : context.currFuncReturnTypes) {
-                    if (!compareTypes(type.first, decl->expr->type)) {
+                    if (!compareTypes(type.first, decl->expr->type, context)) {
                         if (!Context::isCastable(typeToString(type.first), typeToString(decl->expr->type), context)) {
-                            errors.emplace_back("Function '" + decl->name + "' returns incorrect type '" + typeToString(type.first) + "' instead of '" +
+                            errors.emplace_back(context.filename, "Function '" + decl->name + "' returns incorrect type '" + typeToString(type.first) + "' instead of '" +
                                                 typeToString(decl->expr->type) + "'.", type.second, false, false);
                             result = false;
                         }
                         else {
-                            errors.emplace_back("Implicit conversion from '" + typeToString(type.first) + "' to '" + typeToString(decl->expr->type) + "'.", decl->loc, true, false);
+                            errors.emplace_back(context.filename, "Implicit conversion from '" + typeToString(type.first) + "' to '" + typeToString(decl->expr->type) + "'.", decl->loc, true, false);
                         }
                     }
                 }
@@ -167,19 +167,19 @@ namespace Slangc::Check {
         for (const auto& field : thisType.value()->fields) {
             auto str = context.currType + "." + std::string(getDeclarationName(field));
             if (str == decl->name) {
-                errors.emplace_back("Type '" + context.currType + "' already contains definition for '" + decl->name + "'.", decl->loc, false, false);
+                errors.emplace_back(context.filename, "Type '" + context.currType + "' already contains definition for '" + decl->name + "'.", decl->loc, false, false);
                 result = false;
             }
         }
         if (result) {
-            auto foundFunc = context.symbolTable.lookupFunc(decl->name, decl->expr);
+            auto foundFunc = context.symbolTable.lookupFunc(decl->name, decl->expr, context);
             if (foundFunc) {
                 auto func = std::get<FuncDecStatementPtr>(*foundFunc);
                 auto errorMsg = std::string("Function '") + decl->name + "' with the same signature already exists.";
-                if (!compareTypes(func->expr->type, decl->expr->type)) {
+                if (!compareTypes(func->expr->type, decl->expr->type, context)) {
                     errorMsg += " Functions that differ only in their return type cannot be overloaded.";
                 }
-                errors.emplace_back(errorMsg, decl->loc, false, false);
+                errors.emplace_back(context.filename, errorMsg, decl->loc, false, false);
                 result = false;
             }
             context.insert(decl->name, decl);
@@ -193,11 +193,11 @@ namespace Slangc::Check {
                 auto declTypeStr = typeToString(decl->expr->type);
                 if (retTypeStr != declTypeStr) {
                     if (!Context::isCastable(retTypeStr, declTypeStr, context)) {
-                        errors.emplace_back("Function '" + decl->name + "' returns incorrect type '" + retTypeStr + "' instead of '" + declTypeStr + "'.", type.second, false, false);
+                        errors.emplace_back(context.filename, "Function '" + decl->name + "' returns incorrect type '" + retTypeStr + "' instead of '" + declTypeStr + "'.", type.second, false, false);
                         result = false;
                     }
                     else {
-                        errors.emplace_back("Implicit conversion from '" + retTypeStr + "' to '" + declTypeStr + "'.", decl->loc, true, false);
+                        errors.emplace_back(context.filename, "Implicit conversion from '" + retTypeStr + "' to '" + declTypeStr + "'.", decl->loc, true, false);
                     }
                 }
             }
@@ -210,13 +210,13 @@ namespace Slangc::Check {
     bool checkDecl(const TypeDecStmtPtr &decl, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         if (context.lookup(decl->name)) {
-            errors.emplace_back("Variable, type, or function with name '" + decl->name + "' already exists.", decl->loc, false, false);
+            errors.emplace_back(context.filename, "Variable, type, or function with name '" + decl->name + "' already exists.", decl->loc, false, false);
             result = false;
         }
         if (decl->parentTypeName.has_value()) {
             if (!context.symbolTable.lookupType(decl->parentTypeName.value())) {
                 if (!context.symbolTable.lookupType(context.moduleName + "." + decl->parentTypeName.value())) {
-                    errors.emplace_back("Parent type with name '" + decl->parentTypeName.value() + "' does not exist.", decl->loc, false, false);
+                    errors.emplace_back(context.filename, "Parent type with name '" + decl->parentTypeName.value() + "' does not exist.", decl->loc, false, false);
                     result = false;
                 } else {
                     // update type name

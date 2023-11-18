@@ -18,7 +18,7 @@ namespace Slangc {
             auto opToken = prevToken();
             auto rhs = parseAnd();
             if (!rhs.has_value()) {
-                errors.emplace_back("Expected expression after operator.", opToken.location, false, false);
+                errors.emplace_back(filename, "Expected expression after operator.", opToken.location, false, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -36,7 +36,7 @@ namespace Slangc {
             auto opToken = prevToken();
             auto rhs = parseEquality();
             if (!rhs.has_value()) {
-                errors.emplace_back("Expected expression after operator.", opToken.location, false, false);
+                errors.emplace_back(filename, "Expected expression after operator.", opToken.location, false, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -54,7 +54,7 @@ namespace Slangc {
             auto opToken = prevToken();
             auto rhs = parseCmp();
             if (!rhs.has_value()) {
-                errors.emplace_back("Expected expression after operator.", opToken.location, false, false);
+                errors.emplace_back(filename, "Expected expression after operator.", opToken.location, false, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -72,7 +72,7 @@ namespace Slangc {
             auto opToken = prevToken();
             auto rhs = parseAddSub();
             if (!rhs.has_value()) {
-                errors.emplace_back("Expected expression after operator.", opToken.location, false, false);
+                errors.emplace_back(filename, "Expected expression after operator.", opToken.location, false, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -90,7 +90,7 @@ namespace Slangc {
             auto opToken = prevToken();
             auto rhs = parseMulDiv();
             if (!rhs.has_value()) {
-                errors.emplace_back("Expected expression after operator.", opToken.location, false, false);
+                errors.emplace_back(filename, "Expected expression after operator.", opToken.location, false, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -108,7 +108,7 @@ namespace Slangc {
             auto opToken = prevToken();
             auto rhs = parseUnary();
             if (!rhs.has_value()) {
-                errors.emplace_back("Expected expression after operator.", opToken.location, false, false);
+                errors.emplace_back(filename, "Expected expression after operator.", opToken.location, false, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -122,7 +122,7 @@ namespace Slangc {
             auto opToken = prevToken();
             auto expr = parseCall();
             if (!expr.has_value()) {
-                errors.emplace_back("Expected expression after operator.", opToken.location, false, false);
+                errors.emplace_back(filename, "Expected expression after operator.", opToken.location, false, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -143,8 +143,8 @@ namespace Slangc {
                 if (!match(TokenType::RParen)) {
                     do {
                         auto argExpr = parseExpr();
-                        if (!expr.has_value()) {
-                            errors.emplace_back("Expected expression after '('.", opToken.location, false, false);
+                        if (!argExpr.has_value()) {
+                            errors.emplace_back(filename, "Expected expression after '('.", opToken.location, false, false);
                             hasError = true;
                             return std::nullopt;
                         }
@@ -157,14 +157,17 @@ namespace Slangc {
             else if (match(TokenType::Dot)) {
                 auto opToken = prevToken();
                 auto name = consume(TokenType::Identifier).value;
-                expr = createExpr<AccessExprNode>(opToken.location, std::move(expr.value()), name);
+                if (std::holds_alternative<VarExprPtr>(expr.value()) && std::ranges::find(imports, std::get<VarExprPtr>(expr.value())->name) != imports.end()) {
+                    std::get<VarExprPtr>(expr.value())->name += "." + name;
+                }
+                else expr = createExpr<AccessExprNode>(opToken.location, std::move(expr.value()), name);
             }
             else if (match(TokenType::LBracket)) {
                 auto opToken = prevToken();
                 do {
                     auto indexExpr = parseExpr();
                     if (!indexExpr.has_value()) {
-                        errors.emplace_back("Expected expression after '['.", opToken.location, false, false);
+                        errors.emplace_back(filename, "Expected expression after '['.", opToken.location, false, false);
                         hasError = true;
                         return std::nullopt;
                     }
@@ -187,6 +190,7 @@ namespace Slangc {
         else if (tok.type == TokenType::Integer) return createExpr<IntExprNode>(loc, std::stoi(tok.value));
         else if (tok.type == TokenType::Real) return createExpr<RealExprNode>(loc, std::stod(tok.value));
         else if (tok.type == TokenType::Float) return createExpr<FloatExprNode>(loc, std::stof(tok.value));
+        else if (tok.type == TokenType::Nil) return createExpr<NilExprNode>(loc);
         else if (tok.type == TokenType::String) {
             if (tok.value.size() == 1) return createExpr<CharExprNode>(loc, tok.value[0]);
             return createExpr<StringExprNode>(loc, tok.value);
@@ -199,7 +203,7 @@ namespace Slangc {
             consume(TokenType::RParen);
             return expr;
         }
-        errors.emplace_back("Failed to parse expression.", loc);
+        errors.emplace_back(filename, "Failed to parse expression.", loc);
         return std::nullopt;
     }
 
@@ -222,14 +226,18 @@ namespace Slangc {
             if (match(TokenType::Dot)) {
                 auto opToken = prevToken();
                 auto name = consume(TokenType::Identifier).value;
-                expr = createExpr<AccessExprNode>(opToken.location, std::move(expr.value()), name);
+                if (std::holds_alternative<VarExprPtr>(expr.value()) && std::ranges::find(imports, std::get<VarExprPtr>(expr.value())->name) != imports.end()) {
+                    std::get<VarExprPtr>(expr.value())->name += "." + name;
+                }
+                else
+                    expr = createExpr<AccessExprNode>(opToken.location, std::move(expr.value()), name);
             }
             else if (match(TokenType::LBracket)) {
                 auto opToken = prevToken();
                 do {
                     auto indexExpr = parseExpr();
                     if (!indexExpr.has_value()) {
-                        errors.emplace_back("Expected expression after '['.", opToken.location, false, false);
+                        errors.emplace_back(filename, "Expected expression after '['.", opToken.location, false, false);
                         hasError = true;
                         return std::nullopt;
                     }

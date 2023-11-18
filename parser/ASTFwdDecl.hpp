@@ -120,12 +120,11 @@ namespace Slangc {
 
     class Context;
 
-    bool compareTypes(const ExprPtrVariant &type1, const ExprPtrVariant &type2);
-    bool compareFuncSignatures(const FuncExprPtr &func1, const FuncExprPtr &func2, bool checkReturnTypes = true);
-    bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncDecStatementPtr &func2, bool checkReturnTypes = true);
-    //bool compareFuncSignatures(const ExternFuncDecStmtPtr &func1, const ExternFuncDecStmtPtr &func2, bool checkReturnTypes = true);
-    bool compareFuncSignatures(const MethodDecPtr &func1, const MethodDecPtr &func2, bool checkReturnTypes = true);
-    bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncExprPtr &func2, bool checkReturnTypes = true);
+    bool compareTypes(const ExprPtrVariant &type1, const ExprPtrVariant &type2, const Context &context, bool checkCast = false);
+    bool compareFuncSignatures(const FuncExprPtr &func1, const FuncExprPtr &func2, const Context &context, bool checkReturnTypes = true, bool checkCast = false);
+    bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncDecStatementPtr &func2, const Context &context, bool checkReturnTypes = true, bool checkCast = false);
+    bool compareFuncSignatures(const MethodDecPtr &func1, const MethodDecPtr &func2, const Context &context, bool checkReturnTypes = true, bool checkCast = false);
+    bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncExprPtr &func2, const Context &context, bool checkReturnTypes = true, bool checkCast = false);
     std::string typeToString(ExprPtrVariant type, ParameterType parameterType = ParameterType::None);
     bool isParentType(const std::string &parentTypeName, const std::string &childTypeName, const Context &analysis);
 }

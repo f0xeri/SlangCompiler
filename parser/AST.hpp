@@ -114,12 +114,12 @@ namespace Slangc {
 
     struct NilExprNode {
         SourceLoc loc{0, 0};
-        ExprPtrVariant type;
+        std::optional<ExprPtrVariant> type;
         bool isConst = true;
 
-        NilExprNode(SourceLoc loc, ExprPtrVariant type) : loc(loc), type(type) {};
+        NilExprNode(SourceLoc loc, std::optional<ExprPtrVariant> type = std::nullopt) : loc(loc), type(std::move(type)) {};
         auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return type; }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<NilExprNode>(*this); }
     };
 
     struct ArrayExprNode {
@@ -384,44 +384,50 @@ namespace Slangc {
             auto exprType = getExprType(expr, analysis, errors);
             std::optional<ExprPtrVariant> result;
             if (!exprType.has_value()) {
-                errors.emplace_back("Failed to get type of expression.", loc, false, true);
+                errors.emplace_back(analysis.filename, "Failed to get type of expression.", loc, false, true);
                 return std::nullopt;
             }
+            std::optional<TypeDecStmtPtr> typeOpt = std::nullopt;
             if (std::holds_alternative<TypeExprPtr>(exprType.value())) {
-                if (auto typeOpt = analysis.symbolTable.lookupType(std::get<TypeExprPtr>(exprType.value())->type)) {
-                    auto type = typeOpt.value();
-                    auto found = false;
-                    for (const auto &field: type->fields) {
-                        if (auto fieldVar = std::get_if<FieldVarDecPtr>(&field)) {
-                            found = ((*fieldVar)->name == name);
-                        } else if (const auto &fieldArrayVar = std::get_if<FieldArrayVarDecPtr>(&field)) {
-                            found = ((*fieldArrayVar)->name == name);
-                        } else if (auto fieldFuncPointer = std::get_if<FieldFuncPointerStmtPtr>(&field)) {
-                            found = ((*fieldFuncPointer)->name == name);
-                        }
+                typeOpt = analysis.symbolTable.lookupType(std::get<TypeExprPtr>(exprType.value())->type);
+            }
+            else {
+                errors.emplace_back(analysis.filename, "Type of expression is not accessible.", loc, false, true);
+                return std::nullopt;
+            }
+            auto found = false;
+            while (typeOpt.has_value()) {
+                auto type = typeOpt.value();
+                for (const auto &field: type->fields) {
+                    if (auto fieldVar = std::get_if<FieldVarDecPtr>(&field)) {
+                        found = ((*fieldVar)->name == name);
+                    } else if (const auto &fieldArrayVar = std::get_if<FieldArrayVarDecPtr>(&field)) {
+                        found = ((*fieldArrayVar)->name == name);
+                    } else if (auto fieldFuncPointer = std::get_if<FieldFuncPointerStmtPtr>(&field)) {
+                        found = ((*fieldFuncPointer)->name == name);
+                    }
 
-                        if (found) {
-                            result = getDeclType(field, analysis, errors);
+                    if (found) {
+                        result = getDeclType(field, analysis, errors);
+                        break;
+                    }
+                }
+                if (!found) {
+                    for (const auto &method: type->methods) {
+                        if (method->name == type->name + "." + name) {
+                            found = true;
+                            result = getDeclType(method, analysis, errors);
                             break;
                         }
                     }
-                    if (!found) {
-                        for (const auto &method: type->methods) {
-                            if (method->name == type->name + "." + name) {
-                                found = true;
-                                result = getDeclType(method, analysis, errors);
-                                break;
-                            }
-                        }
-                    }
-                    if (!found) {
-                        errors.emplace_back("Type '" + std::get<TypeExprPtr>(exprType.value())->type + "' does not have field or method called '" + name + "'.", loc, false, true);
-                        return std::nullopt;
-                    }
                 }
+                if (!found && type->parentTypeName.has_value()) {
+                    typeOpt = analysis.symbolTable.lookupType(type->parentTypeName.value());
+                }
+                else break;
             }
-            else {
-                errors.emplace_back("Type of expression is not accessible.", loc, false, true);
+            if (!found) {
+                errors.emplace_back(analysis.filename, "Type '" + std::get<TypeExprPtr>(exprType.value())->type + "' does not have field or method called '" + name + "'.", loc, false, true);
                 return std::nullopt;
             }
             return result;
@@ -697,13 +703,23 @@ namespace Slangc {
     }
 
     // checks signatures WITHOUT return type
-    static bool compareFuncSignatures(const FuncExprPtr &func1, const FuncExprPtr &func2, bool checkReturnTypes) {
+    static bool compareFuncSignatures(const FuncExprPtr &func1, const FuncExprPtr &func2, const Context& context, bool checkReturnTypes, bool checkCast) {
         if (func1->params.size() != func2->params.size()) return false;
         if (checkReturnTypes) {
-            if (!compareTypes(func1->type, func2->type)) return false;
+            if (!compareTypes(func1->type, func2->type, context)) return false;  // TODO: should we check cast here?
         }
         for (int i = 0; i < func1->params.size(); i++) {
-            if (!compareTypes(func1->params[i]->type, func2->params[i]->type)) return false;
+            if (!compareTypes(func1->params[i]->type, func2->params[i]->type, context, checkCast)) {
+                if (checkCast) {
+                    // we can cast anything to void* (out void)
+                    if (std::holds_alternative<TypeExprPtr>(func1->params[i]->type)) {
+                        if (std::get<TypeExprPtr>(func1->params[i]->type)->type == "void" && func1->params[i]->parameterType == Out) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
             // if parameterType is None, it means that it is not specified and we can cast
             if (func1->params[i]->parameterType != None && func2->params[i]->parameterType != None) {
                 if (func1->params[i]->parameterType != func2->params[i]->parameterType) return false;
@@ -712,39 +728,49 @@ namespace Slangc {
         return true;
     }
 
-    static bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncDecStatementPtr &func2, bool checkReturnTypes) {
-        return compareFuncSignatures(func1->expr, func2->expr, checkReturnTypes);
+    static bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncDecStatementPtr &func2, const Context &context, bool checkReturnTypes, bool checkCast) {
+        return compareFuncSignatures(func1->expr, func2->expr, context,checkReturnTypes, checkCast);
     }
 
-    /*static bool compareFuncSignatures(const ExternFuncDecStmtPtr &func1, const ExternFuncDecStmtPtr &func2, bool checkReturnTypes) {
-        return compareFuncSignatures(func1->expr, func2->expr, checkReturnTypes);
-    }*/
-
-    static bool compareFuncSignatures(const MethodDecPtr &func1, const MethodDecPtr &func2, bool checkReturnTypes) {
-        return compareFuncSignatures(func1->expr, func2->expr, checkReturnTypes);
+    static bool compareFuncSignatures(const MethodDecPtr &func1, const MethodDecPtr &func2, const Context &context, bool checkReturnTypes, bool checkCast) {
+        return compareFuncSignatures(func1->expr, func2->expr, context, checkReturnTypes, checkCast);
     }
 
-    static bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncExprPtr &func2, bool checkReturnTypes) {
-        return compareFuncSignatures(func1->expr, func2, checkReturnTypes);
+    static bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncExprPtr &func2, const Context &context, bool checkReturnTypes, bool checkCast) {
+        return compareFuncSignatures(func1->expr, func2, context, checkReturnTypes, checkCast);
     }
 
-    static bool compareTypes(const ExprPtrVariant &type1, const ExprPtrVariant &type2) {
+    static bool compareTypes(const ExprPtrVariant &type1, const ExprPtrVariant &type2, const Context &context, bool checkCast) {
+        bool result = false;
         if (auto type1Ptr = std::get_if<TypeExprPtr>(&type1)) {
             if (auto type2Ptr = std::get_if<TypeExprPtr>(&type2)) {
-                return type1Ptr->get()->type == type2Ptr->get()->type;
+                result = type1Ptr->get()->type == type2Ptr->get()->type;
+                if (!result && checkCast) {
+                    result = Context::isCastable(type1Ptr->get()->type, type2Ptr->get()->type, context);
+                }
+                return result;
             }
         }
         if (auto type1Ptr = std::get_if<ArrayExprPtr>(&type1)) {
             if (auto type2Ptr = std::get_if<ArrayExprPtr>(&type2)) {
-                return compareTypes(type1Ptr->get()->type, type2Ptr->get()->type);
+                return compareTypes(type1Ptr->get()->type, type2Ptr->get()->type, context);
             }
         }
         if (std::holds_alternative<FuncExprPtr>(type1)) {
             if (std::holds_alternative<FuncExprPtr>(type2)) {
-                return compareFuncSignatures(std::get<FuncExprPtr>(type1), std::get<FuncExprPtr>(type2));
+                return compareFuncSignatures(std::get<FuncExprPtr>(type1), std::get<FuncExprPtr>(type2), context);
             }
         }
-
+        if (checkCast) {
+            if (auto type1ptr = std::get_if<NilExprPtr>(&type1)) {
+                type1ptr->get()->type = type2;
+                return true;
+            }
+            if (auto type2ptr = std::get_if<NilExprPtr>(&type2)) {
+                type2ptr->get()->type = type1;
+                return true;
+            }
+        }
         return false;
     }
 
@@ -780,6 +806,9 @@ namespace Slangc {
             result += "): " + typeToString(funcExpr->type);
             return result;
         }
+        if (std::holds_alternative<NilExprPtr>(type)) {
+            return result + "nil";
+        }
         return "unknown";
     }
 
@@ -800,14 +829,14 @@ namespace Slangc {
     }
 
     // if there is no func with equal signature, choose the best available overload using implicit casts
-    static auto selectBestOverload(const std::string &name, const FuncExprPtr &func, bool useParamType, bool checkReturnType, Context &analysis) -> std::optional<DeclPtrVariant> {
+    static auto selectBestOverload(const std::string &name, FuncExprPtr &func, bool useParamType, bool checkReturnType, Context &analysis) -> std::optional<DeclPtrVariant> {
         std::optional<DeclPtrVariant> bestOverload = std::nullopt;
         auto bestOverloadScore = 0;
 
-        for (auto &&f : analysis.symbolTable.symbols | std::views::filter([](const auto &s) { return std::holds_alternative<FuncDecStatementPtr>(s.second); })) {
-            auto funcDec = std::get<FuncDecStatementPtr>(f.second);
+        for (auto &&f : analysis.symbolTable.symbols | std::views::filter([](const auto &s) { return std::holds_alternative<FuncDecStatementPtr>(s.declaration); })) {
+            auto funcDec = std::get<FuncDecStatementPtr>(f.declaration);
             if (funcDec->name == name) {
-                if (compareFuncSignatures(funcDec, func, checkReturnType)) {
+                if (compareFuncSignatures(funcDec, func, analysis, checkReturnType)) {
                     return funcDec;
                 }
                 if (funcDec->expr->params.size() == func->params.size()) {
@@ -835,6 +864,15 @@ namespace Slangc {
                 }
             }
         }
+        // fix type of possible nil argument
+        if (bestOverload) {
+            auto funcDec = std::get<FuncDecStatementPtr>(bestOverload.value());
+            for (auto i = 0; i < func->params.size(); i++) {
+                if (auto nil = std::get_if<NilExprPtr>(&func->params[i]->type)) {
+                    nil->get()->type = funcDec->expr->params[i]->type;
+                }
+            }
+        }
         return bestOverload;
     }
 
@@ -843,7 +881,7 @@ namespace Slangc {
         auto bestOverloadScore = 0;
         for (const auto &method: typeDecl->methods) {
             if (method->name == methodName) {
-                if (compareFuncSignatures(method->expr, func, checkReturnType)) {
+                if (compareFuncSignatures(method->expr, func, analysis, checkReturnType)) {
                     return method;
                 }
                 if (method->expr->params.size() == func->params.size()) {

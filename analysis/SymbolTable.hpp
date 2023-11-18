@@ -15,30 +15,35 @@
 #include "common.hpp"
 
 namespace Slangc {
+    struct Symbol {
+        std::string name;
+        std::string moduleName;
+        DeclPtrVariant declaration;
+    };
     class SymbolTable {
     public:
-        std::vector<std::pair<std::string, DeclPtrVariant>> symbols;
+        std::vector<Symbol> symbols;
 
-        void insert(const std::string& name, const DeclPtrVariant &declarationNode) {
-            symbols.emplace_back(name, declarationNode);
+        void insert(const std::string& name, const std::string& moduleName, const DeclPtrVariant &declarationNode) {
+            symbols.emplace_back(name, moduleName, declarationNode);
         }
 
         auto lookup(std::string_view name) const -> const DeclPtrVariant* {
-            for (const auto&[symbolName, symbol]: symbols) {
-                if (symbolName == name) {
-                    return &symbol;
+            for (const auto& symbol: symbols) {
+                if (symbol.name == name) {
+                    return &symbol.declaration;
                 }
             }
             return nullptr;
         }
 
-        auto lookupFunc(std::string_view name, const FuncExprPtr& expr) const -> const DeclPtrVariant* {
-            for (const auto&[symbolName, symbol]: symbols) {
-                if (symbolName == name) {
-                    if (std::holds_alternative<FuncDecStatementPtr>(symbol)) {
-                        auto func = std::get<FuncDecStatementPtr>(symbol);
-                        if (compareFuncSignatures(func, expr)) {
-                            return &symbol;
+        auto lookupFunc(std::string_view name, const FuncExprPtr& expr, const Context& context) const -> const DeclPtrVariant* {
+            for (const auto& symbol: symbols) {
+                if (symbol.name == name) {
+                    if (std::holds_alternative<FuncDecStatementPtr>(symbol.declaration)) {
+                        auto func = std::get<FuncDecStatementPtr>(symbol.declaration);
+                        if (compareFuncSignatures(func, expr, context)) {
+                            return &symbol.declaration;
                         }
                     }
                 }
@@ -47,10 +52,10 @@ namespace Slangc {
         }
 
         auto lookupType(const std::string& name) const -> std::optional<TypeDecStmtPtr> {
-            for (const auto&[symbolName, symbol]: symbols) {
-                if (symbolName == name) {
-                    if (std::holds_alternative<TypeDecStmtPtr>(symbol)) {
-                        return std::get<TypeDecStmtPtr>(symbol);
+            for (const auto& symbol: symbols) {
+                if (symbol.name == name) {
+                    if (std::holds_alternative<TypeDecStmtPtr>(symbol.declaration)) {
+                        return std::get<TypeDecStmtPtr>(symbol.declaration);
                     }
                 }
             }

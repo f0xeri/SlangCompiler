@@ -83,7 +83,7 @@ namespace Slangc {
                 result = lexString(sourceText);
             }
             if (!result) {
-                errors.emplace_back("Unknown token", SourceLoc{currentLine, currentColumn}, false, false);
+                errors.emplace_back(std::string(sourceBuffer->getFilename()), "Unknown token", SourceLoc{currentLine, currentColumn}, false, false);
                 break;
             }
         }
@@ -215,7 +215,7 @@ namespace Slangc {
 
         if (!stringValueView.empty()) {
             if (stringValueView.back() == sourceText.back()) {
-                errors.emplace_back("Unclosed string", SourceLoc{currentLine, stringColumn}, false, false);
+                errors.emplace_back(std::string(sourceBuffer->getFilename()), "Unclosed string", SourceLoc{currentLine, stringColumn}, false, false);
                 return false;
             }
         }

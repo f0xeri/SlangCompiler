@@ -5,7 +5,6 @@
 #include "CompilerOptions.hpp"
 #include "parser/Parser.hpp"
 #include "parser/AST.hpp"
-#include "parser/Scope.hpp"
 #include "analysis/Check.hpp"
 #include <codegen/CodeGen.hpp>
 
@@ -13,7 +12,7 @@ int main(int argc, char **argv) {
     Slangc::CompilerOptions options(argc, argv);
     std::vector<Slangc::ErrorMessage> errors;
 
-    auto buffer = Slangc::SourceBuffer::CreateFromFile("working_examples/classes.sl");
+    auto buffer = Slangc::SourceBuffer::CreateFromFile("sample.sl");
     if (!buffer) {
         std::cout << toString(buffer.takeError()) << std::endl;
     }
@@ -22,7 +21,7 @@ int main(int argc, char **argv) {
     // lexer.printTokens();
 
     Slangc::Context context;
-    Slangc::Parser parser(lexer.tokens, options, context, errors);
+    Slangc::Parser parser(buffer->getFilename(), lexer.tokens, options, context, errors);
     parser.parse();
 
     Slangc::Check::checkAST(parser.moduleAST, context, errors);
@@ -31,6 +30,6 @@ int main(int argc, char **argv) {
     codeGen.process();
 
     std::cout << "\n";
-    Slangc::printErrorMessages(errors, std::cout, buffer->getFilename());
+    Slangc::printErrorMessages(errors, std::cout, false);
     return 0;
 }

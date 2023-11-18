@@ -8,7 +8,7 @@
     if (auto stmt = parse##type(); stmt.has_value()) { \
         block->statements.emplace_back(std::move(stmt.value())); \
     } else { \
-        errors.emplace_back("Failed to parse " #type ".", token->location, false, false); \
+        errors.emplace_back(filename, "Failed to parse " #type ".", token->location, false, false); \
         hasError = true; \
     }
 
@@ -46,18 +46,18 @@ namespace Slangc {
                     advance();
                 }
                 else {
-                    errors.emplace_back(std::string("Expected end of block " + name + ", got " + endName + "."), token->location, false, false);
+                    errors.emplace_back(filename, std::string("Expected end of block " + name + ", got " + endName + "."), token->location, false, false);
                     hasError = true;
                 }
                 //context.exitScope();
                 return block;
             } else if (token->type == TokenType::EndOfFile) {
-                errors.emplace_back("Unexpected end of file.", token->location, false, false);
+                errors.emplace_back(filename, "Unexpected end of file.", token->location, false, false);
                 hasError = true;
                 //context.exitScope();
                 return block;
             } else {
-                errors.emplace_back("Unexpected token " + std::string(Lexer::getTokenName(token->type)) + ".",
+                errors.emplace_back(filename, "Unexpected token " + std::string(Lexer::getTokenName(token->type)) + ".",
                                     token->location, false, false);
                 hasError = true;
                 //context.exitScope();
@@ -67,7 +67,7 @@ namespace Slangc {
                 block->statements.emplace_back(std::move(result.value()));
             }
             else {
-                errors.emplace_back("Failed to parse statement.", token->location, false, false);
+                errors.emplace_back(filename, "Failed to parse statement.", token->location, false, false);
                 hasError = true;
                 //context.exitScope();
                 return block;
@@ -82,7 +82,7 @@ namespace Slangc {
         consume(TokenType::Minus);
         auto type = parseType();
         if (!type.has_value()) {
-            errors.emplace_back("Expected typeExpr.", token->location, false, false);
+            errors.emplace_back(filename, "Expected typeExpr.", token->location, false, false);
             hasError = true;
             return std::nullopt;
         }
@@ -120,7 +120,7 @@ namespace Slangc {
         consume(TokenType::If);
         auto condition = parseExpr();
         if (!condition.has_value()) {
-            errors.emplace_back("Expected expression.", token->location, false, false);
+            errors.emplace_back(filename, "Expected expression.", token->location, false, false);
             hasError = true;
             return {};
         }
@@ -136,7 +136,7 @@ namespace Slangc {
             advance();
             auto elseIfCondition = parseExpr();
             if (!elseIfCondition.has_value()) {
-                errors.emplace_back("Expected expression.", token->location, false, false);
+                errors.emplace_back(filename, "Expected expression.", token->location, false, false);
                 hasError = true;
                 return {};
             }
@@ -161,7 +161,7 @@ namespace Slangc {
         if (condition.has_value() && block.has_value()) {
             return createStmt<WhileStatementNode>(loc, std::move(condition.value()), std::move(block.value()));
         }
-        errors.emplace_back("Failed to parse while statement.", loc, false, false);
+        errors.emplace_back(filename, "Failed to parse while statement.", loc, false, false);
         hasError = true;
         return std::nullopt;
     }
@@ -174,7 +174,7 @@ namespace Slangc {
         if (expr.has_value()) {
             return createStmt<OutputStatementNode>(loc, std::move(expr.value()));
         }
-        errors.emplace_back("Failed to parse output statement.", loc, false, false);
+        errors.emplace_back(filename, "Failed to parse output statement.", loc, false, false);
         hasError = true;
         return std::nullopt;
     }
@@ -187,7 +187,7 @@ namespace Slangc {
         if (expr.has_value()) {
             return createStmt<InputStatementNode>(loc, std::move(expr.value()));
         }
-        errors.emplace_back("Failed to parse input statement.", loc, false, false);
+        errors.emplace_back(filename, "Failed to parse input statement.", loc, false, false);
         hasError = true;
         return std::nullopt;
     }
@@ -202,7 +202,7 @@ namespace Slangc {
         if (varExpr.has_value() && value.has_value()) {
             return createStmt<AssignExprNode>(loc, std::move(varExpr.value()), std::move(value.value()));
         }
-        errors.emplace_back("Failed to parse let statement.", loc, false, false);
+        errors.emplace_back(filename, "Failed to parse let statement.", loc, false, false);
         hasError = true;
         return std::nullopt;
     }
@@ -219,7 +219,7 @@ namespace Slangc {
         if (expr.has_value()) {
             return createStmt<ReturnStatementNode>(loc, std::move(expr.value()));
         }
-        errors.emplace_back("Failed to parse return statement.", loc, false, false);
+        errors.emplace_back(filename, "Failed to parse return statement.", loc, false, false);
         hasError = true;
         return std::nullopt;
     }
@@ -235,7 +235,7 @@ namespace Slangc {
             //auto t = x->getType(analysis);
             return std::move(std::get<CallExprPtr>(expr.value()));
         }
-        errors.emplace_back("Failed to parse call statement.", token->location, false, false);
+        errors.emplace_back(filename, "Failed to parse call statement.", token->location, false, false);
         hasError = true;
         return std::nullopt;
     }
@@ -247,7 +247,7 @@ namespace Slangc {
         if (expr.has_value()) {
             return createStmt<DeleteStmtNode>(token->location, std::move(expr.value()));
         }
-        errors.emplace_back("Failed to parse delete statement.", token->location, false, false);
+        errors.emplace_back(filename, "Failed to parse delete statement.", token->location, false, false);
         hasError = true;
         return std::nullopt;
     }

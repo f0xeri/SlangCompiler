@@ -18,7 +18,7 @@ namespace Slangc {
             if (token->type == TokenType::Function || token->type == TokenType::Procedure || (token->type == TokenType::Extern && ((token + 1)->type == TokenType::Procedure || (token + 1)->type == TokenType::Function))) {
                 auto funcDecl = parseFuncDecl();
                 if (!funcDecl.has_value()) {
-                    errors.emplace_back("Failed to parse function declaration.", token->location, false, false);
+                    errors.emplace_back(filename, "Failed to parse function declaration.", token->location, false, false);
                     hasError = true;
                     return std::nullopt;
                 }
@@ -26,7 +26,7 @@ namespace Slangc {
             else if (token->type == TokenType::Class || (token->type == TokenType::Extern && (token + 1)->type == TokenType::Class)) {
                 auto type = parseClassDecl();
                 if (!type.has_value()) {
-                    errors.emplace_back("Failed to parse class declaration.", token->location, false, false);
+                    errors.emplace_back(filename, "Failed to parse class declaration.", token->location, false, false);
                     hasError = true;
                     return std::nullopt;
                 }
@@ -34,7 +34,7 @@ namespace Slangc {
             else if (token->type == TokenType::Variable) {
                 auto varDecl = parseVarDecl();
                 if (!varDecl.has_value()) {
-                    errors.emplace_back("Failed to parse variable declaration.", token->location, false, false);
+                    errors.emplace_back(filename, "Failed to parse variable declaration.", token->location, false, false);
                     hasError = true;
                     return std::nullopt;
                 }
@@ -43,14 +43,14 @@ namespace Slangc {
         }
         auto block = parseBlockStmt(moduleName);
         if (!block.has_value()) {
-            errors.emplace_back("Failed to parse module block.", token->location, false, true);
+            errors.emplace_back(filename, "Failed to parse module block.", token->location, false, true);
             hasError = true;
             return std::nullopt;
         }
         auto moduleDecl = create<ModuleDeclNode>(loc, moduleName, std::move(block.value()));
         consume(TokenType::Dot);
         if (token->type != TokenType::EndOfFile) {
-            errors.emplace_back("Expected end of file after end of module declaration.", token->location, false, false);
+            errors.emplace_back(filename, "Expected end of file after end of module declaration.", token->location, false, false);
             hasError = true;
             return std::nullopt;
         }
@@ -71,7 +71,7 @@ namespace Slangc {
         consume(TokenType::Minus);
         auto type = parseType();
         if (!type.has_value()) {
-            errors.emplace_back("Expected typeExpr.", token->location, false, false);
+            errors.emplace_back(filename, "Expected typeExpr.", token->location, false, false);
             hasError = true;
             return std::nullopt;
         }
@@ -101,7 +101,7 @@ namespace Slangc {
                 result = createDecl<VarDecStatementNode>(loc, name, typeExpr->type, std::move(value), isGlobal, isPrivate, isExtern);
             }
         }
-        if (result.has_value()) context.symbolTable.insert(name, result.value());
+        if (result.has_value()) context.symbolTable.insert(name, moduleAST->name, result.value());
         return result;
     }
 
@@ -117,7 +117,7 @@ namespace Slangc {
             else if (ptype == "out") parameterType = ParameterType::Out;
             auto type = parseType();
             if (!type.has_value()) {
-                errors.emplace_back("Failed to parse function parameter typeExpr.", token->location, false, false);
+                errors.emplace_back(filename, "Failed to parse function parameter typeExpr.", token->location, false, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -130,7 +130,7 @@ namespace Slangc {
                 advance();
             }
             else if (token->type != TokenType::RParen) {
-                errors.emplace_back("Expected comma or right parenthesis after function parameter declaration.", token->location, false, false);
+                errors.emplace_back(filename, "Expected comma or right parenthesis after function parameter declaration.", token->location, false, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -161,7 +161,7 @@ namespace Slangc {
         std::string name = consume(TokenType::Identifier).value;
         auto params = parseFuncParams();
         if (!params.has_value()) {
-            errors.emplace_back("Failed to parse function parameters.", token->location, false, false);
+            errors.emplace_back(filename, "Failed to parse function parameters.", token->location, false, false);
             hasError = true;
             return std::nullopt;
         }
@@ -172,7 +172,7 @@ namespace Slangc {
             consume(TokenType::Colon);
             auto returnTypeOpt = parseType();
             if (!returnTypeOpt.has_value()) {
-                errors.emplace_back("Failed to parse function return typeExpr.", token->location, false, false);
+                errors.emplace_back(filename, "Failed to parse function return typeExpr.", token->location, false, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -190,12 +190,12 @@ namespace Slangc {
 
         auto funcExpr = create<FuncExprNode>(loc, returnType, params.value(), isFunction);
         funcDecl = createDecl<FuncDecStatementNode>(loc, mangledName, funcExpr, std::nullopt, isPrivate, isFunction, isExtern);
-        context.symbolTable.insert(mangledName, funcDecl);
+        context.symbolTable.insert(mangledName, moduleAST->name, funcDecl);
 
         --token;
         auto block = parseBlockStmt(name, &params.value());
         if (!block.has_value()) {
-            errors.emplace_back("Failed to parse function block.", token->location, false, false);
+            errors.emplace_back(filename, "Failed to parse function block.", token->location, false, false);
             hasError = true;
             return std::nullopt;
         }
@@ -204,7 +204,7 @@ namespace Slangc {
             func->block = std::move(block.value());
         }
         if (token->type != TokenType::Semicolon) {
-            errors.emplace_back("Expected semicolon after function declaration.", token->location, false, false);
+            errors.emplace_back(filename, "Expected semicolon after function declaration.", token->location, false, false);
             hasError = true;
             return std::nullopt;
         }
@@ -220,7 +220,7 @@ namespace Slangc {
         consume(TokenType::Minus);
         auto type = parseType();
         if (!type.has_value()) {
-            errors.emplace_back("Failed to parse field typeExpr.", token->location, false, false);
+            errors.emplace_back(filename, "Failed to parse field typeExpr.", token->location, false, false);
             hasError = true;
             return std::nullopt;
         }
@@ -268,7 +268,7 @@ namespace Slangc {
         consume(TokenType::LParen);
         auto tok = moduleAST->name + "." + consume(TokenType::Identifier).value;
         if (tok != typeName) {
-            errors.emplace_back(std::string("\"this\" should have \"" + typeName + "\" typeExpr, not " + tok), token->location, false, false);
+            errors.emplace_back(filename, std::string("\"this\" should have \"" + typeName + "\" typeExpr, not " + tok), token->location, false, false);
             hasError = true;
             return std::nullopt;
         }
@@ -276,7 +276,7 @@ namespace Slangc {
         consume(TokenType::RParen);
         auto args = parseFuncParams();
         if (!args.has_value()) {
-            errors.emplace_back("Failed to parse method arguments.", token->location, false, false);
+            errors.emplace_back(filename, "Failed to parse method arguments.", token->location, false, false);
             hasError = true;
             return std::nullopt;
         }
@@ -291,7 +291,7 @@ namespace Slangc {
             returnType = parseType();
             isFunction = true;
             if (!returnType.has_value()) {
-                errors.emplace_back("Failed to parse method return typeExpr.", token->location, false, false);
+                errors.emplace_back(filename, "Failed to parse method return typeExpr.", token->location, false, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -311,7 +311,7 @@ namespace Slangc {
             block = std::move(parsedBlock.value());
         }
         else {
-            errors.emplace_back("Failed to parse method body.", token->location, false, false);
+            errors.emplace_back(filename, "Failed to parse method body.", token->location, false, false);
             hasError = true;
             return std::nullopt;
         }
@@ -351,7 +351,7 @@ namespace Slangc {
                 auto field = parseFieldDecl(mangledName, fieldIndex);
                 ++fieldIndex;
                 if (!field.has_value()) {
-                    errors.emplace_back("Failed to parse field declaration.", token->location, false, false);
+                    errors.emplace_back(filename, "Failed to parse field declaration.", token->location, false, false);
                     hasError = true;
                     return std::nullopt;
                 }
@@ -360,7 +360,7 @@ namespace Slangc {
             else if (token->type == TokenType::Method) {
                 auto method = parseMethodDecl(mangledName);
                 if (!method.has_value()) {
-                    errors.emplace_back("Failed to parse method declaration.", token->location, false, false);
+                    errors.emplace_back(filename, "Failed to parse method declaration.", token->location, false, false);
                     hasError = true;
                     return std::nullopt;
                 }
@@ -374,12 +374,12 @@ namespace Slangc {
             std::get<TypeDecStmtPtr>(classNode)->methods = std::move(methods);
         }
         else {
-            errors.emplace_back(std::string("Expected end of " + name + ", got " + token->value + "."), token->location, false, false);
+            errors.emplace_back(filename, std::string("Expected end of " + name + ", got " + token->value + "."), token->location, false, false);
             hasError = true;
             return std::nullopt;
         }
         //context.types[mangledName] = std::get<TypeDecStmtPtr>(classNode);
-        context.symbolTable.insert(mangledName, classNode);
+        context.symbolTable.insert(mangledName, moduleAST->name, classNode);
         return classNode;
     }
 } // Slangc

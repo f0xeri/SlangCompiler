@@ -25,15 +25,16 @@ namespace Slangc {
     class ErrorMessage {
     public:
         std::string message;
+        std::string sourceFile;
         SourceLoc location;
         bool isWarning = false;
         bool internal = false;
 
-        ErrorMessage(std::string message, SourceLoc location, bool isWarning = false, bool internal = false)
-                : message(std::move(message)), location(location), isWarning(isWarning), internal(internal) {}
+        ErrorMessage(std::string sourceFile, std::string message, SourceLoc location, bool isWarning = false, bool internal = false)
+                : message(std::move(message)), sourceFile(std::move(sourceFile)), location(location), isWarning(isWarning), internal(internal) {}
 
-        void print(auto &stream, std::string_view file) const {
-            stream << file;
+        void print(auto &stream) const {
+            stream << sourceFile;
             stream << "(" << location.line << "," << location.column << "): ";
             if (isWarning) {
                 stream << "warning";
@@ -84,10 +85,10 @@ namespace Slangc {
         return str.substr(0, std::distance(str.begin(), endIt));
     }
 
-    static void printErrorMessages(std::vector<ErrorMessage> &errors, auto &stream, std::string_view file, bool warnings = true) {
+    static void printErrorMessages(std::vector<ErrorMessage> &errors, auto &stream, bool warnings = true) {
         for (auto &error : errors) {
             if (error.isWarning && !warnings) continue;
-            error.print(stream, file);
+            error.print(stream);
         }
     }
 }

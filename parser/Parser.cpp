@@ -3,35 +3,58 @@
 //
 
 #include "Parser.hpp"
+#include "analysis/Check.hpp"
 
 namespace Slangc {
-
+    std::vector<std::string> imports;
     auto Parser::parse() -> bool {
         parseImports();
 
         auto loc = SourceLoc{0, 0};
 
         auto obj = create<TypeDecStatementNode>(loc, std::string("Object"), std::vector<DeclPtrVariant>(), std::vector<MethodDecPtr>());
-        context.symbolTable.insert("Object", obj);
+        context.filename = filename;
         auto moduleNode = parseModuleDecl();
         if (moduleNode.has_value()) {
             //std::cout << moduleNode.assignExpr()->block->statements.size() << std::endl;
             moduleAST = std::move(moduleNode.value());
         }
         else {
-            errors.emplace_back("Failed to parse module declaration.", token->location, false, false);
+            errors.emplace_back(filename, "Failed to parse module declaration.", token->location, false, false);
             return false;
         }
+        context.symbolTable.insert("Object", "", obj);
         return true;
     }
 
     auto Parser::parseImports() -> bool {
+        while (token->type == TokenType::Import) {
+            advance();
+            auto importStr = consume(TokenType::Identifier);
+            expect(TokenType::Semicolon);
+            advance();
+            if (std::find(imports.begin(), imports.end(), importStr.value) == imports.end()) {
+                imports.emplace_back(importStr.value);
+
+                auto buffer = SourceBuffer::CreateFromFile("working_examples/" + importStr.value + ".sl");
+                if (!buffer) {
+                    errors.emplace_back(filename, toString(buffer.takeError()), token->location, false, false);
+                    hasError = true;
+                    return false;
+                }
+                Lexer lexer(std::move(buffer.get()), errors);
+                lexer.tokenize();
+                Slangc::Parser parser(buffer->getFilename(), lexer.tokens, options, context, errors);
+                parser.parse();
+                Slangc::Check::checkAST(parser.moduleAST, context, errors);
+            }
+        }
         return true;
     }
 
     auto Parser::parseTypeName() -> std::optional<std::string> {
         if (token->type != TokenType::Identifier) {
-            errors.emplace_back("Expected typeExpr name.", token->location, false, false);
+            errors.emplace_back(filename, "Expected typeExpr name.", token->location, false, false);
             hasError = true;
             return std::nullopt;
         }
@@ -72,7 +95,7 @@ namespace Slangc {
             consume(TokenType::RBracket);
             auto arrayType = parseType();
             if (!arrayType.has_value()) {
-                errors.emplace_back("Failed to parse array typeExpr.", token->location, false, false);
+                errors.emplace_back(filename, "Failed to parse array typeExpr.", token->location, false, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -102,7 +125,7 @@ namespace Slangc {
             bool isFunction = type == "function";
             auto args = parseFuncParams(false);
             if (!args.has_value()) {
-                errors.emplace_back("Expected function parameters.", token->location, false, false);
+                errors.emplace_back(filename, "Expected function parameters.", token->location, false, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -114,7 +137,7 @@ namespace Slangc {
                 if (returnTypeOpt.has_value()) {
                     returnType = std::move(returnTypeOpt.value());
                 } else {
-                    errors.emplace_back("Expected typeExpr after ':'.", token->location, false, false);
+                    errors.emplace_back(filename, "Expected typeExpr after ':'.", token->location, false, false);
                     hasError = true;
                     return std::nullopt;
                 }

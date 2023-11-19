@@ -13,7 +13,7 @@
 #include "Scope.hpp"
 #include "lexer/Lexer.hpp"
 #include "AST.hpp"
-#include "analysis/Context.hpp"
+#include "check/Context.hpp"
 #include <CompilerOptions.hpp>
 
 namespace Slangc {

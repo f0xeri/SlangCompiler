@@ -3,7 +3,8 @@
 //
 
 #include "Parser.hpp"
-#include "analysis/Check.hpp"
+#include "check/Check.hpp"
+#include "codegen/CodeGen.hpp"
 
 namespace Slangc {
     std::vector<std::string> imports;
@@ -47,6 +48,8 @@ namespace Slangc {
                 Slangc::Parser parser(buffer->getFilename(), lexer.tokens, options, context, errors);
                 parser.parse();
                 Slangc::Check::checkAST(parser.moduleAST, context, errors);
+                Slangc::CodeGen codeGen(context, std::move(parser.moduleAST), false);
+                codeGen.process(errors);
             }
         }
         return true;

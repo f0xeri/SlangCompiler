@@ -232,7 +232,7 @@ namespace Slangc {
         if (expr.has_value() && std::holds_alternative<CallExprPtr>(expr.value())) {
             // move expr from variant to caller
             //auto x = std::get<CallExprPtr>(expr.assignExpr());
-            //auto t = x->getType(analysis);
+            //auto t = x->getType(check);
             return std::move(std::get<CallExprPtr>(expr.value()));
         }
         errors.emplace_back(filename, "Failed to parse call statement.", token->location, false, false);

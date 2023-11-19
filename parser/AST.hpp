@@ -11,13 +11,12 @@
 #include <memory>
 #include <vector>
 #include <optional>
-#include <iostream>
 #include <ranges>
 #include "llvm/IR/Value.h"
 #include "lexer/TokenType.hpp"
 #include "codegen/CodeGenContext.hpp"
 #include "ASTFwdDecl.hpp"
-#include "analysis/Context.hpp"
+#include "check/Context.hpp"
 
 
 namespace Slangc {
@@ -53,8 +52,8 @@ namespace Slangc {
         std::string type;
         bool isConst = true;
         TypeExprNode(SourceLoc loc, std::string type) : loc(loc), type(std::move(type)) {};
-        TypeExprNode(std::string type) : type(std::move(type)) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        explicit TypeExprNode(std::string type) : type(std::move(type)) {};
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>(*this); }
     };
 
@@ -64,7 +63,7 @@ namespace Slangc {
         bool isConst = true;
 
         IntExprNode(SourceLoc loc, int value) : loc(loc), value(value) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant>  { return std::make_unique<TypeExprNode>("integer"); }
     };
 
@@ -74,7 +73,7 @@ namespace Slangc {
         bool isConst = true;
 
         FloatExprNode(SourceLoc loc, float value) : loc(loc), value(value) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>("float"); }
     };
 
@@ -84,7 +83,7 @@ namespace Slangc {
         bool isConst = true;
 
         RealExprNode(SourceLoc loc, double value) : loc(loc), value(value) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>("real"); }
     };
 
@@ -94,7 +93,7 @@ namespace Slangc {
         bool isConst = true;
 
         CharExprNode(SourceLoc loc, char value) : loc(loc), value(value) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>("character"); }
     };
 
@@ -104,7 +103,7 @@ namespace Slangc {
         bool isConst = true;
 
         StringExprNode(SourceLoc loc, std::string value) : loc(loc), value(std::move(value)) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> {
             return std::make_unique<ArrayExprNode>(loc, std::nullopt,
                                                    std::make_unique<TypeExprNode>("character"),
@@ -118,7 +117,7 @@ namespace Slangc {
         bool isConst = true;
 
         NilExprNode(SourceLoc loc, std::optional<ExprPtrVariant> type = std::nullopt) : loc(loc), type(std::move(type)) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<NilExprNode>(*this); }
     };
 
@@ -131,7 +130,7 @@ namespace Slangc {
 
         ArrayExprNode(SourceLoc loc, std::optional<std::vector<ExprPtrVariant>> values, ExprPtrVariant type, ExprPtrVariant size) :
             loc(loc), values(std::move(values)), type(std::move(type)), size(std::move(size)) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
 
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<ArrayExprNode>(*this); }
         [[nodiscard]] auto getIndicesCount() const -> uint64_t {
@@ -151,7 +150,7 @@ namespace Slangc {
         bool isConst = true;
 
         BooleanExprNode(SourceLoc loc, bool value) : loc(loc), value(value) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
 
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>("boolean"); }
     };
@@ -167,7 +166,7 @@ namespace Slangc {
 
         VarExprNode(SourceLoc loc, std::string name, bool dotClass = false, bool dotModule = false, bool isPointer = false, int index = -1)
             : loc(loc), name(std::move(name)), dotClass(dotClass), dotModule(dotModule), isPointer(isPointer), index(index) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
 
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return getDeclType(*analysis.lookup(name), analysis, errors); }
     };
@@ -187,7 +186,7 @@ namespace Slangc {
                       bool dotClass = false, bool dotModule = false, bool isPointer = false, int index = -1)
             : loc(loc), expr(std::move(expr)), indexExpr(std::move(indexExpr)), assign(std::move(assign)), dotClass(dotClass),
               dotModule(dotModule), isPointer(isPointer), index(index) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
 
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> {
             auto tmp = getExprType(expr, analysis, errors);
@@ -206,7 +205,7 @@ namespace Slangc {
 
         IndexesExprNode(SourceLoc loc, std::vector<ExprPtrVariant> indexes, std::optional<ExprPtrVariant> assign = std::nullopt)
             : loc(loc), indexes(std::move(indexes)), assign(std::move(assign)) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
 
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return getExprType(indexes.back(), analysis, errors); }
     };
@@ -219,7 +218,7 @@ namespace Slangc {
 
         UnaryOperatorExprNode(SourceLoc loc, TokenType op, ExprPtrVariant expr)
             : loc(loc), op(op), expr(std::move(expr)) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
 
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return getExprType(expr, analysis, errors); }
     };
@@ -232,7 +231,7 @@ namespace Slangc {
 
         OperatorExprNode(SourceLoc loc, TokenType op, ExprPtrVariant left, ExprPtrVariant right)
             : loc(loc), op(op), left(std::move(left)), right(std::move(right)) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
 
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> {
             if (op == TokenType::Less || op == TokenType::LessOrEqual || op == TokenType::Greater || op == TokenType::GreaterOrEqual ||
@@ -253,7 +252,7 @@ namespace Slangc {
         FuncExprNode(SourceLoc loc, ExprPtrVariant type, std::vector<FuncParamDecStmtPtr> params, bool isFunction = true)
                 : loc(loc), type(std::move(type)), isFunction(isFunction), params(std::move(params)) {};
 
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return getExprType(type, analysis, errors); }
     };
 
@@ -265,7 +264,7 @@ namespace Slangc {
 
         CallExprNode(SourceLoc loc, ExprPtrVariant name, std::vector<ExprPtrVariant> args)
             : loc(loc), name(std::move(name)), args(std::move(args)) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
 
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> {
             auto type = getExprType(name, analysis, errors);
@@ -292,7 +291,7 @@ namespace Slangc {
                 : loc(loc), name(std::move(name)), fields(std::move(fields)), methods(std::move(methods)),
                   parentTypeName(std::move(parentTypeName)), isExtern(isExtern), isPrivate(isPrivate) {};
 
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>(name); }
     };
 
@@ -307,7 +306,7 @@ namespace Slangc {
 
         FieldVarDecNode(SourceLoc loc, std::string name, std::string typeName, bool isPrivate, int index, std::string type, std::optional<ExprPtrVariant> expr = std::nullopt)
                 : loc(loc), name(std::move(name)), typeName(std::move(typeName)), isPrivate(isPrivate), index(index), typeExpr(std::move(type)), expr(std::move(expr)) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>(typeExpr); }
     };
 
@@ -329,7 +328,7 @@ namespace Slangc {
                   assignExpr(std::move(assignExpr)), indicesCount(indicesCount),
                   isPrivate(isPrivate), isConst(isConst) {};
 
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return getExprType(expr, analysis, errors); }
     };
 
@@ -348,7 +347,7 @@ namespace Slangc {
                 : loc(loc), name(std::move(name)), typeName(std::move(typeName)), index(index), expr(std::move(expr)),
                   isFunction(isFunction), isPrivate(isPrivate), assignExpr(std::move(assignExpr)) {};
 
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return expr; }
     };
 
@@ -366,7 +365,7 @@ namespace Slangc {
                 : loc(loc), name(std::move(name)), expr(std::move(expr)), thisName(std::move(thisName)),
                   block(std::move(block)), isPrivate(isPrivate), isFunction(isFunction) {};
 
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return expr; }
     };
 
@@ -378,7 +377,7 @@ namespace Slangc {
 
         AccessExprNode(SourceLoc loc, ExprPtrVariant expr, std::string name)
             : loc(loc), expr(std::move(expr)), name(std::move(name)) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
 
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> {
             auto exprType = getExprType(expr, analysis, errors);
@@ -440,7 +439,7 @@ namespace Slangc {
 
         DeleteStmtNode(SourceLoc loc, ExprPtrVariant expr) : loc(loc), expr(std::move(expr)) {};
 
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
     };
 
     struct BlockStmtNode {
@@ -449,7 +448,7 @@ namespace Slangc {
         bool isConst = false;
 
         BlockStmtNode(SourceLoc loc, std::vector<StmtPtrVariant> statements) : loc(loc), statements(std::move(statements)) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
     };
 
     struct AssignExprNode {
@@ -459,7 +458,7 @@ namespace Slangc {
 
         AssignExprNode(SourceLoc loc, ExprPtrVariant left, ExprPtrVariant right)
             : loc(loc), left(std::move(left)), right(std::move(right)) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
     };
 
     struct FuncParamDecStatementNode {
@@ -471,7 +470,7 @@ namespace Slangc {
 
         FuncParamDecStatementNode(SourceLoc loc, std::string name, ParameterType parameterType, ExprPtrVariant type, std::optional<ExprPtrVariant> expr = std::nullopt)
             : loc(loc), name(std::move(name)), parameterType(parameterType), type(std::move(type)), expr(std::move(expr)) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return type; }
     };
 
@@ -481,7 +480,7 @@ namespace Slangc {
 
         ReturnStatementNode(SourceLoc loc, ExprPtrVariant expr) : loc(loc), expr(std::move(expr)) {};
 
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
     };
 
     struct OutputStatementNode {
@@ -490,7 +489,7 @@ namespace Slangc {
 
         OutputStatementNode(SourceLoc loc, ExprPtrVariant expr) : loc(loc), expr(std::move(expr)) {};
 
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
     };
 
     struct InputStatementNode {
@@ -498,7 +497,7 @@ namespace Slangc {
         ExprPtrVariant expr;
 
         InputStatementNode(SourceLoc loc, ExprPtrVariant expr) : loc(loc), expr(std::move(expr)) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
     };
 
     struct VarDecStatementNode {
@@ -513,7 +512,7 @@ namespace Slangc {
         VarDecStatementNode(SourceLoc loc, std::string name, std::string type, std::optional<ExprPtrVariant> expr = std::nullopt, bool isGlobal = false, bool isPrivate = false, bool isExtern = false)
             : loc(loc), name(std::move(name)), typeExpr(std::move(type)), expr(std::move(expr)), isGlobal(isGlobal), isPrivate(isPrivate), isExtern(isExtern) {};
 
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>(typeExpr); }
     };
 
@@ -532,7 +531,7 @@ namespace Slangc {
                                  bool isPrivate = false, bool isExtern = false)
             : loc(loc), name(std::move(name)), expr(std::move(expr)), assignExpr(std::move(value)), isFunction(isFunction),
               isGlobal(isGlobal), isPrivate(isPrivate), isExtern(isExtern) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return expr; }
     };
 
@@ -553,7 +552,7 @@ namespace Slangc {
             : loc(loc), name(std::move(name)), expr(std::move(expr)), assignExpr(std::move(assignExpr)), indicesCount(indicesCount),
             isGlobal(isGlobal), isPrivate(isPrivate), isExtern(isExtern), isConst(isConst) {};
 
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return getExprType(expr, analysis, errors); }
     };
 
@@ -569,7 +568,7 @@ namespace Slangc {
         FuncDecStatementNode(SourceLoc loc, std::string name, FuncExprPtr expr, std::optional<BlockStmtPtr> block = std::nullopt, bool isPrivate = false, bool isFunction = false, bool isExtern = false)
             : loc(loc), name(std::move(name)), expr(std::move(expr)), block(std::move(block)), isPrivate(isPrivate), isFunction(isFunction), isExtern(isExtern) {};
 
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return expr; }
     };
 
@@ -585,8 +584,8 @@ namespace Slangc {
                                    : loc(loc), name(std::move(name)), expr(std::move(expr)),
                                      isPrivate(isPrivate), isFunction(isFunction) {};
 
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
-        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return expr->type; }
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
+        auto getType(const Context& check, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return expr->type; }
     };*/
 
     struct ElseIfStatementNode {
@@ -597,7 +596,7 @@ namespace Slangc {
         ElseIfStatementNode(SourceLoc loc, ExprPtrVariant condExpr, BlockStmtPtr trueBlock)
             : loc(loc), condition(std::move(condExpr)), trueBlock(std::move(trueBlock)) {};
 
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
     };
 
     struct IfStatementNode {
@@ -612,7 +611,7 @@ namespace Slangc {
             : loc(loc), condition(std::move(condExpr)), trueBlock(std::move(trueBlock)),
               falseBlock(std::move(falseBlock)), elseIfNodes(std::move(elseIfNodes)) {};
 
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
     };
 
     struct WhileStatementNode {
@@ -622,7 +621,7 @@ namespace Slangc {
 
         WhileStatementNode(SourceLoc loc, ExprPtrVariant whileExpr, BlockStmtPtr block)
             : loc(loc), condition(std::move(whileExpr)), block(std::move(block)) {};
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
     };
 
     struct ModuleDeclNode {
@@ -633,7 +632,7 @@ namespace Slangc {
         ModuleDeclNode(SourceLoc loc, std::string name, BlockStmtPtr block)
             : loc(loc), name(std::move(name)), block(std::move(block)) {};
 
-        auto codegen(CodeGenContext &context) -> std::shared_ptr<llvm::Value>;
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>(name); }
     };
 

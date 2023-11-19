@@ -4,11 +4,13 @@
 #include "lexer/Lexer.hpp"
 #include "CompilerOptions.hpp"
 #include "parser/Parser.hpp"
-#include "parser/AST.hpp"
-#include "analysis/Check.hpp"
-#include <codegen/CodeGen.hpp>
+#include "check/Check.hpp"
+#include "codegen/CodeGen.hpp"
+#include "llvm/Support/InitLLVM.h"
 
 int main(int argc, char **argv) {
+    llvm::InitLLVM init_llvm(argc, argv);
+
     Slangc::CompilerOptions options(argc, argv);
     std::vector<Slangc::ErrorMessage> errors;
 
@@ -26,10 +28,12 @@ int main(int argc, char **argv) {
 
     Slangc::Check::checkAST(parser.moduleAST, context, errors);
 
-    Slangc::CodeGen codeGen(std::move(parser.moduleAST));
-    codeGen.process();
+    Slangc::CodeGen codeGen(context, std::move(parser.moduleAST), true);
+    codeGen.process(errors);
 
     std::cout << "\n";
     Slangc::printErrorMessages(errors, std::cout, false);
+
+    codeGen.dumpIRToFile("out.ll");
     return 0;
 }

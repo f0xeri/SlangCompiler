@@ -182,14 +182,28 @@ namespace Slangc {
         // printf
         auto printfFunc = context.module->getOrInsertFunction("printf", FunctionType::get(Type::getInt32Ty(*context.llvmContext), PointerType::get(Type::getInt8Ty(*context.llvmContext), 0), true));
         auto val = processNode(expr, context, errors);
+        bool charArray = false;
+        auto exprType = getExprType(expr, context.context, errors).value();
+        if (auto arr = std::get_if<ArrayExprPtr>(&exprType)) {
+            if (auto type = std::get_if<TypeExprPtr>(&arr->get()->type)) {
+                if (type->get()->type == "character") {
+                    charArray = true;
+                }
+            }
+        }
+        if (auto arr = std::get_if<StringExprPtr>(&expr)) charArray = true;
+
         std::vector<Value*> printArgs;
         Value *formatStr;
         if (val->getType()->isFloatingPointTy()) {
             val = context.builder->CreateFPExt(val, Type::getDoubleTy(*context.llvmContext));
             formatStr = context.builder->CreateGlobalStringPtr("%f\n");
         }
-        else if (val->getType()->isPointerTy()) {
+        else if (val->getType()->isPointerTy() && charArray) {
             formatStr = context.builder->CreateGlobalStringPtr("%s\n");
+        }
+        else if (val->getType()->isPointerTy()) {
+            formatStr = context.builder->CreateGlobalStringPtr("%p\n");
         }
         else if (val->getType()->isIntegerTy(8)) {
             formatStr = context.builder->CreateGlobalStringPtr("%c\n");
@@ -242,6 +256,8 @@ namespace Slangc {
         auto type = getIRType(expr, context);
         auto var = context.builder->CreateAlloca(type, nullptr, name);
         createArrayMalloc(expr, var, context, errors);
+        context.locals()[name] = var;
+        context.localsDecls()[name] = shared_from_this();
         return var;
     }
 

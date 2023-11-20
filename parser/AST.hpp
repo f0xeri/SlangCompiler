@@ -535,7 +535,7 @@ namespace Slangc {
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return expr; }
     };
 
-    struct ArrayDecStatementNode {
+    struct ArrayDecStatementNode : std::enable_shared_from_this<ArrayDecStatementNode> {
         SourceLoc loc{0, 0};
         std::string name;
         ArrayExprPtr expr;

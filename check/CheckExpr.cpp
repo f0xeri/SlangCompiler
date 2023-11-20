@@ -58,7 +58,7 @@ namespace Slangc::Check {
             auto rightType = typeToString(getExprType(expr->right, context, errors).value());
             // TODO: check if conversion is possible
             if (leftType != rightType) {
-                if (!Context::isCastable(leftType, rightType, context)) {
+                if (!Context::isCastable(rightType, leftType, context)) {
                     errors.emplace_back(context.filename, std::string("Type mismatch: cannot apply operator '") + "' to '" + leftType + "' and '" + rightType + "'.", expr->loc, false, false);
                     result = false;
                 }

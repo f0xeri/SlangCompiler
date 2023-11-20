@@ -500,7 +500,7 @@ namespace Slangc {
         auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
     };
 
-    struct VarDecStatementNode {
+    struct VarDecStatementNode : std::enable_shared_from_this<VarDecStatementNode> {
         SourceLoc loc{0, 0};
         std::string name;
         TypeExprNode typeExpr;
@@ -699,6 +699,16 @@ namespace Slangc {
             if (std::get<FieldVarDecPtr>(field)->name == name) return std::get<FieldVarDecPtr>(field)->index;
         }
         return -1;
+    }
+
+    struct ExprLocVisitor {
+        auto operator()(const auto &x) const -> SourceLoc {
+            return x->loc;
+        }
+    };
+
+    static auto getExprLoc(const ExprPtrVariant &expr) -> SourceLoc {
+        return std::visit(ExprLocVisitor{}, expr);
     }
 
     // checks signatures WITHOUT return type

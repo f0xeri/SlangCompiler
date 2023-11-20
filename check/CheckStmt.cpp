@@ -35,7 +35,7 @@ namespace Slangc::Check {
             if (!checkExpr(stmt->expr.value(), context, errors)) {
                 return false;
             }
-            auto exprType = std::get<TypeExprPtr>(getExprType(stmt->expr.value(), context, errors).value())->type;
+            auto exprType = typeToString(getExprType(stmt->expr.value(), context, errors).value());
             if (exprType != stmt->typeExpr.type) {
                 if (!Context::isCastable(exprType, stmt->typeExpr.type, context)) {
                     errors.emplace_back(context.filename, "Type mismatch: cannot assign '" + exprType + "' to '" + stmt->typeExpr.type + "'.", stmt->loc, false, false);

@@ -22,7 +22,7 @@ namespace Slangc {
         void process(std::vector<ErrorMessage>& errors) {
 
             for (auto& symbol: context.symbolTable.symbols | std::views::filter([&](const auto&s) { return s.moduleName == moduleAST->name; })) {
-                //processNode(symbol.declaration, codeGenContext, errors);
+                processNode(symbol.declaration, codeGenContext, errors);
             }
 
             if (isMainModule) {

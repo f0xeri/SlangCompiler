@@ -60,6 +60,7 @@ namespace Slangc {
         Context& context;
 
         std::map<std::string, llvm::StructType *> allocatedClasses;
+        LoadInst* currentTypeLoad;
 
         CodeGenContext(Context &context, bool isMainModule) : context(context) {
             llvmContext = std::make_unique<LLVMContext>();
@@ -94,12 +95,52 @@ namespace Slangc {
             delete top;
         }
 
-        void ret(std::unique_ptr<CodeGenBlock> block) {
-            builder->CreateRetVoid();
-            popBlock();
+        void ret(BasicBlock* block) {
+            blocks.back()->block = block;
+        }
+
+        BasicBlock* currentBlock() {
+            return blocks.back()->block;
+        }
+
+        Value* localsLookup(const std::string &name) const {
+            Value *value = nullptr;
+            for (auto &b : blocks) {
+                if (b->locals.contains(name)) {
+                    value = b->locals[name];
+                    break;
+                }
+            }
+            return value;
+        }
+
+        DeclPtrVariant localsDeclsLookup(const std::string &name) const {
+            DeclPtrVariant value;
+            for (auto &b : blocks) {
+                if (b->localsDecls.contains(name)) {
+                    value = b->localsDecls[name];
+                    break;
+                }
+            }
+            return value;
+        }
+
+        std::map<std::string, Value*>& locals() {
+            return blocks.back()->locals;
+        }
+
+        std::map<std::string, DeclPtrVariant>& localsDecls() {
+            return blocks.back()->localsDecls;
         }
     };
-    Type* typeOf(const std::string& type, CodeGenContext& context);
+    Type* getIRType(const std::string& type, CodeGenContext& context);
+    Type* getIRPtrType(const std::string& type, CodeGenContext& context);
+    Type* getIRType(const ExprPtrVariant& expr, CodeGenContext& context);
+    Value* createMalloc(const std::string &type, Value* var, CodeGenContext &context);
+    Function* createDefaultConstructor(TypeDecStatementNode* type, CodeGenContext &context, std::vector<ErrorMessage>& errors);
+    Value* typeCast(Value* value, Type* type, CodeGenContext &context, std::vector<ErrorMessage> &errors, SourceLoc loc);
+    Value* createArrayMalloc(ArrayExprPtr& array, Value* var, CodeGenContext &context, std::vector<ErrorMessage> &errors);
+    void createMallocLoops(int i, ArrayExprPtr &array, int indicesCount, Value *var, std::vector<Value*> jvars, std::vector<Value*> sizes, CodeGenContext &context, std::vector<ErrorMessage> &errors);
 }
 
 #endif //SLANGCREFACTORED_CODEGENCONTEXT_HPP

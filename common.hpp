@@ -49,6 +49,10 @@ namespace Slangc {
         }
     };
 
+    inline bool containsErrors(const std::vector<ErrorMessage> &errors) {
+        return std::ranges::any_of(errors.begin(), errors.end(), [](auto &error) { return !error.isWarning; });
+    }
+
     // https://www.foonathan.net/2022/05/recursive-variant-box/
     /*template <typename T>
     class Box

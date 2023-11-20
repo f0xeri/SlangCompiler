@@ -9,7 +9,7 @@
 #include "llvm/Support/InitLLVM.h"
 
 int main(int argc, char **argv) {
-    llvm::InitLLVM init_llvm(argc, argv);
+    InitLLVM init_llvm(argc, argv);
 
     Slangc::CompilerOptions options(argc, argv);
     std::vector<Slangc::ErrorMessage> errors;
@@ -27,12 +27,12 @@ int main(int argc, char **argv) {
     parser.parse();
 
     Slangc::Check::checkAST(parser.moduleAST, context, errors);
-
     Slangc::CodeGen codeGen(context, std::move(parser.moduleAST), true);
-    codeGen.process(errors);
+    if (!containsErrors(errors))
+        codeGen.process(errors);
 
     std::cout << "\n";
-    Slangc::printErrorMessages(errors, std::cout, false);
+    printErrorMessages(errors, std::cout, false);
 
     codeGen.dumpIRToFile("out.ll");
     return 0;

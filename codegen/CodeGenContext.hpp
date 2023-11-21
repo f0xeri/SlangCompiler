@@ -61,6 +61,7 @@ namespace Slangc {
 
         std::map<std::string, llvm::StructType *> allocatedClasses;
         LoadInst* currentTypeLoad;
+        bool loadAsRvalue = false;
 
         CodeGenContext(Context &context, bool isMainModule) : context(context) {
             llvmContext = std::make_unique<LLVMContext>();

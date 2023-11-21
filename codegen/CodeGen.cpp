@@ -52,13 +52,26 @@ namespace Slangc {
         auto var = context.localsLookup(name);
         auto declType = getDeclType(context.localsDeclsLookup(name), context.context, errors);
         auto type = getIRType(getDeclType(context.localsDeclsLookup(name), context.context, errors).value(), context);
-        if (Context::isBuiltInType(typeToString(declType.value())))
-            return context.builder->CreateLoad(type, var);
+        //if (Context::isBuiltInType(typeToString(declType.value())))
+            //return context.builder->CreateLoad(type, var);
+        if (context.loadAsRvalue)
+            var = context.builder->CreateLoad(type, var);
         return var;
     }
 
     auto IndexExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
-        return {};
+        auto temp = context.loadAsRvalue;
+        context.loadAsRvalue = true;
+        auto var = processNode(expr, context, errors);
+        auto varType = std::get<ArrayExprPtr>(getExprType(expr, context.context, errors).value());
+        auto indexVal = processNode(indexExpr, context, errors);
+        context.loadAsRvalue = false;
+        var = context.builder->CreateGEP(getIRType(varType->type, context), var, indexVal);
+        if (temp) {
+            var = context.builder->CreateLoad(getIRType(varType->type, context), var);
+        }
+        context.loadAsRvalue = temp;
+        return var;
     }
 
     auto IndexesExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
@@ -66,7 +79,10 @@ namespace Slangc {
     }
 
     auto UnaryOperatorExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+        auto temp = context.loadAsRvalue;
+        context.loadAsRvalue = true;
         auto val = processNode(expr, context, errors);
+        context.loadAsRvalue = temp;
         if (val->getType()->isIntegerTy())
             return context.builder->CreateNeg(val);
         if (val->getType()->isFloatingPointTy())
@@ -75,8 +91,11 @@ namespace Slangc {
     }
 
     auto OperatorExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+        auto temp = context.loadAsRvalue;
+        context.loadAsRvalue = true;
         auto leftValue = processNode(left, context, errors);
         auto rightValue = processNode(right, context, errors);
+        context.loadAsRvalue = temp;
 
         if (leftValue->getType() != rightValue->getType()) {
             rightValue = typeCast(rightValue, leftValue->getType(), context, errors, getExprLoc(left));
@@ -157,13 +176,11 @@ namespace Slangc {
     }
 
     auto AssignExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+        context.loadAsRvalue = true;
         auto rightVal = processNode(right, context, errors);
-        Value* leftVal;
-        if (auto leftExpr = std::get_if<VarExprPtr>(&left)) {
-            leftVal = context.localsLookup(leftExpr->get()->name);
-            return context.builder->CreateStore(rightVal, leftVal);
-        }
-        return nullptr;
+        context.loadAsRvalue = false;
+        auto leftVal = processNode(left, context, errors);
+        return context.builder->CreateStore(rightVal, leftVal);
     }
 
     auto FuncParamDecStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
@@ -181,13 +198,17 @@ namespace Slangc {
     auto OutputStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         // printf
         auto printfFunc = context.module->getOrInsertFunction("printf", FunctionType::get(Type::getInt32Ty(*context.llvmContext), PointerType::get(Type::getInt8Ty(*context.llvmContext), 0), true));
+        auto temp = context.loadAsRvalue;
+        context.loadAsRvalue = true;
         auto val = processNode(expr, context, errors);
+        context.loadAsRvalue = temp;
         bool charArray = false;
         auto exprType = getExprType(expr, context.context, errors).value();
         if (auto arr = std::get_if<ArrayExprPtr>(&exprType)) {
             if (auto type = std::get_if<TypeExprPtr>(&arr->get()->type)) {
                 if (type->get()->type == "character") {
                     charArray = true;
+                    //val = context.builder->CreateLoad(val->getType(), val);
                 }
             }
         }

@@ -275,10 +275,16 @@ namespace Slangc {
 
     auto ArrayDecStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         auto type = getIRType(expr, context);
-        auto var = context.builder->CreateAlloca(type, nullptr, name);
-        createArrayMalloc(expr, var, context, errors);
+        Value* var = context.builder->CreateAlloca(type, nullptr, name);
         context.locals()[name] = var;
         context.localsDecls()[name] = shared_from_this();
+        if (assignExpr.has_value()) {
+            context.loadAsRvalue = true;
+            auto assignVal = processNode(assignExpr.value(), context, errors);
+            context.loadAsRvalue = false;
+            context.builder->CreateStore(assignVal, var);
+        }
+        else createArrayMalloc(expr, var, context, errors);
         return var;
     }
 

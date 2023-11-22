@@ -258,21 +258,24 @@ namespace Slangc {
 
     struct CallExprNode {
         SourceLoc loc{0, 0};
-        ExprPtrVariant name;        // TODO: change to VarExprPtrVariant?
+        ExprPtrVariant expr;        // TODO: change to VarExprPtrVariant?
         std::vector<ExprPtrVariant> args;
         bool isConst = false;
 
+        std::optional<DeclPtrVariant> foundFunc = std::nullopt;
+        std::optional<FuncExprPtr> funcType = std::nullopt;
+
         CallExprNode(SourceLoc loc, ExprPtrVariant name, std::vector<ExprPtrVariant> args)
-            : loc(loc), name(std::move(name)), args(std::move(args)) {};
+            : loc(loc), expr(std::move(name)), args(std::move(args)) {};
         auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
 
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> {
-            auto type = getExprType(name, analysis, errors);
+            auto type = getExprType(expr, analysis, errors);
             if (!type.has_value()) return std::nullopt;
             if (auto funcType = std::get_if<FuncExprPtr>(&type.value())) {
                 return (*funcType)->type;
             }
-            return getExprType(name, analysis, errors);
+            return getExprType(expr, analysis, errors);
         }
     };
 
@@ -516,7 +519,7 @@ namespace Slangc {
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>(typeExpr); }
     };
 
-    struct FuncPointerStatementNode {
+    struct FuncPointerStatementNode : std::enable_shared_from_this<FuncPointerStatementNode> {
         SourceLoc loc{0, 0};
         std::string name;
         FuncExprPtr expr;

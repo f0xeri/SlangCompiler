@@ -9,12 +9,15 @@
 #include <utility>
 #include <string>
 #include <vector>
+#include <optional>
 #include "ASTFwdDecl.hpp"
 
 namespace Slangc {
     class Scope {
     public:
         std::shared_ptr<Scope> parent;
+        std::map<std::string, std::shared_ptr<Scope>> children;
+        using ChildrenIterator = std::map<std::string, std::shared_ptr<Scope>>::iterator;
 
         Scope() = default;
         explicit Scope(std::shared_ptr<Scope> parent) : parent(std::move(parent)) {}
@@ -39,6 +42,10 @@ namespace Slangc {
         auto get(std::string_view name) -> const DeclPtrVariant* {
             auto it = std::ranges::find(symbols, name, &std::pair<std::string, DeclPtrVariant>::first);
             return (it == symbols.end()) ? nullptr : &(it->second);
+        }
+
+        auto getNamedChild(const std::string &name) -> std::optional<std::shared_ptr<Scope>> {
+            return children[name];
         }
 
         auto lookup(std::string_view name) -> const DeclPtrVariant* {

@@ -8,7 +8,6 @@
 #include <memory>
 #include <map>
 #include <optional>
-#include <iostream>
 #include "parser/Scope.hpp"
 #include "SymbolTable.hpp"
 #include "common.hpp"
@@ -24,8 +23,16 @@ namespace Slangc {
         std::string currType;
         std::string moduleName;
         std::string filename;
-        auto enterScope() -> void {
-            currScope = std::make_unique<Scope>(std::move(currScope));
+        auto enterScope(const std::string &name = "") -> void {
+            if (currScope->children[name] == nullptr) {
+                currScope->children[name] = std::make_shared<Scope>(currScope);
+            }
+            currScope = currScope->children.at(name);
+        }
+
+        // enterScope by iterator
+        auto enterScope(Scope::ChildrenIterator iter) -> void {
+            currScope = iter->second;
         }
 
         auto exitScope() -> void {

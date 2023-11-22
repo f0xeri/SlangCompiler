@@ -50,12 +50,33 @@ namespace Slangc {
 
     auto VarExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         auto var = context.localsLookup(name);
-        auto declType = getDeclType(context.localsDeclsLookup(name), context.context, errors);
-        auto type = getIRType(getDeclType(context.localsDeclsLookup(name), context.context, errors).value(), context);
-        //if (Context::isBuiltInType(typeToString(declType.value())))
-            //return context.builder->CreateLoad(type, var);
-        if (context.loadAsRvalue)
+        std::optional<ExprPtrVariant> declType;
+        bool isOut = false;
+        bool isVar = false;
+        if (auto localVar = context.localsDeclsLookup(name)) {
+            declType = getDeclType(localVar.value(), context.context, errors);
+            if (auto funcParam = std::get_if<FuncParamDecStmtPtr>(&localVar.value())) {
+                if (funcParam->get()->parameterType == Out) {
+                    isOut = true;
+                }
+                else if (funcParam->get()->parameterType == Var) {
+                    isVar = true;
+                }
+            }
+        }
+        else if (auto func = context.context.symbolTable.lookupFunc(name, context.currentFuncSignature.value(), context.context)) {
+            declType = getDeclType(*func, context.context, errors);
+            var = getFuncFromExpr(*func, context);
+        }
+        auto type = getIRType(declType.value(), context);
+        if (context.loadAsRvalue || isVar) {
+            if (isVar || isOut) type = type->getPointerTo();
             var = context.builder->CreateLoad(type, var);
+            if (context.loadAsRvalue && isVar) {
+                type = getIRType(declType.value(), context);
+                var = context.builder->CreateLoad(type, var);
+            }
+        }
         return var;
     }
 
@@ -160,7 +181,36 @@ namespace Slangc {
     }
 
     auto CallExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
-        return {};
+        Value* func = nullptr;
+        auto temp = context.loadAsRvalue;
+        if (foundFunc.has_value()) {
+            func = getFuncFromExpr(foundFunc.value(), context);
+        }
+        else {
+            context.loadAsRvalue = true;
+            func = processNode(expr, context, errors);
+        }
+
+        std::vector<Value*> argsRef;
+        for (size_t i = 0; i < args.size(); ++i) {
+            auto currArg = args[i];
+            auto currExpectedType = funcType.value()->params[i]->type;
+            if (std::holds_alternative<FuncExprPtr>(currExpectedType)) {
+                context.currentFuncSignature = std::get<FuncExprPtr>(currExpectedType);
+            }
+            auto isOutVar = funcType.value()->params[i]->parameterType == Out || funcType.value()->params[i]->parameterType == Var;
+            if (isOutVar)
+                context.loadAsRvalue = false;
+            else
+                context.loadAsRvalue = true;
+            auto argVal = processNode(currArg, context, errors);
+            auto currExpectedIRType = isOutVar ? getIRType(currExpectedType, context)->getPointerTo() : getIRType(currExpectedType, context);
+            argVal = typeCast(argVal, currExpectedIRType, context, errors, getExprLoc(currArg));
+            argsRef.push_back(argVal);
+            context.currentFuncSignature = std::nullopt;
+        }
+        context.loadAsRvalue = temp;
+        return context.builder->CreateCall(getFuncType(funcType.value(), context), func, argsRef);
     }
 
     auto AccessExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
@@ -192,7 +242,9 @@ namespace Slangc {
     }
 
     auto ReturnStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
-        return context.builder->CreateRet(processNode(expr, context, errors));
+        auto val = processNode(expr, context, errors);
+        val = typeCast(val, context.currentReturnType, context, errors, getExprLoc(expr));
+        return context.builder->CreateRet(val);
     }
 
     auto OutputStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
@@ -208,7 +260,6 @@ namespace Slangc {
             if (auto type = std::get_if<TypeExprPtr>(&arr->get()->type)) {
                 if (type->get()->type == "character") {
                     charArray = true;
-                    //val = context.builder->CreateLoad(val->getType(), val);
                 }
             }
         }
@@ -232,6 +283,9 @@ namespace Slangc {
         else if (val->getType()->isIntegerTy(1)) {
             formatStr = context.builder->CreateGlobalStringPtr("%s\n");
         }
+        else if (val->getType()->isIntegerTy()) {
+            formatStr = context.builder->CreateGlobalStringPtr("%d\n");
+        }
         else {
             formatStr = context.builder->CreateGlobalStringPtr("%s\n");
         }
@@ -249,19 +303,16 @@ namespace Slangc {
         Value* var = nullptr;
         Value* rightVal = nullptr;
         if (type) {
-            if (Context::isBuiltInType(typeExpr.type)) {
-                var = context.builder->CreateAlloca(type, nullptr, name);
-                if (expr) {
-                    rightVal = processNode(expr.value(), context, errors);
-                    if (rightVal->getType() != type) {
-                        rightVal = typeCast(rightVal, type, context, errors, getExprLoc(expr.value()));
-                    }
-                    context.builder->CreateStore(rightVal, var);
-                }
+            var = context.builder->CreateAlloca(Context::isBuiltInType(typeExpr.type) ? type : type->getPointerTo(), nullptr, name);
+            if (expr.has_value()) {
+                context.loadAsRvalue = true;
+                rightVal = processNode(expr.value(), context, errors);
+                context.loadAsRvalue = false;
+                // TODO: do type cast
+                context.builder->CreateStore(rightVal, var);
             }
-            else {
-                var = context.builder->CreateAlloca(type->getPointerTo(), nullptr, name);
-                auto malloc = createMalloc(typeExpr.type, var, context);
+            else if (!Context::isBuiltInType(typeExpr.type)) {
+                createMalloc(typeExpr.type, var, context);
             }
         }
         context.locals()[name] = var;
@@ -270,7 +321,20 @@ namespace Slangc {
     }
 
     auto FuncPointerStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
-        return {};
+        auto type = getIRType(expr, context);
+        Value* var = context.builder->CreateAlloca(type, nullptr, name);
+        context.locals()[name] = var;
+        context.localsDecls()[name] = shared_from_this();
+        if (assignExpr.has_value()) {
+            auto temp = context.loadAsRvalue;
+            context.loadAsRvalue = false;
+            context.currentFuncSignature = expr;
+            auto assignVal = processNode(assignExpr.value(), context, errors);
+            context.currentFuncSignature = std::nullopt;
+            context.loadAsRvalue = temp;
+            context.builder->CreateStore(assignVal, var);
+        }
+        return var;
     }
 
     auto ArrayDecStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
@@ -289,6 +353,41 @@ namespace Slangc {
     }
 
     auto FuncDecStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+        auto funcType = getFuncType(expr, context);
+        auto funcName = name + "." + getMangledFuncName(expr);
+        auto funcCallee = context.module->getOrInsertFunction(funcName, funcType);
+        auto func = context.module->getFunction(funcName);
+        context.context.enterScope(name);
+        if (block.has_value()) {
+            BasicBlock *block = BasicBlock::Create(*context.llvmContext, "entry", context.module->getFunction(funcName));
+            context.pushBlock(block);
+            context.builder->SetInsertPoint(block);
+            Function::arg_iterator argsValues = func->arg_begin();
+            for (auto param = expr->params.begin(); param != expr->params.end(); ++param, ++argsValues) {
+                Value* var;
+                if (param->get()->parameterType == Out || param->get()->parameterType == Var)
+                    var = context.builder->CreateAlloca(getIRType(param->get()->type, context)->getPointerTo(), nullptr, param->get()->name);
+                else
+                    var = context.builder->CreateAlloca(getIRType(param->get()->type, context), nullptr, param->get()->name);
+                context.locals()[param->get()->name] = var;
+                context.localsDecls()[param->get()->name] = *param;
+                argsValues->setName(parameterTypeToString(param->get()->parameterType) + param->get()->name);
+                context.builder->CreateStore(argsValues, var);
+            }
+        }
+        bool hasReturn = false;
+        for (auto &&stmt : block.value()->statements) {
+            context.currentReturnType = getIRType(expr->type, context);
+            auto val = processNode(stmt, context, errors);
+            if (std::holds_alternative<ReturnStatementPtr>(stmt)) {
+                hasReturn = true;
+                break;
+            }
+        }
+        context.currentReturnType = nullptr;
+        if (!isFunction) context.builder->CreateRetVoid();
+        context.context.exitScope();
+        context.popBlock();
         return {};
     }
 

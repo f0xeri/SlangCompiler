@@ -45,10 +45,10 @@ namespace Slangc {
                 }
                 Lexer lexer(std::move(buffer.get()), errors);
                 lexer.tokenize();
-                Slangc::Parser parser(buffer->getFilename(), lexer.tokens, options, context, errors);
+                Parser parser(buffer->getFilename(), lexer.tokens, options, context, errors);
                 parser.parse();
-                Slangc::Check::checkAST(parser.moduleAST, context, errors);
-                Slangc::CodeGen codeGen(context, std::move(parser.moduleAST), false);
+                Check::checkAST(parser.moduleAST, context, errors);
+                CodeGen codeGen(context, std::move(parser.moduleAST), false);
                 codeGen.process(errors);
             }
         }

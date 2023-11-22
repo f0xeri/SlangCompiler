@@ -143,7 +143,7 @@ namespace Slangc::Check {
 
     bool checkExpr(const CallExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
-        result = checkExpr(expr->name, context, errors);
+        result = checkExpr(expr->expr, context, errors);
         for (const auto &arg: expr->args) {
             result &= checkExpr(arg, context, errors);
         }
@@ -157,21 +157,23 @@ namespace Slangc::Check {
         params.reserve(expr->args.size());
         auto zeroLoc = SourceLoc{0, 0};
         for (const auto &arg: expr->args) {
-            params.push_back(create<FuncParamDecStatementNode>(zeroLoc, "", ParameterType::None, getExprType(arg, context, errors).value()));
+            params.push_back(create<FuncParamDecStatementNode>(zeroLoc, "", None, getExprType(arg, context, errors).value()));
         }
         auto funcExpr = create<FuncExprNode>(zeroLoc, create<TypeExprNode>(zeroLoc, "void"), params);
 
-        auto type = getExprType(expr->name, context, errors);
+        auto type = getExprType(expr->expr, context, errors);
         // check is callable
-        if (auto access = std::get_if<AccessExprPtr>(&expr->name)) {
+        if (auto access = std::get_if<AccessExprPtr>(&expr->expr)) {
             auto accessType = getExprType(access->get()->expr, context, errors);
             std::optional<TypeDecStmtPtr> typeDecl = std::nullopt;
             if (std::holds_alternative<TypeExprPtr>(accessType.value())) {
                 typeDecl = context.symbolTable.lookupType(std::get<TypeExprPtr>(accessType.value())->type);
-                funcExpr->params.insert(funcExpr->params.begin(), create<FuncParamDecStatementNode>(zeroLoc, "", ParameterType::Out, std::get<TypeExprPtr>(accessType.value())));
+                funcExpr->params.insert(funcExpr->params.begin(), create<FuncParamDecStatementNode>(zeroLoc, "", Out, std::get<TypeExprPtr>(accessType.value())));
             }
             while (typeDecl.has_value()) {
                 func = selectBestOverload(typeDecl.value(), typeDecl.value()->name + "." + access->get()->name, funcExpr, false, false, context);
+                expr->foundFunc = func;
+                expr->funcType = std::get<MethodDecPtr>(*func)->expr;
                 overloaded = true;
                 if (!func && typeDecl.value()->parentTypeName.has_value()) {
                     typeDecl = context.symbolTable.lookupType(typeDecl.value()->parentTypeName.value());
@@ -179,8 +181,10 @@ namespace Slangc::Check {
                 else break;
             }
         }
-        else if (auto var = std::get_if<VarExprPtr>(&expr->name)) {
+        else if (auto var = std::get_if<VarExprPtr>(&expr->expr)) {
             func = selectBestOverload(var->get()->name, funcExpr, false, false, context);
+            expr->foundFunc = func;
+            if (func) expr->funcType = std::get<FuncDecStatementPtr>(*func)->expr;
             overloaded = true;
             if (!func) {
                 auto funcPointer = context.lookup(var->get()->name);
@@ -191,31 +195,38 @@ namespace Slangc::Check {
                 if (funcPointer) {
                     if (std::holds_alternative<FuncPointerStmtPtr>(*funcPointer)) {
                         overloaded = true;
-                        if (compareFuncSignatures(std::get<FuncPointerStmtPtr>(*funcPointer)->expr, funcExpr, context, false, true))
+                        if (compareFuncSignatures(std::get<FuncPointerStmtPtr>(*funcPointer)->expr, funcExpr, context, false, true)) {
                             func = *funcPointer;
+                            expr->funcType = std::get<FuncPointerStmtPtr>(*funcPointer)->expr;
+                        }
                     }
                     else if (std::holds_alternative<FieldFuncPointerStmtPtr>(*funcPointer)) {
                         overloaded = true;
-                        if (compareFuncSignatures(std::get<FieldFuncPointerStmtPtr>(*funcPointer)->expr, funcExpr, context, false, true))
+                        if (compareFuncSignatures(std::get<FieldFuncPointerStmtPtr>(*funcPointer)->expr, funcExpr, context, false, true)) {
                             func = *funcPointer;
+                            expr->funcType = std::get<FieldFuncPointerStmtPtr>(*funcPointer)->expr;
+                        }
                     }
                     else if (std::holds_alternative<FuncParamDecStmtPtr>(*funcPointer)) {
                         auto param = std::get<FuncParamDecStmtPtr>(*funcPointer);
                         if (std::holds_alternative<FuncExprPtr>(param->type)) {
                             overloaded = true;
-                            if (compareFuncSignatures(std::get<FuncExprPtr>(param->type), funcExpr, context, false, true))
+                            if (compareFuncSignatures(std::get<FuncExprPtr>(param->type), funcExpr, context, false, true)) {
                                 func = *funcPointer;
+                                expr->funcType = std::get<FuncExprPtr>(param->type);
+                            }
                         }
                     }
                 }
             }
         }
-        else if (auto index = std::get_if<IndexExprPtr>(&expr->name)) {
+        else if (auto index = std::get_if<IndexExprPtr>(&expr->expr)) {
             auto indexType = getExprType(*index, context, errors);
             if (indexType.has_value() && std::holds_alternative<FuncExprPtr>(indexType.value())) {
                 overloaded = true;
                 if (compareFuncSignatures(std::get<FuncExprPtr>(indexType.value()), funcExpr, context, false, true)) {
                     funcPtrsArrIndex = *index;
+                    expr->funcType = std::get<FuncExprPtr>(indexType.value());
                 }
             }
         }
@@ -223,7 +234,6 @@ namespace Slangc::Check {
             errors.emplace_back(context.filename, overloaded ? "No matching function for call." : "Expression is not callable.", expr->loc, false, false);
             result = false;
         }
-
         return result;
     }
 

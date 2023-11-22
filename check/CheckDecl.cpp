@@ -119,7 +119,7 @@ namespace Slangc::Check {
                 result = false;
             }
             context.insert(decl->name, decl);
-            context.enterScope();
+            context.enterScope(decl->name);
             for (const auto &param: decl->expr->params) {
                 context.insert(param->name, param);
             }
@@ -183,7 +183,7 @@ namespace Slangc::Check {
                 result = false;
             }
             context.insert(decl->name, decl);
-            context.enterScope();
+            context.enterScope(decl->name);
             for (const auto &param: decl->expr->params) {
                 context.insert(param->name, param);
             }
@@ -227,7 +227,7 @@ namespace Slangc::Check {
 
         context.insert(decl->name, decl);
         context.currType = decl->name;
-        context.enterScope();
+        context.enterScope(decl->name);
         for (const auto &field: decl->fields) {
             result &= checkDecl(field, context, errors);
         }

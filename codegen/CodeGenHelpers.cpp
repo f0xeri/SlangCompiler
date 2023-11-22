@@ -59,6 +59,9 @@ namespace Slangc {
         if (auto arr = std::get_if<ArrayExprPtr>(&expr)) {
             return getIRType(arr->get()->type, context)->getPointerTo();
         }
+        if (auto func = std::get_if<FuncExprPtr>(&expr)) {
+            return getFuncType(*func, context)->getPointerTo();
+        }
         return nullptr;
     }
 
@@ -174,5 +177,67 @@ namespace Slangc {
         context.builder->CreateRetVoid();
         context.popBlock();
         return constructor;
+    }
+
+    FunctionType* getFuncType(const FuncExprPtr& funcExpr, CodeGenContext &context) {
+        std::vector<Type*> params;
+        for (auto& param : funcExpr->params) {
+            if (param->parameterType == In || param->parameterType == None)
+                params.push_back(getIRType(param->type, context));
+            else
+                params.push_back(getIRType(param->type, context)->getPointerTo());
+        }
+        return FunctionType::get(getIRType(funcExpr->type, context), params, false);
+    }
+
+    std::string typeToMangledString(const ExprPtrVariant& type, ParameterType parameterType, bool newType = false) {
+        std::string result;
+        if (newType) result += "%";
+        switch (parameterType) {
+            case Out:
+            case Var:
+                result += "*";
+                break;
+            default:
+                break;
+        }
+        if (auto typePtr = std::get_if<TypeExprPtr>(&type)) {
+            return result + typePtr->get()->type;
+        }
+        if (auto typePtr = std::get_if<ArrayExprPtr>(&type)) {
+            result += "arr[]";
+            return result + typeToMangledString(typePtr->get()->type, None);
+        }
+        if (std::holds_alternative<FuncExprPtr>(type)) {
+            auto funcExpr = std::get<FuncExprPtr>(type);
+            result += "func(";
+            for (int i = 0; i < funcExpr->params.size(); i++) {
+                result += typeToMangledString(funcExpr->params[i]->type, funcExpr->params[i]->parameterType);
+                if (i != funcExpr->params.size() - 1) result += ", ";
+            }
+            result += "):" + typeToMangledString(funcExpr->type, None);
+            return result;
+        }
+        return "unknown";
+    }
+
+    std::string getMangledFuncName(const FuncExprPtr& funcExpr) {
+        std::string result = "_";
+        for (auto& param : funcExpr->params) {
+            result += typeToMangledString(param->type, param->parameterType, true);
+        }
+        result += "_";
+        result += typeToMangledString(funcExpr->type, None, true);
+        return result;
+    }
+
+    Function* getFuncFromExpr(const DeclPtrVariant& funcExpr, CodeGenContext &context) {
+        if (auto func = std::get_if<FuncDecStatementPtr>(&funcExpr)) {
+            return context.module->getFunction(func->get()->name + "." + getMangledFuncName(func->get()->expr));
+        }
+        if (auto method = std::get_if<MethodDecPtr>(&funcExpr)) {
+            return context.module->getFunction(method->get()->name + "." + getMangledFuncName(method->get()->expr));
+        }
+        return nullptr;
     }
 }

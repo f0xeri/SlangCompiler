@@ -60,7 +60,9 @@ namespace Slangc {
         Context& context;
 
         std::map<std::string, llvm::StructType *> allocatedClasses;
-        LoadInst* currentTypeLoad;
+        LoadInst* currentTypeLoad = nullptr;
+        std::optional<FuncExprPtr> currentFuncSignature = std::nullopt;
+        Type* currentReturnType = nullptr;
         bool loadAsRvalue = false;
 
         CodeGenContext(Context &context, bool isMainModule) : context(context) {
@@ -115,8 +117,8 @@ namespace Slangc {
             return value;
         }
 
-        DeclPtrVariant localsDeclsLookup(const std::string &name) const {
-            DeclPtrVariant value;
+        std::optional<DeclPtrVariant> localsDeclsLookup(const std::string &name) const {
+            std::optional<DeclPtrVariant> value = std::nullopt;
             for (auto &b : blocks) {
                 if (b->localsDecls.contains(name)) {
                     value = b->localsDecls[name];
@@ -142,6 +144,11 @@ namespace Slangc {
     Value* typeCast(Value* value, Type* type, CodeGenContext &context, std::vector<ErrorMessage> &errors, SourceLoc loc);
     Value* createArrayMalloc(ArrayExprPtr& array, Value* var, CodeGenContext &context, std::vector<ErrorMessage> &errors);
     void createMallocLoops(int i, ArrayExprPtr &array, int indicesCount, Value *var, std::vector<Value*> jvars, std::vector<Value*> sizes, CodeGenContext &context, std::vector<ErrorMessage> &errors);
+    FunctionType* getFuncType(const FuncExprPtr& funcExpr, CodeGenContext &context);
+    std::string typeToMangledString(const ExprPtrVariant& type, ParameterType parameterType, bool newType);
+    std::string getMangledFuncName(const FuncExprPtr& funcExpr);
+    Function* getFuncFromExpr(const DeclPtrVariant& funcExpr, CodeGenContext &context);
+
 }
 
 #endif //SLANGCREFACTORED_CODEGENCONTEXT_HPP

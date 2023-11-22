@@ -230,6 +230,11 @@ namespace Slangc {
         auto rightVal = processNode(right, context, errors);
         context.loadAsRvalue = false;
         auto leftVal = processNode(left, context, errors);
+        auto ltype = getIRType(getExprType(left, context.context, errors).value(), context);
+        // auto rtype = getIRType(getExprType(right, context.context, errors).value(), context);
+        if (ltype != rightVal->getType()) {
+            rightVal = typeCast(rightVal, ltype, context, errors, getExprLoc(right));
+        }
         return context.builder->CreateStore(rightVal, leftVal);
     }
 

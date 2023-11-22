@@ -34,8 +34,8 @@ module sample
         output z;
         variable-integer x1 := x;
         // variable-integer y1 := y; // this should throw an error in check
-        variable-integer y1 := y;
-        // let y1 := y;              // this should throw an error in check
+        variable-integer y1;
+        let y1 := y;                 // this should throw an error in check
         variable-integer z1 := z;
         output "";
         output x1;

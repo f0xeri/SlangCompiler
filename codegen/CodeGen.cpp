@@ -226,12 +226,17 @@ namespace Slangc {
     }
 
     auto AssignExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
-        context.loadAsRvalue = true;
-        auto rightVal = processNode(right, context, errors);
-        context.loadAsRvalue = false;
-        auto leftVal = processNode(left, context, errors);
         auto ltype = getIRType(getExprType(left, context.context, errors).value(), context);
-        // auto rtype = getIRType(getExprType(right, context.context, errors).value(), context);
+        auto rtype = getIRType(getExprType(right, context.context, errors).value(), context);
+        auto leftVal = processNode(left, context, errors);
+        context.loadAsRvalue = true;
+        if (std::holds_alternative<FuncExprPtr>(getExprType(left, context.context, errors).value())) {
+            context.loadAsRvalue = false;
+            context.currentFuncSignature = std::get<FuncExprPtr>(getExprType(left, context.context, errors).value());
+        }
+        auto rightVal = processNode(right, context, errors);
+        context.currentFuncSignature = std::nullopt;
+        context.loadAsRvalue = false;
         if (ltype != rightVal->getType()) {
             rightVal = typeCast(rightVal, ltype, context, errors, getExprLoc(right));
         }

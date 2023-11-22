@@ -3,39 +3,41 @@ module sample
         return x + y;
     end testFunc;
 
+    public function testFunc2(in integer x, in integer y): integer
+        return x - y;
+    end testFunc2;
+
     public procedure testProc(in integer x, in integer y)
-        output "testProc(in integer x, in integer y):";
+        output "\ntestProc(in integer x, in integer y):";
         output x + y;
     end testProc;
 
     public procedure testProc(out function(in integer, in integer): integer func)
-        output "testProc(out function(in integer, in integer): integer func)";
+        output "\ntestProc(out function(in integer, in integer): integer func)";
         output func(1, 2);
     end testProc;
 
     public procedure testProc(in integer x)
-        output "testProc(in integer x)";
+        output "\ntestProc(in integer x)";
         output x;
     end testProc;
 
     public procedure testProc(in real x)
-        output "testProc(in real x)";
+        output "\ntestProc(in real x)";
         output x;
     end testProc;
 
     public procedure testProc()
-        output "testProc()";
+        output "\ntestProc()";
     end testProc;
 
     public procedure testInOutVar(in integer x, out integer y, var integer z, out integer z2)
-        output "testInOutVar(in integer x, out integer y, var integer z)";
+        output "\ntestInOutVar(in integer x, out integer y, var integer z)";
         output x;
         output y;
         output z;
         variable-integer x1 := x;
-        // variable-integer y1 := y; // this should throw an error in check
-        variable-integer y1;
-        let y1 := y;                 // this should throw an error in check
+        variable-integer y1 := y;    // this should throw an error in check (as well as let y1 := y)
         variable-integer z1 := z;
         output "";
         output x1;
@@ -44,9 +46,9 @@ module sample
     end testInOutVar;
 
     public procedure testout(in integer x, out integer y)
-        output "testout(in integer x, out integer y)";
+        output "\ntestout(in integer x, out integer y)";
         variable-integer x2 := x;
-        variable-integer y2 := y;
+        variable-integer y2 := y;    // this should throw an error in check (as well as let y1 := y)
         output x2;
         output y2;
     end testout;
@@ -80,7 +82,7 @@ start
     call testInOutVar(x, y, z, z);
     call testout(x, y);
 
-    output "check swaps";
+    output "\ncheck swaps";
     variable-real a := 5.1;
     variable-real b := 10.2;
     call swapReal(a, b);
@@ -92,4 +94,11 @@ start
     call test(c, d);
     output c;
     output d;
+
+    output "\ncheck array of func pointers";
+    variable-array[3] function(in integer, in integer): integer funcArray;
+    let funcArray[0] := testFunc;
+    let funcArray[1] := testFunc2;
+    output funcArray[0](1, 2);
+    output funcArray[1](1, 2);
 end sample.

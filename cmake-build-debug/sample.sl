@@ -32,7 +32,36 @@ module sample
         output x;
         output y;
         output z;
+        variable-integer x1 := x;
+        // variable-integer y1 := y; // this should throw an error in check
+        variable-integer y1 := y;
+        // let y1 := y;              // this should throw an error in check
+        variable-integer z1 := z;
+        output "";
+        output x1;
+        output y1;
+        output z1;
     end testInOutVar;
+
+    public procedure testout(in integer x, out integer y)
+        output "testout(in integer x, out integer y)";
+        variable-integer x2 := x;
+        variable-integer y2 := y;
+        output x2;
+        output y2;
+    end testout;
+
+    private procedure swapReal(var real a, var real b)
+        variable-real temp := a;
+        let a := b;
+        let b := temp;
+    end swapReal;
+
+    private procedure test(var integer a, var integer b)
+        variable-integer temp := a;
+        let a := b;
+        let b := temp;
+    end test;
 start
     variable-procedure(in integer, in integer) procPointer := testProc;
     variable-procedure(in integer) procPointer2 := testProc;
@@ -45,8 +74,22 @@ start
     call procPointer4();
     call procPointer5(testFunc);
 
-    variable-float x := 1.0f;
+    variable-integer x := 1;
     variable-integer y := 2;
     variable-integer z := 3;
     call testInOutVar(x, y, z, z);
+    call testout(x, y);
+
+    output "check swaps";
+    variable-real a := 5.1;
+    variable-real b := 10.2;
+    call swapReal(a, b);
+    output a;
+    output b;
+
+    variable-integer c := 5;
+    variable-integer d := 10;
+    call test(c, d);
+    output c;
+    output d;
 end sample.

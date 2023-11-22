@@ -21,6 +21,9 @@ namespace Slangc {
         if (value->getType()->isFloatingPointTy() && type->isFloatingPointTy()) {
             return context.builder->CreateFPCast(value, type);
         }
+        if (value->getType()->isPointerTy() && type->isIntegerTy()) {
+            return context.builder->CreatePtrToInt(value, type);
+        }
         std::string type_str = "";
         raw_string_ostream rso(type_str);
         value->getType()->print(rso);

@@ -300,15 +300,19 @@ namespace Slangc {
 
     auto VarDecStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         auto type = getIRType(typeExpr.type, context);
+        type = Context::isBuiltInType(typeExpr.type) ? type : type->getPointerTo();
         Value* var = nullptr;
         Value* rightVal = nullptr;
         if (type) {
-            var = context.builder->CreateAlloca(Context::isBuiltInType(typeExpr.type) ? type : type->getPointerTo(), nullptr, name);
+            var = context.builder->CreateAlloca(type, nullptr, name);
             if (expr.has_value()) {
                 context.loadAsRvalue = true;
                 rightVal = processNode(expr.value(), context, errors);
                 context.loadAsRvalue = false;
                 // TODO: do type cast
+                if (rightVal->getType() != type) {
+                    rightVal = typeCast(rightVal, type, context, errors, getExprLoc(expr.value()));
+                }
                 context.builder->CreateStore(rightVal, var);
             }
             else if (!Context::isBuiltInType(typeExpr.type)) {

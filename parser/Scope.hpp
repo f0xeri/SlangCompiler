@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <map>
 #include "ASTFwdDecl.hpp"
 
 namespace Slangc {

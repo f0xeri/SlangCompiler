@@ -184,7 +184,9 @@ namespace Slangc::Check {
         else if (auto var = std::get_if<VarExprPtr>(&expr->expr)) {
             func = selectBestOverload(var->get()->name, funcExpr, false, false, context);
             expr->foundFunc = func;
-            if (func) expr->funcType = std::get<FuncDecStatementPtr>(*func)->expr;
+            if (func) {
+                expr->funcType = std::get<FuncDecStatementPtr>(*func)->expr;
+            }
             overloaded = true;
             if (!func) {
                 auto funcPointer = context.lookup(var->get()->name);
@@ -233,6 +235,13 @@ namespace Slangc::Check {
         if (!func && !funcPtrsArrIndex) {
             errors.emplace_back(context.filename, overloaded ? "No matching function for call." : "Expression is not callable.", expr->loc, false, false);
             result = false;
+        }
+        if (expr->funcType.has_value()) {
+            for (size_t i = 0; i < expr->args.size(); ++i) {
+                if (auto nilExpr = std::get_if<NilExprPtr>(&expr->args[i])) {
+                    nilExpr->get()->type = expr->funcType->get()->params[i]->type;
+                }
+            }
         }
         return result;
     }

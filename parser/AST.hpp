@@ -881,7 +881,7 @@ namespace Slangc {
             auto funcDec = std::get<FuncDecStatementPtr>(bestOverload.value());
             for (auto i = 0; i < func->params.size(); i++) {
                 if (auto nil = std::get_if<NilExprPtr>(&func->params[i]->type)) {
-                    nil->get()->type = funcDec->expr->params[i]->type;
+                    (*nil)->type = funcDec->expr->params[i]->type;
                 }
             }
         }

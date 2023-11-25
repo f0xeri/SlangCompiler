@@ -31,7 +31,7 @@ module sample
         output "\ntestProc()";
     end testProc;
 
-    public procedure testInOutVar(in integer x, out integer y, var integer z, out integer z2)
+    public procedure testInOutVar(in integer x, out integer y, var integer z, out integer y2)
         output "\ntestInOutVar(in integer x, out integer y, var integer z)";
         output x;
         output y;
@@ -43,6 +43,10 @@ module sample
         output x1;
         output y1;
         output z1;
+        let x := z;
+        let y := -1;
+        let z := 88;
+        output y;
     end testInOutVar;
 
     public procedure testout(in integer x, out integer y)
@@ -80,6 +84,10 @@ start
     variable-integer y := 2;
     variable-integer z := 3;
     call testInOutVar(x, y, z, z);
+    output "after call testInOutVar";
+    output x;
+    output y;
+    output z;
     call testout(x, y);
 
     output "\ncheck swaps";
@@ -96,7 +104,7 @@ start
     output d;
 
     output "\ncheck array of func pointers";
-    variable-array[3] function(in integer, in integer): integer funcArray;
+    variable-array[2] function(in integer, in integer): integer funcArray;
     let funcArray[0] := testFunc;
     let funcArray[1] := testFunc2;
     output funcArray[0](1, 2);

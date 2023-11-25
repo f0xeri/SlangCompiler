@@ -37,7 +37,8 @@ namespace Slangc {
     }
 
     auto NilExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
-        return {};
+        auto irType = context.loadAsRvalue ? getIRType(type.value(), context) : getIRType(type.value(), context)->getPointerTo();
+        return Constant::getNullValue(irType);
     }
 
     auto ArrayExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {

@@ -184,9 +184,7 @@ namespace Slangc::Check {
         else if (auto var = std::get_if<VarExprPtr>(&expr->expr)) {
             func = selectBestOverload(var->get()->name, funcExpr, false, false, context);
             expr->foundFunc = func;
-            if (func) {
-                expr->funcType = std::get<FuncDecStatementPtr>(*func)->expr;
-            }
+            if (func) expr->funcType = std::get<FuncDecStatementPtr>(*func)->expr;
             overloaded = true;
             if (!func) {
                 auto funcPointer = context.lookup(var->get()->name);

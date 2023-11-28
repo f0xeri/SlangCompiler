@@ -125,8 +125,11 @@ namespace Slangc {
     bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncDecStatementPtr &func2, const Context &context, bool checkReturnTypes = true, bool checkCast = false);
     bool compareFuncSignatures(const MethodDecPtr &func1, const MethodDecPtr &func2, const Context &context, bool checkReturnTypes = true, bool checkCast = false);
     bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncExprPtr &func2, const Context &context, bool checkReturnTypes = true, bool checkCast = false);
-    std::string typeToString(ExprPtrVariant type, ParameterType parameterType = ParameterType::None);
+    auto parameterTypeToString(ParameterType parameterType) -> std::string;
+    auto typeToString(ExprPtrVariant type, ParameterType parameterType = ParameterType::None) -> std::string;
     bool isParentType(const std::string &parentTypeName, const std::string &childTypeName, const Context &analysis);
+    auto selectBestOverload(const std::string &name, FuncExprPtr &func, bool useParamType, bool checkReturnType, Context &analysis) -> std::optional<DeclPtrVariant>;
+    auto selectBestOverload(const TypeDecStmtPtr &typeDecl, const std::string &methodName, const FuncExprPtr &func, bool useParamType, bool checkReturnType, Context &analysis) -> std::optional<DeclPtrVariant>;
 }
 
 #endif //SLANGCREFACTORED_ASTFWDDECL_HPP

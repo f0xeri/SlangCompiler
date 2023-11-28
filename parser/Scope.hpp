@@ -11,6 +11,7 @@
 #include <vector>
 #include <optional>
 #include <map>
+#include <algorithm>
 #include "ASTFwdDecl.hpp"
 
 namespace Slangc {

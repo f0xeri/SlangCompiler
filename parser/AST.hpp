@@ -97,6 +97,29 @@ namespace Slangc {
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>("character"); }
     };
 
+    struct ArrayExprNode {
+        SourceLoc loc{0, 0};
+        std::optional<std::vector<ExprPtrVariant>> values;
+        ExprPtrVariant type;
+        ExprPtrVariant size;
+        bool isConst = false;
+
+        ArrayExprNode(SourceLoc loc, std::optional<std::vector<ExprPtrVariant>> values, ExprPtrVariant type, ExprPtrVariant size) :
+            loc(loc), values(std::move(values)), type(std::move(type)), size(std::move(size)) {};
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
+
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<ArrayExprNode>(*this); }
+        [[nodiscard]] auto getIndicesCount() const -> uint64_t {
+            auto finalType = type;
+            auto sz = 1;
+            while (auto arrayType = std::get_if<ArrayExprPtr>(&finalType)) {
+                finalType = arrayType->get()->type;
+                sz++;
+            }
+            return sz;
+        }
+    };
+
     struct StringExprNode {
         SourceLoc loc{0, 0};
         std::string value;
@@ -119,29 +142,6 @@ namespace Slangc {
         NilExprNode(SourceLoc loc, std::optional<ExprPtrVariant> type = std::nullopt) : loc(loc), type(std::move(type)) {};
         auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<NilExprNode>(*this); }
-    };
-
-    struct ArrayExprNode {
-        SourceLoc loc{0, 0};
-        std::optional<std::vector<ExprPtrVariant>> values;
-        ExprPtrVariant type;
-        ExprPtrVariant size;
-        bool isConst = false;
-
-        ArrayExprNode(SourceLoc loc, std::optional<std::vector<ExprPtrVariant>> values, ExprPtrVariant type, ExprPtrVariant size) :
-            loc(loc), values(std::move(values)), type(std::move(type)), size(std::move(size)) {};
-        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
-
-        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<ArrayExprNode>(*this); }
-        [[nodiscard]] auto getIndicesCount() const -> uint64_t {
-            auto finalType = type;
-            auto sz = 1;
-            while (auto arrayType = std::get_if<ArrayExprPtr>(&finalType)) {
-                finalType = arrayType->get()->type;
-                sz++;
-            }
-            return sz;
-        }
     };
 
     struct BooleanExprNode {

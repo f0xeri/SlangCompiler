@@ -31,25 +31,25 @@ namespace Slangc {
     auto Parser::parseImports() -> bool {
         while (token->type == TokenType::Import) {
             advance();
-            auto importStr = consume(TokenType::Identifier);
+            expect({TokenType::Identifier, TokenType::String});
+            std::filesystem::path importStr = token->value;
+            auto currModuleDir = filepath.parent_path();
+            if (token->type == TokenType::Identifier)
+                importStr = currModuleDir / (token->value + ".sl");
+            else
+                importStr = currModuleDir / importStr;
+            advance();
             expect(TokenType::Semicolon);
             advance();
-            if (std::find(imports.begin(), imports.end(), importStr.value) == imports.end()) {
-                imports.emplace_back(importStr.value);
-
-                auto buffer = SourceBuffer::CreateFromFile("working_examples/" + importStr.value + ".sl");
-                if (!buffer) {
-                    errors.emplace_back(filename, toString(buffer.takeError()), token->location, false, false);
-                    hasError = true;
-                    return false;
+            if (std::find(imports.begin(), imports.end(), importStr) == imports.end()) {
+                imports.emplace_back(importStr.stem().string());
+                auto importContext = driver.processUnit(importStr, false);
+                // copy declarations from imported module to current module
+                for (const auto& symbol: importContext->symbolTable.symbols) {
+                    if (symbol.moduleName == importStr.stem().string()) {
+                        context.symbolTable.insert(symbol.name, symbol.moduleName, symbol.declaration, true);
+                    }
                 }
-                Lexer lexer(std::move(buffer.get()), errors);
-                lexer.tokenize();
-                Parser parser(buffer->getFilename(), lexer.tokens, options, context, errors);
-                parser.parse();
-                Check::checkAST(parser.moduleAST, context, errors);
-                CodeGen codeGen(context, std::move(parser.moduleAST), false);
-                codeGen.process(errors);
             }
         }
         return true;

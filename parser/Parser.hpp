@@ -14,7 +14,8 @@
 #include "lexer/Lexer.hpp"
 #include "AST.hpp"
 #include "check/Context.hpp"
-#include <CompilerOptions.hpp>
+#include "CompilerOptions.hpp"
+#include "driver/Driver.hpp"
 
 namespace Slangc {
     using ParserExprResult = std::optional<ExprPtrVariant>;
@@ -23,15 +24,16 @@ namespace Slangc {
 
     class Parser {
         Context &context;
+        Driver &driver;
+        std::filesystem::path filepath;
     public:
-        explicit Parser(std::string_view filename, std::vector<Token> tokens, const CompilerOptions &options, Context &context, std::vector<ErrorMessage> &errors)
-                : context(context), options(options), errors(errors), tokens(std::move(tokens)), filename(filename) {
-            token = this->tokens.cbegin();
-            //context.enterScope();
-            //context.insert("Object", createDecl<TypeDecStatementNode>(SourceLoc{0, 0}, "Object", std::vector<DeclPtrVariant>{}, std::vector<MethodDecPtr>{}));
+        explicit Parser(std::filesystem::path &filepath, std::vector<Token> tokens, Driver &driver, Context &context, std::vector<ErrorMessage> &errors)
+                : context(context), driver(driver), errors(errors), tokens(std::move(tokens)), filepath(filepath) {
+            token = this->tokens.begin();
+            filename = filepath.string();
         }
 
-        const CompilerOptions &options;
+        //const CompilerOptions &options;
         std::vector<ErrorMessage> &errors;
         ModuleDeclPtr moduleAST;
         std::string filename;

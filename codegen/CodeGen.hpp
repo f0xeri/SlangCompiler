@@ -21,8 +21,10 @@ namespace Slangc {
 
         void process(std::vector<ErrorMessage>& errors) {
 
-            for (auto& symbol: context.symbolTable.symbols | std::views::filter([&](const auto&s) { return s.moduleName == moduleAST->name; })) {
+            for (auto& symbol: context.symbolTable.symbols /*| std::views::filter([&](const auto&s) { return s.moduleName == moduleAST->name; })*/) {
+                if (symbol.isImported) codeGenContext.currentDeclImported = true;
                 processNode(symbol.declaration, codeGenContext, errors);
+                codeGenContext.currentDeclImported = false;
             }
 
             if (isMainModule) {

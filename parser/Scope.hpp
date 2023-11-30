@@ -13,6 +13,7 @@
 #include <map>
 #include <algorithm>
 #include "ASTFwdDecl.hpp"
+#include "log/Logger.hpp"
 
 namespace Slangc {
     class Scope {

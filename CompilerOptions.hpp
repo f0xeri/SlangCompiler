@@ -62,27 +62,30 @@ namespace Slangc {
             });
             llvm::cl::ParseCommandLineOptions(argc, argv, "Slangc LLVM compiler\n");
 
-            outputFileName_ = OutputFileName;
+            outputFileName_ = OutputFileName.getValue();
             optimizationLevel_ = OptimizationLevel;
             debug_ = DebugInfo;
             gcEnabled_ = GCEnabled;
             libraries_ = Libraries;
-            inputFiles_ = InputFiles;
+            inputFiles_.reserve(InputFiles.size());
+            for (auto &file : InputFiles) {
+                inputFiles_.emplace_back(std::move(file));
+            }
         };
 
-        [[nodiscard]] auto getInputFileNames() const -> const std::vector<std::string>& { return inputFiles_; }
-        [[nodiscard]] auto getOutputFileName() const -> const std::string& { return outputFileName_; }
+        [[nodiscard]] auto getInputFilePaths() const -> const std::vector<std::filesystem::path>& { return inputFiles_; }
+        [[nodiscard]] auto getOutputFilePath() const -> const std::filesystem::path& { return outputFileName_; }
         [[nodiscard]] auto isDebug() const -> bool { return debug_; }
         [[nodiscard]] auto getLinkLibraries() const -> const std::vector<std::string> & { return libraries_; }
         [[nodiscard]] auto getOptimizationLevel() const -> OptLevel { return optimizationLevel_; }
         [[nodiscard]] auto isGCEnabled() const -> bool { return gcEnabled_; }
 
     private:
-        std::string outputFileName_;
+        std::filesystem::path outputFileName_;
         bool debug_;
         bool gcEnabled_;
         std::vector<std::string> libraries_;
-        std::vector<std::string> inputFiles_;
+        std::vector<std::filesystem::path> inputFiles_;
         OptLevel optimizationLevel_;
     };
 

@@ -64,6 +64,7 @@ namespace Slangc {
         std::optional<FuncExprPtr> currentFuncSignature = std::nullopt;
         Type* currentReturnType = nullptr;
         bool loadAsRvalue = false;
+        bool currentDeclImported = false;
 
         CodeGenContext(Context &context, bool isMainModule) : context(context) {
             llvmContext = std::make_unique<LLVMContext>();

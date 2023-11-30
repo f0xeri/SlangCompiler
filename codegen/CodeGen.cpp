@@ -372,6 +372,7 @@ namespace Slangc {
         auto funcName = name + "." + getMangledFuncName(expr);
         auto funcCallee = context.module->getOrInsertFunction(funcName, funcType);
         auto func = context.module->getFunction(funcName);
+        if (context.currentDeclImported) return func;
         context.context.enterScope(name);
         if (block.has_value()) {
             BasicBlock *block = BasicBlock::Create(*context.llvmContext, "entry", context.module->getFunction(funcName));
@@ -445,6 +446,7 @@ namespace Slangc {
     }
 
     auto TypeDecStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+        if (name == "Object") return nullptr;
         context.allocatedClasses[name] = StructType::create(*context.llvmContext, name);
         context.allocatedClasses[name]->setName(name);
         std::vector<Type*> types;

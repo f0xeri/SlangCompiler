@@ -19,13 +19,14 @@ namespace Slangc {
         std::string name;
         std::string moduleName;
         DeclPtrVariant declaration;
+        bool isImported = false;
     };
     class SymbolTable {
     public:
         std::vector<Symbol> symbols;
 
-        void insert(const std::string& name, const std::string& moduleName, const DeclPtrVariant &declarationNode) {
-            symbols.emplace_back(name, moduleName, declarationNode);
+        void insert(const std::string& name, const std::string& moduleName, const DeclPtrVariant &declarationNode, bool isImported = false) {
+            symbols.emplace_back(name, moduleName, declarationNode, isImported);
         }
 
         auto lookup(std::string_view name) const -> const DeclPtrVariant* {

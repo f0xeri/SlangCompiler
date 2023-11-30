@@ -101,7 +101,7 @@ namespace Slangc {
                 result = createDecl<VarDecStatementNode>(loc, name, typeExpr->type, std::move(value), isGlobal, isPrivate, isExtern);
             }
         }
-        if (result.has_value()) context.symbolTable.insert(name, moduleAST->name, result.value());
+        if (result.has_value()) context.symbolTable.insert(name, moduleAST->name, result.value(), isPrivate, false);
         return result;
     }
 
@@ -190,7 +190,7 @@ namespace Slangc {
 
         auto funcExpr = create<FuncExprNode>(loc, returnType, params.value(), isFunction);
         funcDecl = createDecl<FuncDecStatementNode>(loc, mangledName, funcExpr, std::nullopt, isPrivate, isFunction, isExtern);
-        context.symbolTable.insert(mangledName, moduleAST->name, funcDecl);
+        context.symbolTable.insert(mangledName, moduleAST->name, funcDecl, isPrivate, false);
 
         --token;
         auto block = parseBlockStmt(name, &params.value());
@@ -379,7 +379,7 @@ namespace Slangc {
             return std::nullopt;
         }
         //context.types[mangledName] = std::get<TypeDecStmtPtr>(classNode);
-        context.symbolTable.insert(mangledName, moduleAST->name, classNode);
+        context.symbolTable.insert(mangledName, moduleAST->name, classNode, isPrivate, false);
         return classNode;
     }
 } // Slangc

@@ -253,7 +253,9 @@ namespace Slangc {
     }
 
     auto ReturnStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+        context.loadAsRvalue = true;
         auto val = processNode(expr, context, errors);
+        context.loadAsRvalue = false;
         val = typeCast(val, context.currentReturnType, context, errors, getExprLoc(expr));
         return context.builder->CreateRet(val);
     }
@@ -373,7 +375,7 @@ namespace Slangc {
         auto funcCallee = context.module->getOrInsertFunction(funcName, funcType);
         auto func = context.module->getFunction(funcName);
         if (context.currentDeclImported) return func;
-        context.context.enterScope(name);
+        context.context.enterScope(funcName);   // scope name is mangled
         if (block.has_value()) {
             BasicBlock *block = BasicBlock::Create(*context.llvmContext, "entry", context.module->getFunction(funcName));
             context.pushBlock(block);

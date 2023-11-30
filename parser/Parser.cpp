@@ -24,7 +24,7 @@ namespace Slangc {
             errors.emplace_back(filename, "Failed to parse module declaration.", token->location, false, false);
             return false;
         }
-        context.symbolTable.insert("Object", "", obj);
+        context.symbolTable.insert("Object", "", obj, false, false);
         return true;
     }
 
@@ -46,8 +46,8 @@ namespace Slangc {
                 auto importContext = driver.processUnit(importStr, false);
                 // copy declarations from imported module to current module
                 for (const auto& symbol: importContext->symbolTable.symbols) {
-                    if (symbol.moduleName == importStr.stem().string()) {
-                        context.symbolTable.insert(symbol.name, symbol.moduleName, symbol.declaration, true);
+                    if (symbol.moduleName == importStr.stem().string() && !symbol.isPrivate) {
+                        context.symbolTable.insert(symbol.name, symbol.moduleName, symbol.declaration, symbol.isPrivate, true);
                     }
                 }
             }

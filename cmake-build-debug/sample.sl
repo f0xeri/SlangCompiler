@@ -68,6 +68,15 @@ module sample
         let a := b;
         let b := temp;
     end test;
+
+    public function add(in integer a, in integer b): integer
+        return a + b;
+    end add;
+
+    public function add(in real a, in real b): real
+        return a + b;
+    end add;
+
 start
     variable-procedure(in integer, in integer) procPointer := testProc;
     variable-procedure(in integer) procPointer2 := testProc;

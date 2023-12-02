@@ -54,8 +54,14 @@ namespace Slangc {
         std::optional<ExprPtrVariant> declType;
         bool isOut = false;
         bool isVar = false;
+        bool isFunc = false;
+        bool isCustomType = false;
         if (auto localVar = context.localsDeclsLookup(name)) {
             declType = getDeclType(localVar.value(), context.context, errors);
+            if (!Context::isBuiltInType(typeToString(declType.value()))) {
+                isCustomType = true;
+            }
+            else
             if (auto funcParam = std::get_if<FuncParamDecStmtPtr>(&localVar.value())) {
                 if (funcParam->get()->parameterType == Out) {
                     isOut = true;
@@ -68,9 +74,10 @@ namespace Slangc {
         else if (auto func = context.context.symbolTable.lookupFunc(name, context.currentFuncSignature.value(), context.context)) {
             declType = getDeclType(*func, context.context, errors);
             var = getFuncFromExpr(*func, context);
+            isFunc = true;
         }
         auto type = getIRType(declType.value(), context);
-        if (context.loadAsRvalue || isVar) {
+        if ((context.loadAsRvalue && !isFunc) || isVar || isCustomType) {
             if (isVar || isOut) type = type->getPointerTo();
             var = context.builder->CreateLoad(type, var);
             if (context.loadAsRvalue && isVar) {
@@ -184,38 +191,64 @@ namespace Slangc {
     auto CallExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         Value* func = nullptr;
         auto temp = context.loadAsRvalue;
+        std::vector<Value*> argsRef;
+        size_t argsOffset = 0;
         if (foundFunc.has_value()) {
             func = getFuncFromExpr(foundFunc.value(), context);
+            if (std::holds_alternative<MethodDecPtr>(foundFunc.value()) && std::holds_alternative<AccessExprPtr>(expr)) {
+                //context.loadAsRvalue = true;  "this" is always a custom type, so it will be loaded anyway
+                auto thisArg = processNode(std::get<AccessExprPtr>(expr)->expr, context, errors);
+                argsRef.push_back(thisArg);
+                //context.loadAsRvalue = temp;
+                argsOffset = 1;
+            }
         }
         else {
             context.loadAsRvalue = true;
             func = processNode(expr, context, errors);
         }
 
-        std::vector<Value*> argsRef;
         for (size_t i = 0; i < args.size(); ++i) {
-            auto currArg = args[i];
-            auto currExpectedType = funcType.value()->params[i]->type;
-            if (std::holds_alternative<FuncExprPtr>(currExpectedType)) {
-                context.currentFuncSignature = std::get<FuncExprPtr>(currExpectedType);
+            auto currCallArg = args[i];
+            auto currExpectedArg = funcType.value()->params[i + argsOffset];
+            auto tempSig = context.currentFuncSignature;
+            if (std::holds_alternative<FuncExprPtr>(currExpectedArg->type)) {
+                context.currentFuncSignature = std::get<FuncExprPtr>(currExpectedArg->type);
             }
-            auto isOutVar = funcType.value()->params[i]->parameterType == Out || funcType.value()->params[i]->parameterType == Var;
-            if (isOutVar)
-                context.loadAsRvalue = false;
-            else
-                context.loadAsRvalue = true;
-            auto argVal = processNode(currArg, context, errors);
-            auto currExpectedIRType = isOutVar ? getIRType(currExpectedType, context)->getPointerTo() : getIRType(currExpectedType, context);
-            argVal = typeCast(argVal, currExpectedIRType, context, errors, getExprLoc(currArg));
+            auto isOutVar = currExpectedArg->parameterType == Out || currExpectedArg->parameterType == Var;
+            context.loadAsRvalue = !isOutVar;
+            auto argVal = processNode(currCallArg, context, errors);
+            auto currExpectedIRType = isOutVar ? getIRType(currExpectedArg->type, context)->getPointerTo() : getIRType(currExpectedArg->type, context);
+            argVal = typeCast(argVal, currExpectedIRType, context, errors, getExprLoc(currCallArg));
             argsRef.push_back(argVal);
-            context.currentFuncSignature = std::nullopt;
+            context.currentFuncSignature = tempSig;
         }
         context.loadAsRvalue = temp;
         return context.builder->CreateCall(getFuncType(funcType.value(), context), func, argsRef);
     }
 
     auto AccessExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
-        return {};
+        auto temp = context.loadAsRvalue;
+        context.loadAsRvalue = true;
+        auto var = processNode(expr, context, errors);
+        context.loadAsRvalue = temp;
+        auto varType = getExprType(expr, context.context, errors).value();
+        auto typeName = std::get<TypeExprPtr>(varType)->type;
+        if (context.currentFuncSignature.has_value()) {
+            auto method = selectBestOverload(context.allocatedClassesDecls[typeName], typeName + "." + name, context.currentFuncSignature.value(), true, true, context.context);
+            if (method.has_value()) {
+                auto methodDecl = std::get<MethodDecPtr>(method.value());
+                auto methodName = methodDecl->name + "." + getMangledFuncName(methodDecl->expr);
+                return context.module->getFunction(methodName);
+            }
+        }
+
+        auto elementPtr = context.builder->CreateStructGEP(context.allocatedClasses[typeName], var, index, typeName + "." + name);
+        auto type = getIRType(getExprType(shared_from_this(), context.context, errors).value(), context);
+        if (context.loadAsRvalue) {
+            elementPtr = context.builder->CreateLoad(type, elementPtr);
+        }
+        return elementPtr;
     }
 
     auto DeleteStmtNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
@@ -231,12 +264,13 @@ namespace Slangc {
         auto rtype = getIRType(getExprType(right, context.context, errors).value(), context);
         auto leftVal = processNode(left, context, errors);
         context.loadAsRvalue = true;
+        auto tempSig = context.currentFuncSignature;
         if (std::holds_alternative<FuncExprPtr>(getExprType(left, context.context, errors).value())) {
             context.loadAsRvalue = false;
             context.currentFuncSignature = std::get<FuncExprPtr>(getExprType(left, context.context, errors).value());
         }
         auto rightVal = processNode(right, context, errors);
-        context.currentFuncSignature = std::nullopt;
+        context.currentFuncSignature = tempSig;
         context.loadAsRvalue = false;
         if (ltype != rightVal->getType()) {
             rightVal = typeCast(rightVal, ltype, context, errors, getExprLoc(right));
@@ -330,6 +364,10 @@ namespace Slangc {
             }
             else if (!Context::isBuiltInType(typeExpr.type)) {
                 createMalloc(typeExpr.type, var, context);
+                // call constructor
+                auto arg = context.builder->CreateLoad(type, var);
+                auto constructor = context.module->getFunction(typeExpr.type + "._default_constructor");
+                if (constructor) context.builder->CreateCall(constructor, arg);
             }
         }
         context.locals()[name] = var;
@@ -345,9 +383,10 @@ namespace Slangc {
         if (assignExpr.has_value()) {
             auto temp = context.loadAsRvalue;
             context.loadAsRvalue = false;
+            auto tempSig = context.currentFuncSignature;
             context.currentFuncSignature = expr;
             auto assignVal = processNode(assignExpr.value(), context, errors);
-            context.currentFuncSignature = std::nullopt;
+            context.currentFuncSignature = tempSig;
             context.loadAsRvalue = temp;
             context.builder->CreateStore(assignVal, var);
         }
@@ -396,11 +435,15 @@ namespace Slangc {
         bool hasReturn = false;
         for (auto &&stmt : block.value()->statements) {
             context.currentReturnType = getIRType(expr->type, context);
+            if (std::holds_alternative<FuncExprPtr>(expr->type))
+                context.currentFuncSignature = std::get<FuncExprPtr>(expr->type);
+
             auto val = processNode(stmt, context, errors);
             if (std::holds_alternative<ReturnStatementPtr>(stmt)) {
                 hasReturn = true;
                 break;
             }
+            context.currentFuncSignature = std::nullopt;
         }
         context.currentReturnType = nullptr;
         if (!isFunction) context.builder->CreateRetVoid();
@@ -415,8 +458,8 @@ namespace Slangc {
         Value* rightVal = nullptr;
         auto elementPtr = context.builder->CreateStructGEP(context.allocatedClasses[typeName.type], context.currentTypeLoad, index, typeName.type + "." + name);
         if (!Context::isBuiltInType(typeExpr.type)) {
-            var = context.builder->CreateAlloca(type->getPointerTo(), nullptr, name);
             auto malloc = createMalloc(typeExpr.type, var, context);
+            context.builder->CreateStore(malloc, elementPtr);
             // calling a constructor can cause an infinite recursion (A calls constr of B, B calls constr of A...)
             // TODO: make calling of constructor implicit, like variable-A a = new A;
         }
@@ -432,31 +475,55 @@ namespace Slangc {
 
     auto FieldArrayVarDecNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         auto type = getIRType(expr, context);
-        auto var = context.builder->CreateAlloca(type, nullptr, name);
         auto elementPtr = context.builder->CreateStructGEP(context.allocatedClasses[typeName.type], context.currentTypeLoad, index, typeName.type + "." + name);
 
-
+        if (assignExpr.has_value()) {
+            context.loadAsRvalue = true;
+            auto assignVal = processNode(assignExpr.value(), context, errors);
+            context.loadAsRvalue = false;
+            context.builder->CreateStore(assignVal, elementPtr);
+        }
+        else createArrayMalloc(expr, elementPtr, context, errors);
         return elementPtr;
     }
 
     auto FieldFuncPointerStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
-        return {};
+        auto type = getIRType(expr, context);
+        auto elementPtr = context.builder->CreateStructGEP(context.allocatedClasses[typeName.type], context.currentTypeLoad, index, typeName.type + "." + name);
+        if (assignExpr.has_value()) {
+            auto temp = context.loadAsRvalue;
+            context.loadAsRvalue = false;
+            context.currentFuncSignature = expr;
+            auto assignVal = processNode(assignExpr.value(), context, errors);
+            context.currentFuncSignature = std::nullopt;
+            context.loadAsRvalue = temp;
+            context.builder->CreateStore(assignVal, elementPtr);
+        }
+        return elementPtr;
     }
 
     auto MethodDecNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
-        return {};
+        auto temp = create<FuncDecStatementNode>(loc, name, expr, block, true, isFunction, false);
+        auto res = temp->codegen(context, errors);
+        return res;
     }
 
     auto TypeDecStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         if (name == "Object") return nullptr;
         context.allocatedClasses[name] = StructType::create(*context.llvmContext, name);
         context.allocatedClasses[name]->setName(name);
+        context.allocatedClassesDecls[name] = shared_from_this();
         std::vector<Type*> types;
         for (auto &field : fields) {
             types.push_back(getIRType(getDeclType(field, context.context, errors).value(), context));
         }
         context.allocatedClasses[name]->setBody(types);
         createDefaultConstructor(this, context, errors);
+        context.context.enterScope(name);
+        for (auto &method : methods) {
+            method->codegen(context, errors);
+        }
+        context.context.exitScope();
         return nullptr;
     }
 

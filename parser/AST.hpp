@@ -279,7 +279,7 @@ namespace Slangc {
         }
     };
 
-    struct TypeDecStatementNode {
+    struct TypeDecStatementNode : std::enable_shared_from_this<TypeDecStatementNode> {
         SourceLoc loc{0, 0};
         std::string name;
         std::vector<DeclPtrVariant> fields;
@@ -372,14 +372,15 @@ namespace Slangc {
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return expr; }
     };
 
-    struct AccessExprNode {
+    struct AccessExprNode : std::enable_shared_from_this<AccessExprNode> {
         SourceLoc loc{0, 0};
         ExprPtrVariant expr;
         std::string name;
+        size_t index;
         bool isConst = false;
 
-        AccessExprNode(SourceLoc loc, ExprPtrVariant expr, std::string name)
-            : loc(loc), expr(std::move(expr)), name(std::move(name)) {};
+        AccessExprNode(SourceLoc loc, ExprPtrVariant expr, std::string name, size_t index = 0)
+            : loc(loc), expr(std::move(expr)), name(std::move(name)), index(index) {};
         auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
 
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> {

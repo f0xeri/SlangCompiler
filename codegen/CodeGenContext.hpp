@@ -60,6 +60,7 @@ namespace Slangc {
         Context& context;
 
         std::map<std::string, llvm::StructType *> allocatedClasses;
+        std::map<std::string, TypeDecStmtPtr> allocatedClassesDecls;
         LoadInst* currentTypeLoad = nullptr;
         std::optional<FuncExprPtr> currentFuncSignature = std::nullopt;
         Type* currentReturnType = nullptr;

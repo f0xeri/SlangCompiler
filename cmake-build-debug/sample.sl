@@ -1,121 +1,42 @@
 module sample
-    public function testFunc(in integer x, in integer y): integer
-        return x + y;
-    end testFunc;
+    public class A inherits Object
+        public field-array[1] procedure() arr;
+        public field-integer i := 1;
+        private field-integer ip := 11;
+        public method p1(A a)(in integer i2, in float f)
+            output i2;
+            output f;
+            output a.i;
+            output a.ip;
+        end p1;
+        public method getA(A a)(): A
+            return a;
+        end getA;
+        public method printSomething(A a)()
+            output "Something\n";
+        end printSomething;
 
-    public function testFunc2(in integer x, in integer y): integer
-        return x - y;
-    end testFunc2;
+        public method getMethod(A a)(): procedure(out A, in integer, in float)
+            call a.printSomething();
+            return a.p1;
+        end getMethod;
+    end A;
 
-    public procedure testProc(in integer x, in integer y)
-        output "\ntestProc(in integer x, in integer y):";
-        output x + y;
-    end testProc;
+    public function getA(): A
+        variable-A a;
+        return a;
+    end getA;
 
-    public procedure testProc(out function(in integer, in integer): integer func)
-        output "\ntestProc(out function(in integer, in integer): integer func)";
-        output func(1, 2);
-    end testProc;
-
-    public procedure testProc(in integer x)
-        output "\ntestProc(in integer x)";
-        output x;
-    end testProc;
-
-    public procedure testProc(in real x)
-        output "\ntestProc(in real x)";
-        output x;
-    end testProc;
-
-    public procedure testProc()
-        output "\ntestProc()";
-    end testProc;
-
-    public procedure testInOutVar(in integer x, out integer y, var integer z, out integer y2)
-        output "\ntestInOutVar(in integer x, out integer y, var integer z)";
-        output x;
-        output y;
-        output z;
-        variable-integer x1 := x;
-        variable-integer y1 := y;    // this should throw an error in check (as well as let y1 := y)
-        variable-integer z1 := z;
-        output "";
-        output x1;
-        output y1;
-        output z1;
-        let x := z;
-        let y := -1;
-        let z := 88;
-        output y;
-    end testInOutVar;
-
-    public procedure testout(in integer x, out integer y)
-        output "\ntestout(in integer x, out integer y)";
-        variable-integer x2 := x;
-        variable-integer y2 := y;    // this should throw an error in check (as well as let y1 := y)
-        output x2;
-        output y2;
-    end testout;
-
-    private procedure swapReal(var real a, var real b)
-        variable-real temp := a;
-        let a := b;
-        let b := temp;
-    end swapReal;
-
-    private procedure test(var integer a, var integer b)
-        variable-integer temp := a;
-        let a := b;
-        let b := temp;
-    end test;
-
-    public function add(in integer a, in integer b): integer
-        return a + b;
-    end add;
-
-    public function add(in real a, in real b): real
-        return a + b;
-    end add;
-
+    public procedure printHello()
+        output "Hello World!\n";
+    end printHello;
 start
-    variable-procedure(in integer, in integer) procPointer := testProc;
-    variable-procedure(in integer) procPointer2 := testProc;
-    variable-procedure(in real) procPointer3 := testProc;
-    variable-procedure() procPointer4 := testProc;
-    variable-procedure(out function(in integer, in integer): integer) procPointer5 := testProc;
-    call procPointer(1, 2);
-    call procPointer2(1);
-    call procPointer3(1.0);
-    call procPointer4();
-    call procPointer5(testFunc);
-
-    variable-integer x := 1;
-    variable-integer y := 2;
-    variable-integer z := 3;
-    call testInOutVar(x, y, z, z);
-    output "after call testInOutVar";
-    output x;
-    output y;
-    output z;
-    call testout(x, y);
-
-    output "\ncheck swaps";
-    variable-real a := 5.1;
-    variable-real b := 10.2;
-    call swapReal(a, b);
-    output a;
-    output b;
-
-    variable-integer c := 5;
-    variable-integer d := 10;
-    call test(c, d);
-    output c;
-    output d;
-
-    output "\ncheck array of func pointers";
-    variable-array[2] function(in integer, in integer): integer funcArray;
-    let funcArray[0] := testFunc;
-    let funcArray[1] := testFunc2;
-    output funcArray[0](1, 2);
-    output funcArray[1](1, 2);
+    variable-function(): A getAFuncPtr := getA;
+    call getAFuncPtr().getA().getA().getA().getA().getA().p1(1, 2.0);
+    variable-A a;
+    call a.p1(2, 3.0);
+    variable-A a2 := getA();
+    let a2.arr[0] := printHello;
+    call a2.arr[0]();
+    call a2.getMethod()(a2, 3, 4.0);
 end sample.

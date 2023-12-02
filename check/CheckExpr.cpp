@@ -150,6 +150,7 @@ namespace Slangc::Check {
         if (!result) return false;
         std::optional<DeclPtrVariant> func = std::nullopt;
         std::optional<IndexExprPtr> funcPtrsArrIndex = std::nullopt;
+        std::optional<CallExprPtr> funcCall = std::nullopt;
         bool overloaded = false;
 
         // create func expr based on arg types
@@ -230,7 +231,17 @@ namespace Slangc::Check {
                 }
             }
         }
-        if (!func && !funcPtrsArrIndex) {
+        else if (auto call = std::get_if<CallExprPtr>(&expr->expr)) {
+            auto callType = getExprType(*call, context, errors);
+            if (callType.has_value() && std::holds_alternative<FuncExprPtr>(callType.value())) {
+                overloaded = true;
+                if (compareFuncSignatures(std::get<FuncExprPtr>(callType.value()), funcExpr, context, false, true)) {
+                    funcCall = *call;
+                    expr->funcType = std::get<FuncExprPtr>(callType.value());
+                }
+            }
+        }
+        if (!func && !funcPtrsArrIndex && !funcCall) {
             errors.emplace_back(context.filename, overloaded ? "No matching function for call." : "Expression is not callable.", expr->loc, false, false);
             result = false;
         }
@@ -262,6 +273,7 @@ namespace Slangc::Check {
             result = false;
         }
         auto found = false;
+        size_t index = 0;
         while (typeOpt.has_value()) {
             auto type = typeOpt.value();
             for (const auto &field: type->fields) {
@@ -273,6 +285,7 @@ namespace Slangc::Check {
                         }
                         // found = true even if we got error, because we want to suppress final not found error
                         found = true;
+                        index = (*fieldVar)->index;
                     }
                 } else if (const auto &fieldArrayVar = std::get_if<FieldArrayVarDecPtr>(&field)) {
                     if ((*fieldArrayVar)->name == expr->name) {
@@ -281,6 +294,7 @@ namespace Slangc::Check {
                             result = false;
                         }
                         found = true;
+                        index = (*fieldArrayVar)->index;
                     }
                 } else if (auto fieldFuncPointer = std::get_if<FieldFuncPointerStmtPtr>(&field)) {
                     if ((*fieldFuncPointer)->name == expr->name) {
@@ -289,6 +303,7 @@ namespace Slangc::Check {
                             result = false;
                         }
                         found = true;
+                        index = (*fieldFuncPointer)->index;
                     }
                 }
 
@@ -315,6 +330,7 @@ namespace Slangc::Check {
             errors.emplace_back(context.filename, "Type '" + std::get<TypeExprPtr>(exprType.value())->type + "' does not have field or method called '" + expr->name + "'.", expr->loc, false,false);
             result = false;
         }
+        expr->index = index;
         return result;
     }
 

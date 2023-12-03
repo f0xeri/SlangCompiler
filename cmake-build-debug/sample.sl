@@ -3,14 +3,21 @@ module sample
         public field-array[1] procedure() arr;
         public field-integer i := 1;
         private field-integer ip := 11;
+        public field-array[10] character c := "Hello";
         public method p1(A a)(in integer i2, in float f)
             output i2;
             output f;
             output a.i;
             output a.ip;
+            output a.c;
         end p1;
+        private method setC(A a)(in array[] character c)
+            let a.c := c;
+        end setC;
         public method getA(A a)(): A
-            return a;
+            variable-A a2;
+            call a2.setC("NewHello");
+            return a2;
         end getA;
         public method printSomething(A a)()
             output "Something\n";

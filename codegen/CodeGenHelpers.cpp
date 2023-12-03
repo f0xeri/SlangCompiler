@@ -51,6 +51,24 @@ namespace Slangc {
         return nullptr;
     }
 
+    Type* getIRTypeForSize(const std::string& type, CodeGenContext& context) {
+        if (type == "integer")
+            return Type::getInt32Ty(*context.llvmContext);
+        if (type == "real")
+            return Type::getDoubleTy(*context.llvmContext);
+        if (type == "float")
+            return Type::getFloatTy(*context.llvmContext);
+        if (type == "boolean")
+            return Type::getInt1Ty(*context.llvmContext);
+        if (type == "character")
+            return Type::getInt8Ty(*context.llvmContext);
+        if (type == "void" || type == "")
+            return Type::getVoidTy(*context.llvmContext);
+        if (context.allocatedClasses.contains(type))
+            return context.allocatedClasses[type];
+        return nullptr;
+    }
+
     Type* getIRPtrType(const std::string& type, CodeGenContext& context) {
         return getIRType(type, context)->getPointerTo();
     }
@@ -68,9 +86,22 @@ namespace Slangc {
         return nullptr;
     }
 
+    Type* getIRTypeForSize(const ExprPtrVariant& expr, CodeGenContext& context) {
+        if (auto type = std::get_if<TypeExprPtr>(&expr)) {
+            return getIRTypeForSize(type->get()->type, context);
+        }
+        if (auto arr = std::get_if<ArrayExprPtr>(&expr)) {
+            return getIRTypeForSize(arr->get()->type, context)->getPointerTo();
+        }
+        if (auto func = std::get_if<FuncExprPtr>(&expr)) {
+            return getFuncType(*func, context)->getPointerTo();
+        }
+        return nullptr;
+    }
+
     Value* createMalloc(const std::string &type, Value* var, CodeGenContext &context) {
         auto intType = Type::getInt32Ty(*context.llvmContext);
-        auto structType = getIRType(type, context);
+        auto structType = context.allocatedClasses[type];
         auto mallocCall = context.builder->CreateMalloc(intType, structType, ConstantInt::get(intType, context.module->getDataLayout().getTypeAllocSize(structType)), nullptr);
         context.builder->CreateStore(mallocCall, var);
         return var;
@@ -98,7 +129,7 @@ namespace Slangc {
         auto arrayType = getIRType(array->type, context);
         auto loadArrType = getIRType(array, context);
 
-        auto allocSize = context.builder->CreateMul(sizes[i], ConstantInt::get(intType, context.module->getDataLayout().getTypeAllocSize(arrayType)));
+        auto allocSize = context.builder->CreateMul(sizes[i], ConstantInt::get(intType, context.module->getDataLayout().getTypeAllocSize(getIRTypeForSize(array->type, context))));
         auto mallocCall = context.builder->CreateMalloc(intType, arrayType, allocSize, nullptr);
 
         auto arrLoad = context.builder->CreateLoad(loadArrType, var);
@@ -106,7 +137,7 @@ namespace Slangc {
         for (int k = 1; k <= i; ++k) {
             jvar = context.builder->CreateLoad(intType, jvars[k]);
             auto sext = context.builder->CreateSExt(jvar, Type::getInt64Ty(*context.llvmContext));
-            arrPtr = context.builder->CreateGEP(loadArrType, arrLoad, sext);
+            arrPtr = context.builder->CreateInBoundsGEP(loadArrType, arrLoad, sext);
             arrLoad = context.builder->CreateLoad(loadArrType, arrPtr);
         }
         context.builder->CreateStore(mallocCall, arrPtr);
@@ -135,8 +166,11 @@ namespace Slangc {
 
     Value* createArrayMalloc(ArrayExprPtr& array, Value* var, CodeGenContext &context, std::vector<ErrorMessage> &errors) {
         auto intType = Type::getInt32Ty(*context.llvmContext);
-        auto structType = getIRType(array->type, context);
+        auto structType = getIRTypeForSize(array->type, context);
+        auto temp = context.loadAsRvalue;
+        context.loadAsRvalue = true;
         auto arraySize = processNode(array->size, context, errors);
+        context.loadAsRvalue = temp;
         auto allocSize = context.builder->CreateMul(arraySize, ConstantInt::get(intType, context.module->getDataLayout().getTypeAllocSize(structType)));
         auto mallocCall = context.builder->CreateMalloc(intType, structType, allocSize, nullptr);
         auto indicesCount = array->getIndicesCount();
@@ -146,10 +180,12 @@ namespace Slangc {
         sizes.reserve(indicesCount);
         sizes.push_back(arraySize);
         auto currArray = array->type;
+        context.loadAsRvalue = true;
         while (auto arr = std::get_if<ArrayExprPtr>(&currArray)) {
             sizes.push_back(processNode(arr->get()->size, context, errors));
             currArray = arr->get()->type;
         }
+        context.loadAsRvalue = temp;
         std::vector<Value*> jvars;
         jvars.reserve(indicesCount);
         for (int i = 0; i < indicesCount; ++i) {
@@ -161,11 +197,12 @@ namespace Slangc {
         return var;
     }
 
-    Function* createDefaultConstructor(TypeDecStatementNode* type, CodeGenContext &context, std::vector<ErrorMessage>& errors) {
+    Function* createDefaultConstructor(TypeDecStatementNode* type, CodeGenContext &context, std::vector<ErrorMessage>& errors, bool isImported) {
         auto structType = getIRType(type->name, context);
         auto intType = Type::getInt32Ty(*context.llvmContext);
         auto constructorType = FunctionType::get(Type::getVoidTy(*context.llvmContext), {structType->getPointerTo()}, false);
         auto constructor = Function::Create(constructorType, Function::ExternalLinkage, type->name + "._default_constructor", context.module.get());
+        if (isImported) return constructor;
         auto block = BasicBlock::Create(*context.llvmContext, "entry", constructor);
         context.builder->SetInsertPoint(block);
         context.pushBlock(block);
@@ -236,6 +273,7 @@ namespace Slangc {
 
     Function* getFuncFromExpr(const DeclPtrVariant& funcExpr, CodeGenContext &context) {
         if (auto func = std::get_if<FuncDecStatementPtr>(&funcExpr)) {
+            if (func->get()->isExtern) return context.module->getFunction(func->get()->name);
             return context.module->getFunction(func->get()->name + "." + getMangledFuncName(func->get()->expr));
         }
         if (auto method = std::get_if<MethodDecPtr>(&funcExpr)) {

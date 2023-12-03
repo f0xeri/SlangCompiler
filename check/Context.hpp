@@ -23,7 +23,7 @@ namespace Slangc {
         std::string currType;
         std::string moduleName;
         std::string filename;
-        auto enterScope(const std::string &name = "") -> void {
+        auto enterScope(const std::string &name) -> void {
             if (currScope->children[name] == nullptr) {
                 currScope->children[name] = std::make_shared<Scope>(currScope);
             }
@@ -31,7 +31,7 @@ namespace Slangc {
         }
 
         // enterScope by iterator
-        auto enterScope(Scope::ChildrenIterator iter) -> void {
+        auto enterScope(const Scope::ChildrenIterator& iter) -> void {
             currScope = iter->second;
         }
 

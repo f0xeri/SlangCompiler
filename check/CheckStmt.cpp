@@ -103,14 +103,14 @@ namespace Slangc::Check {
                 }
             }
         }
-        context.enterScope();
+        context.enterScope("if#" + std::to_string(stmt->loc.line) + ":" + std::to_string(stmt->loc.column));
         result &= checkBlockStmt(stmt->trueBlock, context, errors);
         context.exitScope();
         for (const auto &elseIf: stmt->elseIfNodes) {
             result &= checkStmt(elseIf, context, errors);
         }
         if (stmt->falseBlock.has_value()) {
-            context.enterScope();
+            context.enterScope("else#" + std::to_string(stmt->loc.line) + ":" + std::to_string(stmt->loc.column));
             result &= checkBlockStmt(stmt->falseBlock.value(), context, errors);
             context.exitScope();
         }
@@ -132,7 +132,7 @@ namespace Slangc::Check {
                 }
             }
         }
-        context.enterScope();
+        context.enterScope("else-if#" + std::to_string(stmt->loc.line) + ":" + std::to_string(stmt->loc.column));
         result &= checkBlockStmt(stmt->trueBlock, context, errors);
         context.exitScope();
         return result;
@@ -153,7 +153,7 @@ namespace Slangc::Check {
                 }
             }
         }
-        context.enterScope();
+        context.enterScope("while#" + std::to_string(stmt->loc.line) + ":" + std::to_string(stmt->loc.column));
         result &= checkBlockStmt(stmt->block, context, errors);
         context.exitScope();
         return result;

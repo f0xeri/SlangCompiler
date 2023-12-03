@@ -58,8 +58,11 @@ namespace Slangc {
         bool isCustomType = false;
         if (auto localVar = context.localsDeclsLookup(name)) {
             declType = getDeclType(localVar.value(), context.context, errors);
-            if (!Context::isBuiltInType(typeToString(declType.value()))) {
+            if (std::holds_alternative<TypeExprPtr>(declType.value()) && context.allocatedClassesDecls.contains(std::get<TypeExprPtr>(declType.value())->type)) {
                 isCustomType = true;
+                if (isCustomType && !context.loadAsRvalue) {
+                    std::cout << "zalupa";
+                }
             }
             else
             if (auto funcParam = std::get_if<FuncParamDecStmtPtr>(&localVar.value())) {
@@ -77,7 +80,8 @@ namespace Slangc {
             isFunc = true;
         }
         auto type = getIRType(declType.value(), context);
-        if ((context.loadAsRvalue && !isFunc) || isVar || isCustomType) {
+        // TODO: it looks really really bad
+        if ((context.loadAsRvalue && !isFunc) || isVar /*|| isCustomType*/) {
             if (isVar || isOut) type = type->getPointerTo();
             var = context.builder->CreateLoad(type, var);
             if (context.loadAsRvalue && isVar) {
@@ -95,8 +99,8 @@ namespace Slangc {
         auto varType = std::get<ArrayExprPtr>(getExprType(expr, context.context, errors).value());
         auto indexVal = processNode(indexExpr, context, errors);
         context.loadAsRvalue = false;
-        var = context.builder->CreateGEP(getIRType(varType->type, context), var, indexVal);
-        if (temp) {
+        var = context.builder->CreateInBoundsGEP(getIRTypeForSize(varType->type, context), var, indexVal);
+        if (temp && context.loadIndex) {
             var = context.builder->CreateLoad(getIRType(varType->type, context), var);
         }
         context.loadAsRvalue = temp;
@@ -171,6 +175,8 @@ namespace Slangc {
                     return context.builder->CreateFMul(leftValue, rightValue);
                 case TokenType::Division:
                     return context.builder->CreateFDiv(leftValue, rightValue);
+                case TokenType::Remainder:
+                    return context.builder->CreateFRem(leftValue, rightValue);
                 case TokenType::Equal:
                     return context.builder->CreateFCmpOEQ(leftValue, rightValue);
                 case TokenType::NotEqual:
@@ -191,15 +197,20 @@ namespace Slangc {
     auto CallExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         Value* func = nullptr;
         auto temp = context.loadAsRvalue;
+        auto tempIndex = context.loadIndex;
         std::vector<Value*> argsRef;
         size_t argsOffset = 0;
         if (foundFunc.has_value()) {
             func = getFuncFromExpr(foundFunc.value(), context);
             if (std::holds_alternative<MethodDecPtr>(foundFunc.value()) && std::holds_alternative<AccessExprPtr>(expr)) {
-                //context.loadAsRvalue = true;  "this" is always a custom type, so it will be loaded anyway
+                context.loadAsRvalue = true;  //"this" is a custom type, so it should be loaded anyway, if it's in array, it should not be loaded after gep
+                context.loadIndex = false;
+                //if (std::holds_alternative<IndexExprPtr>(std::get<AccessExprPtr>(expr)->expr))
+                //    context.loadAsRvalue = false;
                 auto thisArg = processNode(std::get<AccessExprPtr>(expr)->expr, context, errors);
                 argsRef.push_back(thisArg);
-                //context.loadAsRvalue = temp;
+                context.loadAsRvalue = temp;
+                context.loadIndex = tempIndex;
                 argsOffset = 1;
             }
         }
@@ -217,6 +228,12 @@ namespace Slangc {
             }
             auto isOutVar = currExpectedArg->parameterType == Out || currExpectedArg->parameterType == Var;
             context.loadAsRvalue = !isOutVar;
+            auto exprType = getExprType(currCallArg, context.context, errors).value();
+            // We should load custom types even if they are out or var, because they are saved as pointer to pointer
+            if (std::holds_alternative<TypeExprPtr>(exprType) && context.allocatedClassesDecls.contains(std::get<TypeExprPtr>(exprType)->type)) {
+                context.loadAsRvalue = true;
+                context.loadIndex = false;
+            }
             auto argVal = processNode(currCallArg, context, errors);
             auto currExpectedIRType = isOutVar ? getIRType(currExpectedArg->type, context)->getPointerTo() : getIRType(currExpectedArg->type, context);
             argVal = typeCast(argVal, currExpectedIRType, context, errors, getExprLoc(currCallArg));
@@ -224,16 +241,21 @@ namespace Slangc {
             context.currentFuncSignature = tempSig;
         }
         context.loadAsRvalue = temp;
+        context.loadIndex = tempIndex;
         return context.builder->CreateCall(getFuncType(funcType.value(), context), func, argsRef);
     }
 
     auto AccessExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         auto temp = context.loadAsRvalue;
+        auto tempIndex = context.loadIndex;
         context.loadAsRvalue = true;
+        context.loadIndex = false;
         auto var = processNode(expr, context, errors);
         context.loadAsRvalue = temp;
+        context.loadIndex = tempIndex;
         auto varType = getExprType(expr, context.context, errors).value();
         auto typeName = std::get<TypeExprPtr>(varType)->type;
+        // TODO: next block looks weird, probably needs refactoring
         if (context.currentFuncSignature.has_value()) {
             auto method = selectBestOverload(context.allocatedClassesDecls[typeName], typeName + "." + name, context.currentFuncSignature.value(), true, true, context.context);
             if (method.has_value()) {
@@ -252,7 +274,10 @@ namespace Slangc {
     }
 
     auto DeleteStmtNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
-        return {};
+        context.loadAsRvalue = true;    // TODO: not sure if it's correct
+        auto var = processNode(expr, context, errors);
+        context.loadAsRvalue = false;
+        return context.builder->CreateFree(var);
     }
 
     auto BlockStmtNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
@@ -288,8 +313,14 @@ namespace Slangc {
 
     auto ReturnStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         context.loadAsRvalue = true;
+        context.loadIndex = true;
+        auto type = getExprType(expr, context.context, errors).value();
+        if (std::holds_alternative<TypeExprPtr>(type) && context.allocatedClassesDecls.contains(std::get<TypeExprPtr>(type)->type)) {
+            context.loadIndex = false;
+        }
         auto val = processNode(expr, context, errors);
         context.loadAsRvalue = false;
+        context.loadIndex = true;
         val = typeCast(val, context.currentReturnType, context, errors, getExprLoc(expr));
         return context.builder->CreateRet(val);
     }
@@ -410,10 +441,10 @@ namespace Slangc {
 
     auto FuncDecStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         auto funcType = getFuncType(expr, context);
-        auto funcName = name + "." + getMangledFuncName(expr);
+        auto funcName = isExtern ? name : name + "." + getMangledFuncName(expr);
         auto funcCallee = context.module->getOrInsertFunction(funcName, funcType);
         auto func = context.module->getFunction(funcName);
-        if (context.currentDeclImported) return func;
+        if (context.currentDeclImported || isExtern) return func;
         context.context.enterScope(funcName);   // scope name is mangled
         if (block.has_value()) {
             BasicBlock *block = BasicBlock::Create(*context.llvmContext, "entry", context.module->getFunction(funcName));
@@ -447,6 +478,17 @@ namespace Slangc {
         }
         context.currentReturnType = nullptr;
         if (!isFunction) context.builder->CreateRetVoid();
+        else {
+            if (context.currentBlock()->empty()) {
+                context.builder->CreateCall(context.module->getOrInsertFunction("llvm.trap", FunctionType::getVoidTy(*context.llvmContext)), {});
+                context.builder->CreateUnreachable();
+            } else {
+                if (context.currentBlock()->getTerminator() == nullptr) {
+                    context.builder->CreateCall(context.module->getOrInsertFunction("llvm.trap", FunctionType::getVoidTy(*context.llvmContext)), {});
+                    context.builder->CreateUnreachable();
+                }
+            }
+        }
         context.context.exitScope();
         context.popBlock();
         return {};
@@ -518,7 +560,7 @@ namespace Slangc {
             types.push_back(getIRType(getDeclType(field, context.context, errors).value(), context));
         }
         context.allocatedClasses[name]->setBody(types);
-        createDefaultConstructor(this, context, errors);
+        createDefaultConstructor(this, context, errors, context.currentDeclImported);
         context.context.enterScope(name);
         for (auto &method : methods) {
             method->codegen(context, errors);
@@ -536,10 +578,13 @@ namespace Slangc {
         auto trueBB = BasicBlock::Create(*context.llvmContext, "then", func);
         auto falseBB = BasicBlock::Create(*context.llvmContext, "else", func);
         auto endBB = BasicBlock::Create(*context.llvmContext, "ifend", func);
-
+        auto temp = context.loadAsRvalue;
+        context.loadAsRvalue = true;
         context.builder->CreateCondBr(processNode(condition, context, errors), trueBB, falseBB);
+        context.loadAsRvalue = temp;
         context.pushBlock(trueBB);
         context.builder->SetInsertPoint(trueBB);
+        context.context.enterScope("if#" + std::to_string(loc.line) + ":" + std::to_string(loc.column));
         bool hasReturn = false;
         for (auto &&stmt : trueBlock->statements) {
             auto val = processNode(stmt, context, errors);
@@ -547,23 +592,29 @@ namespace Slangc {
         }
         if (!hasReturn) context.builder->CreateBr(endBB);
         context.popBlock();
+        context.context.exitScope();
 
         context.pushBlock(falseBB);
         context.builder->SetInsertPoint(falseBB);
+
         //elseif blocks
         for (auto &&elseif : elseIfNodes) {
             auto elseifBBTrue = BasicBlock::Create(*context.llvmContext, "elseifthen", func);
             auto elseifBBFalse = BasicBlock::Create(*context.llvmContext, "elseifelse", func);
+            context.loadAsRvalue = true;
             context.builder->CreateCondBr(processNode(elseif->condition, context, errors), elseifBBTrue, elseifBBFalse);
+            context.loadAsRvalue = temp;
             context.pushBlock(elseifBBTrue);
             context.builder->SetInsertPoint(elseifBBTrue);
             hasReturn = false;
+            context.context.enterScope("else-if#" + std::to_string(elseif->loc.line) + ":" + std::to_string(elseif->loc.column));
             for (auto &&stmt : elseif->trueBlock->statements) {
                 auto val = processNode(stmt, context, errors);
                 if (std::holds_alternative<ReturnStatementPtr>(stmt)) hasReturn = true;
             }
             if (!hasReturn) context.builder->CreateBr(endBB);
             context.popBlock();
+            context.context.exitScope();
             context.pushBlock(elseifBBFalse);
             context.builder->SetInsertPoint(elseifBBFalse);
         }
@@ -571,10 +622,12 @@ namespace Slangc {
         // else block
         if (falseBlock.has_value()) {
             hasReturn = false;
+            context.context.enterScope("else#" + std::to_string(loc.line) + ":" + std::to_string(loc.column));
             for (auto &&stmt : falseBlock.value()->statements) {
                 auto val = processNode(stmt, context, errors);
                 if (std::holds_alternative<ReturnStatementPtr>(stmt)) hasReturn = true;
             }
+            context.context.exitScope();
             if (!hasReturn) context.builder->CreateBr(endBB);
         }
         else {
@@ -597,15 +650,20 @@ namespace Slangc {
         context.builder->CreateBr(whileCheck);
         context.pushBlock(whileCheck);
         context.builder->SetInsertPoint(whileCheck);
+        auto temp = context.loadAsRvalue;
+        context.loadAsRvalue = true;
         context.builder->CreateCondBr(processNode(condition, context, errors), whileIter, whileEnd);
+        context.loadAsRvalue = temp;
         context.popBlock();
         context.pushBlock(whileIter);
         context.builder->SetInsertPoint(whileIter);
         bool hasReturn = false;
+        context.context.enterScope("while#" + std::to_string(loc.line) + ":" + std::to_string(loc.column));
         for (auto &&stmt : block->statements) {
             auto val = processNode(stmt, context, errors);
             if (std::holds_alternative<ReturnStatementPtr>(stmt)) hasReturn = true;
         }
+        context.context.exitScope();
         if (!hasReturn) context.builder->CreateBr(whileCheck);
         context.popBlock();
         context.ret(whileEnd);

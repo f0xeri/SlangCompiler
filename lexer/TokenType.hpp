@@ -77,6 +77,7 @@ namespace Slangc {
         EndOfFile,
         Delete,
         Extern,
+        Virtual
     };
 
     struct Token {

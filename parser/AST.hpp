@@ -197,19 +197,6 @@ namespace Slangc {
         }
     };
 
-    struct IndexesExprNode {
-        SourceLoc loc{0, 0};
-        std::vector<ExprPtrVariant> indexes;
-        std::optional<ExprPtrVariant> assign = std::nullopt;
-        bool isConst = false;
-
-        IndexesExprNode(SourceLoc loc, std::vector<ExprPtrVariant> indexes, std::optional<ExprPtrVariant> assign = std::nullopt)
-            : loc(loc), indexes(std::move(indexes)), assign(std::move(assign)) {};
-        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
-
-        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return getExprType(indexes.back(), analysis, errors); }
-    };
-
     struct UnaryOperatorExprNode {
         SourceLoc loc{0, 0};
         TokenType op{};
@@ -287,6 +274,7 @@ namespace Slangc {
         std::optional<std::string> parentTypeName = std::nullopt;
         bool isExtern = false;
         bool isPrivate = false;
+        bool vtableRequired = false;
 
         TypeDecStatementNode(SourceLoc loc, std::string name, std::vector<DeclPtrVariant> fields,
                              std::vector<MethodDecPtr> methods, std::optional<std::string> parentTypeName = std::nullopt,
@@ -307,7 +295,7 @@ namespace Slangc {
         TypeExprNode typeExpr;
         std::optional<ExprPtrVariant> expr;
 
-        FieldVarDecNode(SourceLoc loc, std::string name, std::string typeName, bool isPrivate, int index, std::string type, std::optional<ExprPtrVariant> expr = std::nullopt)
+        FieldVarDecNode(SourceLoc loc, std::string name, std::string typeName, bool isPrivate, size_t index, std::string type, std::optional<ExprPtrVariant> expr = std::nullopt)
                 : loc(loc), name(std::move(name)), typeName(std::move(typeName)), isPrivate(isPrivate), index(index), typeExpr(std::move(type)), expr(std::move(expr)) {};
         auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>(typeExpr); }
@@ -362,11 +350,15 @@ namespace Slangc {
         std::optional<BlockStmtPtr> block;
         bool isPrivate = false;
         bool isFunction = false;
+        bool isVirtual = false;
+        size_t vtableIndex = 0;
 
         MethodDecNode(SourceLoc loc, std::string name, FuncExprPtr expr, std::string thisName,
-                      std::optional<BlockStmtPtr> block = std::nullopt, bool isPrivate = false, bool isFunction = false)
+                      std::optional<BlockStmtPtr> block = std::nullopt, bool isPrivate = false, bool isFunction = false,
+                      bool isVirtual = false, size_t vtableIndex = 0)
                 : loc(loc), name(std::move(name)), expr(std::move(expr)), thisName(std::move(thisName)),
-                  block(std::move(block)), isPrivate(isPrivate), isFunction(isFunction) {};
+                  block(std::move(block)), isPrivate(isPrivate), isFunction(isFunction),
+                  isVirtual(isVirtual), vtableIndex(vtableIndex) {};
 
         auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return expr; }
@@ -377,6 +369,7 @@ namespace Slangc {
         ExprPtrVariant expr;
         std::string name;
         size_t index;
+        std::string accessedType;
         bool isConst = false;
 
         AccessExprNode(SourceLoc loc, ExprPtrVariant expr, std::string name, size_t index = 0)

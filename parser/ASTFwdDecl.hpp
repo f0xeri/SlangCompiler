@@ -29,7 +29,6 @@ namespace Slangc {
     struct StringExprNode;
     struct UnaryOperatorExprNode;
     struct VarExprNode;
-    struct IndexesExprNode;
     struct IndexExprNode;
     struct CallExprNode;
     struct AccessExprNode;
@@ -47,7 +46,6 @@ namespace Slangc {
     using StringExprPtr = std::shared_ptr<StringExprNode>;
     using UnaryOperatorExprPtr = std::shared_ptr<UnaryOperatorExprNode>;
     using VarExprPtr = std::shared_ptr<VarExprNode>;
-    using IndexesExprPtr = std::shared_ptr<IndexesExprNode>;
     using IndexExprPtr = std::shared_ptr<IndexExprNode>;
     using CallExprPtr = std::shared_ptr<CallExprNode>;
     using AccessExprPtr = std::shared_ptr<AccessExprNode>;
@@ -56,9 +54,9 @@ namespace Slangc {
     using ExprPtrVariant
             = std::variant<ArrayExprPtr, BooleanExprPtr, CharExprPtr, FloatExprPtr,
             FuncExprPtr, IntExprPtr, NilExprPtr, OperatorExprPtr, RealExprPtr, StringExprPtr,
-            UnaryOperatorExprPtr, VarExprPtr, IndexesExprPtr, IndexExprPtr, CallExprPtr, AccessExprPtr, TypeExprPtr>;
+            UnaryOperatorExprPtr, VarExprPtr, IndexExprPtr, CallExprPtr, AccessExprPtr, TypeExprPtr>;
 
-    using VarExprPtrVariant = std::variant<VarExprPtr, IndexesExprPtr, IndexExprPtr>;
+    using VarExprPtrVariant = std::variant<VarExprPtr, IndexExprPtr>;
 
     struct ArrayDecStatementNode;
     //struct ExternFuncDecStatementNode;
@@ -112,11 +110,12 @@ namespace Slangc {
     using BlockStmtPtr = std::shared_ptr<BlockStmtNode>;
 
     using StmtPtrVariant
-            = std::variant<AssignExprPtr, CallExprPtr, ArrayDecStatementPtr, /*ExternFuncDecStmtPtr,*/
-            FieldArrayVarDecPtr, FieldVarDecPtr, FuncDecStatementPtr, FuncParamDecStmtPtr, FuncPointerStmtPtr,
+            = std::variant<AssignExprPtr, CallExprPtr, ArrayDecStatementPtr,
+            FieldArrayVarDecPtr, FieldVarDecPtr, FieldFuncPointerStmtPtr,
+            FuncDecStatementPtr, FuncParamDecStmtPtr, FuncPointerStmtPtr,
             MethodDecPtr, TypeDecStmtPtr, VarDecStmtPtr, DeleteStmtPtr, ElseIfStatementPtr, IfStatementPtr,
-            InputStatementPtr, OutputStatementPtr, ReturnStatementPtr, VarExprPtr,
-            IndexesExprPtr, IndexExprPtr, WhileStatementPtr, BlockStmtPtr>;
+            InputStatementPtr, OutputStatementPtr, ReturnStatementPtr, VarExprPtr, IndexExprPtr,
+            WhileStatementPtr, BlockStmtPtr>;
 
     class Context;
 

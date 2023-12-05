@@ -96,10 +96,6 @@ namespace Slangc::Check {
         return result;
     }
 
-    bool checkExpr(const IndexesExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
-        return true;
-    }
-
     bool checkExpr(const IndexExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
         result = checkExpr(expr->expr, context, errors);
@@ -173,13 +169,17 @@ namespace Slangc::Check {
             }
             while (typeDecl.has_value()) {
                 func = selectBestOverload(typeDecl.value(), typeDecl.value()->name + "." + access->get()->name, funcExpr, false, false, context);
-                expr->foundFunc = func;
-                expr->funcType = std::get<MethodDecPtr>(*func)->expr;
-                overloaded = true;
                 if (!func && typeDecl.value()->parentTypeName.has_value()) {
                     typeDecl = context.symbolTable.lookupType(typeDecl.value()->parentTypeName.value());
                 }
-                else break;
+                else {
+                    overloaded = true;
+                    if (func) {
+                        expr->foundFunc = func;
+                        expr->funcType = std::get<MethodDecPtr>(*func)->expr;
+                    }
+                    break;
+                }
             }
         }
         else if (auto var = std::get_if<VarExprPtr>(&expr->expr)) {
@@ -274,6 +274,7 @@ namespace Slangc::Check {
         }
         auto found = false;
         size_t index = 0;
+        std::string accessedType;
         while (typeOpt.has_value()) {
             auto type = typeOpt.value();
             for (const auto &field: type->fields) {
@@ -286,6 +287,7 @@ namespace Slangc::Check {
                         // found = true even if we got error, because we want to suppress final not found error
                         found = true;
                         index = (*fieldVar)->index;
+                        accessedType = (*fieldVar)->typeName.type;
                     }
                 } else if (const auto &fieldArrayVar = std::get_if<FieldArrayVarDecPtr>(&field)) {
                     if ((*fieldArrayVar)->name == expr->name) {
@@ -295,6 +297,7 @@ namespace Slangc::Check {
                         }
                         found = true;
                         index = (*fieldArrayVar)->index;
+                        accessedType = (*fieldArrayVar)->typeName.type;
                     }
                 } else if (auto fieldFuncPointer = std::get_if<FieldFuncPointerStmtPtr>(&field)) {
                     if ((*fieldFuncPointer)->name == expr->name) {
@@ -304,6 +307,7 @@ namespace Slangc::Check {
                         }
                         found = true;
                         index = (*fieldFuncPointer)->index;
+                        accessedType = (*fieldFuncPointer)->typeName.type;
                     }
                 }
 
@@ -331,6 +335,7 @@ namespace Slangc::Check {
             result = false;
         }
         expr->index = index;
+        expr->accessedType = accessedType;
         return result;
     }
 

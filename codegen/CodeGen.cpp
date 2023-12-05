@@ -60,9 +60,6 @@ namespace Slangc {
             declType = getDeclType(localVar.value(), context.context, errors);
             if (std::holds_alternative<TypeExprPtr>(declType.value()) && context.allocatedClassesDecls.contains(std::get<TypeExprPtr>(declType.value())->type)) {
                 isCustomType = true;
-                if (isCustomType && !context.loadAsRvalue) {
-                    std::cout << "zalupa";
-                }
             }
             else
             if (auto funcParam = std::get_if<FuncParamDecStmtPtr>(&localVar.value())) {
@@ -98,17 +95,14 @@ namespace Slangc {
         auto var = processNode(expr, context, errors);
         auto varType = std::get<ArrayExprPtr>(getExprType(expr, context.context, errors).value());
         auto indexVal = processNode(indexExpr, context, errors);
+        indexVal = typeCast(indexVal, Type::getInt64Ty(*context.llvmContext), context, errors, getExprLoc(indexExpr));
         context.loadAsRvalue = false;
-        var = context.builder->CreateInBoundsGEP(getIRTypeForSize(varType->type, context), var, indexVal);
+        var = context.builder->CreateInBoundsGEP(getIRType(varType->type, context), var, indexVal);
         if (temp && context.loadIndex) {
             var = context.builder->CreateLoad(getIRType(varType->type, context), var);
         }
         context.loadAsRvalue = temp;
         return var;
-    }
-
-    auto IndexesExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
-        return {};
     }
 
     auto UnaryOperatorExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
@@ -203,15 +197,20 @@ namespace Slangc {
         if (foundFunc.has_value()) {
             func = getFuncFromExpr(foundFunc.value(), context);
             if (std::holds_alternative<MethodDecPtr>(foundFunc.value()) && std::holds_alternative<AccessExprPtr>(expr)) {
+                auto method = std::get<MethodDecPtr>(foundFunc.value());
                 context.loadAsRvalue = true;  //"this" is a custom type, so it should be loaded anyway, if it's in array, it should not be loaded after gep
-                context.loadIndex = false;
-                //if (std::holds_alternative<IndexExprPtr>(std::get<AccessExprPtr>(expr)->expr))
-                //    context.loadAsRvalue = false;
+                context.loadIndex = true;
                 auto thisArg = processNode(std::get<AccessExprPtr>(expr)->expr, context, errors);
                 argsRef.push_back(thisArg);
+                argsOffset = 1;
+
+                if (method->isVirtual) {
+                    auto vtableLoad = context.builder->CreateLoad(context.builder->getPtrTy(), thisArg);
+                    auto vtablePtr = context.builder->CreateInBoundsGEP(context.builder->getPtrTy(), vtableLoad, ConstantInt::get(Type::getInt64Ty(*context.llvmContext), method->vtableIndex), "vtable_" + method->name);
+                    func = context.builder->CreateLoad(context.builder->getPtrTy(), vtablePtr);
+                }
                 context.loadAsRvalue = temp;
                 context.loadIndex = tempIndex;
-                argsOffset = 1;
             }
         }
         else {
@@ -249,7 +248,7 @@ namespace Slangc {
         auto temp = context.loadAsRvalue;
         auto tempIndex = context.loadIndex;
         context.loadAsRvalue = true;
-        context.loadIndex = false;
+        context.loadIndex = true;
         auto var = processNode(expr, context, errors);
         context.loadAsRvalue = temp;
         context.loadIndex = tempIndex;
@@ -265,7 +264,7 @@ namespace Slangc {
             }
         }
 
-        auto elementPtr = context.builder->CreateStructGEP(context.allocatedClasses[typeName], var, index, typeName + "." + name);
+        auto elementPtr = context.builder->CreateStructGEP(context.allocatedClasses[accessedType], var, index, typeName + "." + name);
         auto type = getIRType(getExprType(shared_from_this(), context.context, errors).value(), context);
         if (context.loadAsRvalue) {
             elementPtr = context.builder->CreateLoad(type, elementPtr);
@@ -496,14 +495,16 @@ namespace Slangc {
 
     auto FieldVarDecNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         auto type = getIRType(typeExpr.type, context);
-        Value* var = nullptr;
         Value* rightVal = nullptr;
         auto elementPtr = context.builder->CreateStructGEP(context.allocatedClasses[typeName.type], context.currentTypeLoad, index, typeName.type + "." + name);
         if (!Context::isBuiltInType(typeExpr.type)) {
-            auto malloc = createMalloc(typeExpr.type, var, context);
+            auto malloc = createMalloc(typeExpr.type, elementPtr, context);
             context.builder->CreateStore(malloc, elementPtr);
             // calling a constructor can cause an infinite recursion (A calls constr of B, B calls constr of A...)
             // TODO: make calling of constructor implicit, like variable-A a = new A;
+            auto arg = context.builder->CreateLoad(type, elementPtr);
+            auto constructor = context.module->getFunction(typeExpr.type + "._default_constructor");
+            if (constructor) context.builder->CreateCall(constructor, arg);
         }
         if (expr.has_value()) {
             rightVal = processNode(expr.value(), context, errors);
@@ -556,15 +557,28 @@ namespace Slangc {
         context.allocatedClasses[name]->setName(name);
         context.allocatedClassesDecls[name] = shared_from_this();
         std::vector<Type*> types;
-        for (auto &field : fields) {
-            types.push_back(getIRType(getDeclType(field, context.context, errors).value(), context));
+        size_t index = 0;
+        if (parentTypeName != "Object") {
+            types.push_back(context.allocatedClasses.at(parentTypeName.value()));
+            ++index;
+        }
+        // vtable pointer stored only in base class
+        if (vtableRequired && parentTypeName == "Object") {
+            types.push_back(PointerType::get(StructType::create(*context.llvmContext, "vtable_" + name), 0));
+        }
+        for (; index < fields.size(); ++index) {
+            types.push_back(getIRType(getDeclType(fields[index], context.context, errors).value(), context));
         }
         context.allocatedClasses[name]->setBody(types);
-        createDefaultConstructor(this, context, errors, context.currentDeclImported);
+        // create definition of default constructor
+        //createDefaultConstructor(this, context, errors, true);
         context.context.enterScope(name);
         for (auto &method : methods) {
             method->codegen(context, errors);
         }
+
+        if (vtableRequired) createVTable(this, context, errors);
+        createDefaultConstructor(this, context, errors, context.currentDeclImported);
         context.context.exitScope();
         return nullptr;
     }

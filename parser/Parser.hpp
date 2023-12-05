@@ -74,7 +74,7 @@ namespace Slangc {
         auto parseFuncParams(bool named = true) -> std::optional<std::vector<FuncParamDecStmtPtr>>;
         auto parseFuncDecl() -> std::optional<DeclPtrVariant>;
         auto parseFieldDecl(const std::string& typeName, uint32_t fieldId) -> std::optional<DeclPtrVariant>;
-        auto parseMethodDecl(const std::string& typeName) -> std::optional<DeclPtrVariant>;
+        auto parseMethodDecl(const std::string& typeName, size_t vtableIndex) -> std::optional<DeclPtrVariant>;
         auto parseClassDecl() -> std::optional<DeclPtrVariant>;
         auto parseVarDecl() -> std::optional<DeclPtrVariant>;
 

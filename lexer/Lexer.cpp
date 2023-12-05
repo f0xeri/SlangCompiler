@@ -64,6 +64,7 @@ namespace Slangc {
 
             {"public",    TokenType::VisibilityType},
             {"private",   TokenType::VisibilityType},
+            {"virtual",   TokenType::Virtual},
             {"nil",       TokenType::Nil},
             {"false",     TokenType::Boolean},
             {"true",      TokenType::Boolean}

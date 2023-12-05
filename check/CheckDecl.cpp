@@ -228,8 +228,16 @@ namespace Slangc::Check {
         context.insert(decl->name, decl);
         context.currType = decl->name;
         context.enterScope(decl->name);
+        /*if (decl->vtableRequired) {
+            decl->fields.insert(decl->fields.begin(), createDecl<FieldVarDecNode>(decl->loc, "", decl->name, true, 0, "_vtable", std::nullopt));
+        }*/
         for (const auto &field: decl->fields) {
             result &= checkDecl(field, context, errors);
+            if (decl->vtableRequired && decl->parentTypeName == "Object") {
+                if (auto fieldVar = std::get_if<FieldVarDecPtr>(&field)) fieldVar->get()->index++;
+                else if (auto fieldArrayVar = std::get_if<FieldArrayVarDecPtr>(&field)) fieldArrayVar->get()->index++;
+                else if (auto fieldFuncPointer = std::get_if<FieldFuncPointerStmtPtr>(&field)) fieldFuncPointer->get()->index++;
+            }
         }
         // we don't need field names in scope after checking them
         context.clearCurrentScope();

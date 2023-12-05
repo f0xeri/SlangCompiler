@@ -256,11 +256,16 @@ namespace Slangc {
         return result;
     }
 
-    auto Parser::parseMethodDecl(const std::string& typeName) -> std::optional<DeclPtrVariant> {
+    auto Parser::parseMethodDecl(const std::string& typeName, size_t vtableIndex) -> std::optional<DeclPtrVariant> {
         --token;
         SourceLoc loc = token->location;
         //context.enterScope();
         bool isPrivate = consume(TokenType::VisibilityType).value == "private";
+        bool isVirtual = false;
+        if (token->type == TokenType::Virtual) {
+            isVirtual = true;
+            advance();
+        }
         consume(TokenType::Method);
         bool isFunction = false;
         std::string basicName = consume(TokenType::Identifier).value;
@@ -303,7 +308,7 @@ namespace Slangc {
         std::vector<StmtPtrVariant> statements;
         auto block = create<BlockStmtNode>(loc, statements);
         auto funcExpr = create<FuncExprNode>(loc, returnType.value(), args.value(), isFunction);
-        auto funcDecl = create<MethodDecNode>(loc, name, funcExpr, thisName, block, isPrivate, isFunction);
+        auto funcDecl = create<MethodDecNode>(loc, name, funcExpr, thisName, block, isPrivate, isFunction, isVirtual, vtableIndex);
         //context.insert(name, funcDecl);
         --token;
         auto parsedBlock = parseBlockStmt(basicName);
@@ -345,6 +350,14 @@ namespace Slangc {
         std::vector<DeclPtrVariant> fields;
         std::vector<MethodDecPtr> methods;
         advance();
+        // if current type is inherited from another type, add invisible parent field at 0 index
+        if (parentTypeName != "Object") {
+            auto parentField = createDecl<FieldVarDecNode>(loc, "", mangledName, true, fieldIndex, parentTypeName, std::nullopt);
+            ++fieldIndex;
+            fields.emplace_back(parentField);
+        }
+        bool vtableRequired = false;
+        size_t vtableIndex = 0;
         while (token->type != TokenType::End) {
             consume(TokenType::VisibilityType);
             if (token->type == TokenType::Field) {
@@ -357,8 +370,11 @@ namespace Slangc {
                 }
                 fields.emplace_back(field.value());
             }
-            else if (token->type == TokenType::Method) {
-                auto method = parseMethodDecl(mangledName);
+            else if (token->type == TokenType::Method || token->type == TokenType::Virtual) {
+                if (token->type == TokenType::Virtual) {
+                    vtableRequired = true;
+                }
+                auto method = parseMethodDecl(mangledName, vtableIndex++);
                 if (!method.has_value()) {
                     errors.emplace_back(filename, "Failed to parse method declaration.", token->location, false, false);
                     hasError = true;
@@ -378,6 +394,7 @@ namespace Slangc {
             hasError = true;
             return std::nullopt;
         }
+        std::get<TypeDecStmtPtr>(classNode)->vtableRequired = vtableRequired;
         //context.types[mangledName] = std::get<TypeDecStmtPtr>(classNode);
         context.symbolTable.insert(mangledName, moduleAST->name, classNode, isPrivate, false);
         return classNode;

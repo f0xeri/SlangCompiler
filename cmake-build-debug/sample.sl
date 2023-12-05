@@ -1,49 +1,38 @@
 module sample
     public class A inherits Object
-        public field-array[1] procedure() arr;
-        public field-integer i := 1;
-        private field-integer ip := 11;
-        public field-array[10] character c := "Hello";
-        public method p1(A a)(in integer i2, in float f)
-            output i2;
-            output f;
-            output a.i;
-            output a.ip;
-            output a.c;
-        end p1;
-        private method setC(A a)(in array[] character c)
-            let a.c := c;
-        end setC;
-        public method getA(A a)(): A
-            variable-A a2;
-            call a2.setC("NewHello");
-            return a2;
-        end getA;
-        public method printSomething(A a)()
-            output "Something\n";
-        end printSomething;
-
-        public method getMethod(A a)(): procedure(out A, in integer, in float)
-            call a.printSomething();
-            return a.p1;
-        end getMethod;
+        public field-integer i := 10;
+        public virtual method foo(A a)()
+            output "A::foo called";
+        end foo;
+        public virtual method foo(A a)(in integer x)
+            output "A::foo(in integer) called";
+        end foo;
+        public method bar(A a)()
+            output "A::bar called";
+        end bar;
     end A;
-
-    public function getA(): A
-        variable-A a;
-        return a;
-    end getA;
-
-    public procedure printHello()
-        output "Hello World!\n";
-    end printHello;
+    public class B inherits A
+        public virtual method foo(B b)()
+            output "B::foo called";
+        end foo;
+    end B;
 start
-    variable-function(): A getAFuncPtr := getA;
-    call getAFuncPtr().getA().getA().getA().getA().getA().p1(1, 2.0);
     variable-A a;
-    call a.p1(2, 3.0);
-    variable-A a2 := getA();
-    let a2.arr[0] := printHello;
-    call a2.arr[0]();
-    call a2.getMethod()(a2, 3, 4.0);
+    variable-B b;
+    variable-A a2;
+    variable-B b2;
+    variable-array[5] A arr;
+    let arr[0] := a;
+    let arr[1] := b;
+    let arr[2] := b2;
+    let arr[3] := a2;
+    let arr[4] := a;
+    variable-integer i := 0;
+    while i < 5 repeat
+        call arr[i].foo();
+        call arr[i].bar();
+        let arr[i].i := i;
+        output arr[i].i;
+        let i := i + 1;
+    end while;
 end sample.

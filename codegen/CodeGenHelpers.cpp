@@ -107,6 +107,51 @@ namespace Slangc {
         return var;
     }
 
+    void callArrayElementsConstructors(ArrayExprPtr& array, Value* var, Value* size, CodeGenContext &context, std::vector<ErrorMessage> &errors) {
+        auto int32Type = Type::getInt32Ty(*context.llvmContext);
+        auto int64Type = Type::getInt64Ty(*context.llvmContext);
+        auto jvar = context.builder->CreateAlloca(int32Type, nullptr, "j");
+        context.builder->CreateStore(ConstantInt::get(int32Type, 0), jvar);
+        auto func = context.builder->GetInsertBlock()->getParent();
+        auto whileCheck = BasicBlock::Create(*context.llvmContext, "whilecheck", func);
+        auto whileIter = BasicBlock::Create(*context.llvmContext, "whileiter", func);
+        auto whileEnd = BasicBlock::Create(*context.llvmContext, "whileend", func);
+        context.builder->CreateBr(whileCheck);
+        context.pushBlock(whileCheck);
+        context.builder->SetInsertPoint(whileCheck);
+
+        auto j = context.builder->CreateLoad(int32Type, jvar);
+        auto cmp = context.builder->CreateICmpSLT(j, size, "j_less_arrSz");
+
+        context.builder->CreateCondBr(cmp, whileIter, whileEnd);
+        context.popBlock();
+        context.pushBlock(whileIter);
+        context.builder->SetInsertPoint(whileIter);
+
+        auto elementType = getIRType(array->type, context);
+        auto loadArrType = getIRType(array, context);
+        auto arrLoad = context.builder->CreateLoad(loadArrType, var);
+        auto jLoad = context.builder->CreateLoad(int32Type, jvar);
+        auto jext = context.builder->CreateSExt(jLoad, int64Type);
+        auto arrPtr = context.builder->CreateInBoundsGEP(loadArrType, arrLoad, jext);
+
+        if (auto type = std::get_if<TypeExprPtr>(&array->type)) {
+            if (!Context::isBuiltInType(type->get()->type)) {
+                auto malloc = createMalloc(type->get()->type, arrPtr, context);
+                auto constructor = context.module->getFunction(type->get()->type + "._default_constructor");
+                auto load = context.builder->CreateLoad(elementType, arrPtr);
+                context.builder->CreateCall(constructor, {load});
+            }
+        }
+
+        auto jLoad2 = context.builder->CreateLoad(int32Type, jvar);
+        context.builder->CreateStore(context.builder->CreateAdd(jLoad2, ConstantInt::get(int32Type, 1)), jvar);
+        context.builder->CreateBr(whileCheck);
+        context.popBlock();
+        context.ret(whileEnd);
+        context.builder->SetInsertPoint(whileEnd);
+    }
+
     void createMallocLoops(int i, ArrayExprPtr &array, int indicesCount, Value *var, std::vector<Value*> jvars, std::vector<Value*> sizes, CodeGenContext &context, std::vector<ErrorMessage> &errors) {
         if (i == indicesCount) return;
         auto intType = Type::getInt32Ty(*context.llvmContext);
@@ -129,7 +174,7 @@ namespace Slangc {
         auto arrayType = getIRType(array->type, context);
         auto loadArrType = getIRType(array, context);
 
-        auto allocSize = context.builder->CreateMul(sizes[i], ConstantInt::get(intType, context.module->getDataLayout().getTypeAllocSize(getIRTypeForSize(array->type, context))));
+        auto allocSize = context.builder->CreateMul(sizes[i], ConstantInt::get(intType, context.module->getDataLayout().getTypeAllocSize(getIRType(array->type, context))));
         auto mallocCall = context.builder->CreateMalloc(intType, arrayType, allocSize, nullptr);
 
         auto arrLoad = context.builder->CreateLoad(loadArrType, var);
@@ -146,6 +191,7 @@ namespace Slangc {
             jvar = context.builder->CreateLoad(intType, jvars[i]);
             auto add = context.builder->CreateAdd(jvar, ConstantInt::get(intType, 1));
             context.builder->CreateStore(add, jvars[i]);
+            callArrayElementsConstructors(array, arrPtr, sizes[i], context, errors);
         }
         else context.builder->CreateStore(ConstantInt::get(intType, 0), jvars[i + 1]);
 
@@ -166,7 +212,7 @@ namespace Slangc {
 
     Value* createArrayMalloc(ArrayExprPtr& array, Value* var, CodeGenContext &context, std::vector<ErrorMessage> &errors) {
         auto intType = Type::getInt32Ty(*context.llvmContext);
-        auto structType = getIRTypeForSize(array->type, context);
+        auto structType = getIRType(array->type, context);
         auto temp = context.loadAsRvalue;
         context.loadAsRvalue = true;
         auto arraySize = processNode(array->size, context, errors);
@@ -175,6 +221,7 @@ namespace Slangc {
         auto mallocCall = context.builder->CreateMalloc(intType, structType, allocSize, nullptr);
         auto indicesCount = array->getIndicesCount();
         context.builder->CreateStore(mallocCall, var);
+        callArrayElementsConstructors(array, var, arraySize, context, errors);
         if (indicesCount == 1) return var;
         std::vector<Value*> sizes;
         sizes.reserve(indicesCount);
@@ -208,15 +255,65 @@ namespace Slangc {
         context.pushBlock(block);
 
         auto typeAlloc = context.builder->CreateAlloca(structType);
-        auto storeThis = context.builder->CreateStore(constructor->getArg(0), typeAlloc);
+        context.builder->CreateStore(constructor->getArg(0), typeAlloc);
         auto loadThis = context.builder->CreateLoad(structType->getPointerTo(), typeAlloc);
         context.currentTypeLoad = loadThis;
-        for (auto &&field : type->fields) {
-            processNode(field, context, errors);
+        size_t index = 0;
+        if (type->parentTypeName != "Object") {
+            // call ctor
+            auto parentCtor = context.module->getFunction(type->parentTypeName.value() + "._default_constructor");
+            context.builder->CreateCall(parentCtor, {loadThis});
+            index++;
+        }
+        if (type->vtableRequired) {
+            auto vtable = context.module->getGlobalVariable("vtable_" + type->name);
+            // gep to vtable
+            context.builder->CreateStore(context.builder->CreateInBoundsGEP(vtable->getValueType(), vtable, {ConstantInt::get(intType, 0), ConstantInt::get(intType, 0), ConstantInt::get(intType, 1)}), loadThis);
+        }
+        for (; index < type->fields.size(); ++index) {
+            processNode(type->fields[index], context, errors);
         }
         context.builder->CreateRetVoid();
         context.popBlock();
         return constructor;
+    }
+
+    void createVTable(TypeDecStatementNode* type, CodeGenContext &context, std::vector<ErrorMessage>& errors) {
+        auto vtableName = "vtable_" + type->name;
+        auto vtableMethods = std::vector<Constant*>();
+        auto vtableMethodsDecls = std::vector<MethodDecPtr>();
+        vtableMethods.push_back(ConstantPointerNull::get(context.builder->getPtrTy()));
+        // add all parent virtual methods
+        if (type->parentTypeName != "Object") {
+            auto parentType = context.allocatedClassesDecls[type->parentTypeName.value()];
+            for (auto &method : parentType->methods | std::views::filter([](auto& method) { return method->isVirtual; })) {
+                auto func = context.module->getFunction(method->name + "." + getMangledFuncName(method->expr));
+                vtableMethods.push_back(func);
+                vtableMethodsDecls.push_back(method);
+            }
+        }
+        // replace parent virtual methods with child virtual methods if they exist in child and add new child virtual methods
+        for (auto &method : type->methods | std::views::filter([](auto& method) { return method->isVirtual; })) {
+            auto func = context.module->getFunction(method->name + "." + getMangledFuncName(method->expr));
+            auto it = std::find_if(vtableMethodsDecls.begin(), vtableMethodsDecls.end(), [&](MethodDecPtr& val) {
+                return val->vtableIndex == method->vtableIndex;
+            });
+            if (it != vtableMethodsDecls.end()) {
+                *it = method;
+                vtableMethods[std::distance(vtableMethodsDecls.begin(), it) + 1] = func;
+            }
+            else {
+                vtableMethods.push_back(func);
+                vtableMethodsDecls.push_back(method);
+            }
+        }
+        auto arrayType = ArrayType::get(context.builder->getPtrTy(), vtableMethods.size());
+        auto constant = ConstantStruct::getAnon(ConstantArray::get(arrayType, vtableMethods));
+        auto global = new GlobalVariable(*context.module, constant->getType(), false, GlobalValue::LinkOnceODRLinkage, constant, vtableName);
+        global->setAlignment(llvm::MaybeAlign(8));
+        global->setUnnamedAddr(GlobalValue::UnnamedAddr::None);
+        global->setDSOLocal(true);
+        global->setComdat(context.module->getOrInsertComdat(vtableName));
     }
 
     FunctionType* getFuncType(const FuncExprPtr& funcExpr, CodeGenContext &context) {

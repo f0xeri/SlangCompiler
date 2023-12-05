@@ -65,7 +65,6 @@ namespace Slangc {
         std::optional<FuncExprPtr> currentFuncSignature = std::nullopt;
         Type* currentReturnType = nullptr;
         bool loadAsRvalue = false;
-        bool loadIndex = true;
         bool currentDeclImported = false;
 
         CodeGenContext(Context &context, bool isMainModule) : context(context) {

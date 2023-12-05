@@ -98,7 +98,7 @@ namespace Slangc {
         indexVal = typeCast(indexVal, Type::getInt64Ty(*context.llvmContext), context, errors, getExprLoc(indexExpr));
         context.loadAsRvalue = false;
         var = context.builder->CreateInBoundsGEP(getIRType(varType->type, context), var, indexVal);
-        if (temp && context.loadIndex) {
+        if (temp) {
             var = context.builder->CreateLoad(getIRType(varType->type, context), var);
         }
         context.loadAsRvalue = temp;
@@ -191,7 +191,6 @@ namespace Slangc {
     auto CallExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         Value* func = nullptr;
         auto temp = context.loadAsRvalue;
-        auto tempIndex = context.loadIndex;
         std::vector<Value*> argsRef;
         size_t argsOffset = 0;
         if (foundFunc.has_value()) {
@@ -199,7 +198,6 @@ namespace Slangc {
             if (std::holds_alternative<MethodDecPtr>(foundFunc.value()) && std::holds_alternative<AccessExprPtr>(expr)) {
                 auto method = std::get<MethodDecPtr>(foundFunc.value());
                 context.loadAsRvalue = true;  //"this" is a custom type, so it should be loaded anyway, if it's in array, it should not be loaded after gep
-                context.loadIndex = true;
                 auto thisArg = processNode(std::get<AccessExprPtr>(expr)->expr, context, errors);
                 argsRef.push_back(thisArg);
                 argsOffset = 1;
@@ -210,7 +208,6 @@ namespace Slangc {
                     func = context.builder->CreateLoad(context.builder->getPtrTy(), vtablePtr);
                 }
                 context.loadAsRvalue = temp;
-                context.loadIndex = tempIndex;
             }
         }
         else {
@@ -231,7 +228,6 @@ namespace Slangc {
             // We should load custom types even if they are out or var, because they are saved as pointer to pointer
             if (std::holds_alternative<TypeExprPtr>(exprType) && context.allocatedClassesDecls.contains(std::get<TypeExprPtr>(exprType)->type)) {
                 context.loadAsRvalue = true;
-                context.loadIndex = false;
             }
             auto argVal = processNode(currCallArg, context, errors);
             auto currExpectedIRType = isOutVar ? getIRType(currExpectedArg->type, context)->getPointerTo() : getIRType(currExpectedArg->type, context);
@@ -240,18 +236,14 @@ namespace Slangc {
             context.currentFuncSignature = tempSig;
         }
         context.loadAsRvalue = temp;
-        context.loadIndex = tempIndex;
         return context.builder->CreateCall(getFuncType(funcType.value(), context), func, argsRef);
     }
 
     auto AccessExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         auto temp = context.loadAsRvalue;
-        auto tempIndex = context.loadIndex;
         context.loadAsRvalue = true;
-        context.loadIndex = true;
         auto var = processNode(expr, context, errors);
         context.loadAsRvalue = temp;
-        context.loadIndex = tempIndex;
         auto varType = getExprType(expr, context.context, errors).value();
         auto typeName = std::get<TypeExprPtr>(varType)->type;
         // TODO: next block looks weird, probably needs refactoring
@@ -312,14 +304,9 @@ namespace Slangc {
 
     auto ReturnStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         context.loadAsRvalue = true;
-        context.loadIndex = true;
         auto type = getExprType(expr, context.context, errors).value();
-        if (std::holds_alternative<TypeExprPtr>(type) && context.allocatedClassesDecls.contains(std::get<TypeExprPtr>(type)->type)) {
-            context.loadIndex = false;
-        }
         auto val = processNode(expr, context, errors);
         context.loadAsRvalue = false;
-        context.loadIndex = true;
         val = typeCast(val, context.currentReturnType, context, errors, getExprLoc(expr));
         return context.builder->CreateRet(val);
     }

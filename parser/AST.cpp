@@ -113,7 +113,11 @@ namespace Slangc {
             return result;
         }
         if (std::holds_alternative<NilExprPtr>(type)) {
-            return result + "nil";
+            auto nilExpr = std::get<NilExprPtr>(type);
+            if (nilExpr->type) {
+                return result + typeToString(nilExpr->type.value());
+            }
+            else return result + "nil";
         }
         return "unknown";
     }

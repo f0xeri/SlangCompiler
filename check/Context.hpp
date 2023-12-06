@@ -11,6 +11,7 @@
 #include "parser/Scope.hpp"
 #include "SymbolTable.hpp"
 #include "common.hpp"
+#include "lexer/TokenType.hpp"
 
 namespace Slangc {
     extern std::vector<std::string> imports;
@@ -87,6 +88,41 @@ namespace Slangc {
                 (  to == "integer" ||   to == "float" ||   to == "real" ||   to == "character" ||   to == "boolean"))
                 return true;
             return false;
+        }
+
+        static std::string operatorToString(TokenType tokenType) {
+            switch (tokenType) {
+                case TokenType::Plus:
+                    return "+";
+                case TokenType::Minus:
+                    return "-";
+                case TokenType::Multiplication:
+                    return "*";
+                case TokenType::Division:
+                    return "/";
+                case TokenType::Remainder:
+                    return "%";
+                case TokenType::Less:
+                    return "<";
+                case TokenType::LessOrEqual:
+                    return "<=";
+                case TokenType::Greater:
+                    return ">";
+                case TokenType::GreaterOrEqual:
+                    return ">=";
+                case TokenType::Equal:
+                    return "==";
+                case TokenType::NotEqual:
+                    return "!=";
+                case TokenType::And:
+                    return "&&";
+                case TokenType::Or:
+                    return "||";
+                case TokenType::Neg:
+                    return "!";
+                default:
+                    return "";
+            }
         }
 
         static bool isPrivateAccessible(const std::string& parent, const std::string& child, Context& context) {

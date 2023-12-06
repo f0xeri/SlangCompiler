@@ -192,15 +192,16 @@ namespace Slangc::Check {
             // we don't need to compare function signatures here because we can just check their text representation
             auto leftTypeStr = typeToString(leftType);
             auto rightTypeStr = typeToString(rightType);
+            if (auto nilExpr = std::get_if<NilExprPtr>(&stmt->right)) {
+                nilExpr->get()->type = getExprType(stmt->left, context, errors).value();
+                rightTypeStr = typeToString(nilExpr->get()->type.value());
+            }
             if (leftTypeStr != rightTypeStr) {
                 if (!Context::isCastable(rightTypeStr, leftTypeStr, context)) {
                     errors.emplace_back(context.filename, "Type mismatch: cannot assign '" + rightTypeStr + "' to '" + leftTypeStr + "'.", stmt->loc, false, false);
                     result = false;
                 }
                 else {
-                    if (auto nilExpr = std::get_if<NilExprPtr>(&stmt->right)) {
-                        nilExpr->get()->type = getExprType(stmt->left, context, errors).value();
-                    }
                     errors.emplace_back(context.filename, "Implicit conversion from '" + rightTypeStr + "' to '" + leftTypeStr + "'.", stmt->loc, true, false);
                 }
             }

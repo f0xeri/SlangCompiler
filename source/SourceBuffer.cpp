@@ -7,6 +7,7 @@
 #include <system_error>
 #include <fstream>
 #include <filesystem>
+#include <codecvt>
 #include "SourceBuffer.hpp"
 
 namespace Slangc {
@@ -17,20 +18,23 @@ namespace Slangc {
             return llvm::make_error<llvm::StringError>(filename + " : slang source file extension must be .sl", llvm::inconvertibleErrorCode());
         }
         constexpr auto read_size = std::size_t{4096};
-        auto stream = std::ifstream{path.data()};
+        auto stream = std::basic_ifstream<char32_t>{path.data()};
         stream.exceptions(std::ios_base::badbit);
 
         if (!stream) {
             return llvm::make_error<llvm::StringError>(filename + " : file not found", llvm::inconvertibleErrorCode());
         }
 
-        auto result = std::string{};
-        auto buffer = std::string(read_size, '\0');
+        auto result = std::u32string{};
+        auto buffer = std::u32string(read_size, '\0');
         while (stream.read(&buffer[0], read_size)) {
             result.append(buffer, 0, stream.gcount());
         }
         result.append(buffer, 0, stream.gcount());
-        return SourceBuffer{std::move(filename), std::move(result)};
+        std::string str;
+        std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
+        str = converter.to_bytes(result);
+        return SourceBuffer{std::move(filename), std::move(str)};
     }
 
     SourceBuffer::SourceBuffer(std::string filename, std::string text) : filename(std::move(filename)), text(std::move(text)) {}

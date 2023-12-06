@@ -130,7 +130,7 @@ namespace Slangc {
 
         if (!leftValue || !rightValue) return nullptr;
         // TODO: pointers can be compared only with == and !=, not with other operators
-        if (leftValue->getType()->isIntegerTy() && rightValue->getType()->isIntegerTy() || leftValue->getType()->isPointerTy() && rightValue->getType()->isPointerTy()) {
+        if (leftValue->getType()->isIntegerTy() && rightValue->getType()->isIntegerTy()) {
             switch (op) {
                 case TokenType::Plus:
                     return context.builder->CreateAdd(leftValue, rightValue);
@@ -158,6 +158,14 @@ namespace Slangc {
                     return context.builder->CreateAnd(leftValue, rightValue);
                 case TokenType::Or:
                     return context.builder->CreateOr(leftValue, rightValue);
+            }
+        }
+        else if (leftValue->getType()->isPointerTy() && rightValue->getType()->isPointerTy()) {
+            switch (op) {
+                case TokenType::Equal:
+                    return context.builder->CreateICmpEQ(leftValue, rightValue);
+                case TokenType::NotEqual:
+                    return context.builder->CreateICmpNE(leftValue, rightValue);
             }
         }
         else {
@@ -346,7 +354,8 @@ namespace Slangc {
             formatStr = context.builder->CreateGlobalStringPtr("%c\n");
         }
         else if (val->getType()->isIntegerTy(1)) {
-            formatStr = context.builder->CreateGlobalStringPtr("%s\n");
+            val = context.builder->CreateIntCast(val, Type::getInt32Ty(*context.llvmContext), false);
+            formatStr = context.builder->CreateGlobalStringPtr("%d\n");
         }
         else if (val->getType()->isIntegerTy()) {
             formatStr = context.builder->CreateGlobalStringPtr("%d\n");

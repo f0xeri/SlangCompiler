@@ -56,21 +56,25 @@ namespace Slangc::Check {
         if (result) {
             auto leftType = typeToString(getExprType(expr->left, context, errors).value());
             auto rightType = typeToString(getExprType(expr->right, context, errors).value());
-            // TODO: check if conversion is possible
+            if (auto nilExpr = std::get_if<NilExprPtr>(&expr->left)) {
+                nilExpr->get()->type = getExprType(expr->right, context, errors).value();
+                leftType = typeToString(getExprType(expr->left, context, errors).value());
+            }
+            if (auto nilExpr = std::get_if<NilExprPtr>(&expr->right)) {
+                nilExpr->get()->type = getExprType(expr->left, context, errors).value();
+                rightType = typeToString(getExprType(expr->right, context, errors).value());
+            }
             if (leftType != rightType) {
                 if (!Context::isCastable(rightType, leftType, context)) {
-                    errors.emplace_back(context.filename, std::string("Type mismatch: cannot apply operator '") + "' to '" + leftType + "' and '" + rightType + "'.", expr->loc, false, false);
+                    errors.emplace_back(context.filename, std::string("Cannot apply operator '") + Context::operatorToString(expr->op) + "' to '" + leftType + "' and '" + rightType + "'.", expr->loc, false, false);
                     result = false;
                 }
-                else {
-                    if (auto nilExpr = std::get_if<NilExprPtr>(&expr->left)) {
-                        nilExpr->get()->type = getExprType(expr->right, context, errors).value();
-                    }
-                    if (auto nilExpr = std::get_if<NilExprPtr>(&expr->right)) {
-                        nilExpr->get()->type = getExprType(expr->left, context, errors).value();
-                    }
+                else
                     errors.emplace_back(context.filename, "Implicit conversion from '" + rightType + "' to '" + leftType + "'.", expr->loc, true, false);
-                }
+            }
+            if (result && (!Context::isBuiltInType(leftType) || !Context::isBuiltInType(rightType)) && !(expr->op == TokenType::Equal || expr->op == TokenType::NotEqual)) {
+                errors.emplace_back(context.filename, std::string("Cannot apply operator '") + Context::operatorToString(expr->op) + "' to '" + leftType + "' and '" + rightType + "'.", expr->loc, false, false);
+                result = false;
             }
         }
         return result;

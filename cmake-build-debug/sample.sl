@@ -1,4 +1,4 @@
-module sample
+﻿module sample
     public class A inherits Object
         public field-integer i := 10;
         public virtual method foo(A a)()
@@ -39,5 +39,4 @@ start
     let arr2[0] := 1;
     let arr2[1] := 2;
     let arr2[2] := 3;
-    output arr + nil;   // crashes the compiler but should throw error in check
 end sample.

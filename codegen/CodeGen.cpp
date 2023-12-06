@@ -129,7 +129,8 @@ namespace Slangc {
         }
 
         if (!leftValue || !rightValue) return nullptr;
-        if (leftValue->getType()->isIntegerTy() && rightValue->getType()->isIntegerTy()) {
+        // TODO: pointers can be compared only with == and !=, not with other operators
+        if (leftValue->getType()->isIntegerTy() && rightValue->getType()->isIntegerTy() || leftValue->getType()->isPointerTy() && rightValue->getType()->isPointerTy()) {
             switch (op) {
                 case TokenType::Plus:
                     return context.builder->CreateAdd(leftValue, rightValue);

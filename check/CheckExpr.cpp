@@ -63,6 +63,12 @@ namespace Slangc::Check {
                     result = false;
                 }
                 else {
+                    if (auto nilExpr = std::get_if<NilExprPtr>(&expr->left)) {
+                        nilExpr->get()->type = getExprType(expr->right, context, errors).value();
+                    }
+                    if (auto nilExpr = std::get_if<NilExprPtr>(&expr->right)) {
+                        nilExpr->get()->type = getExprType(expr->left, context, errors).value();
+                    }
                     errors.emplace_back(context.filename, "Implicit conversion from '" + rightType + "' to '" + leftType + "'.", expr->loc, true, false);
                 }
             }

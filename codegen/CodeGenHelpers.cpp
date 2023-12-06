@@ -24,6 +24,9 @@ namespace Slangc {
         if (value->getType()->isPointerTy() && type->isIntegerTy()) {
             return context.builder->CreatePtrToInt(value, type);
         }
+        if (value->getType()->isIntegerTy() && type->isPointerTy()) {
+            return context.builder->CreateIntToPtr(value, type);
+        }
         std::string type_str = "";
         raw_string_ostream rso(type_str);
         value->getType()->print(rso);
@@ -282,6 +285,7 @@ namespace Slangc {
         auto vtableName = "vtable_" + type->name;
         auto vtableMethods = std::vector<Constant*>();
         auto vtableMethodsDecls = std::vector<MethodDecPtr>();
+        // TODO: first element will be required only if we add multiple inheritance to Slang. For now, it's just useless
         vtableMethods.push_back(ConstantPointerNull::get(context.builder->getPtrTy()));
         // add all parent virtual methods
         if (type->parentTypeName != "Object") {

@@ -198,6 +198,9 @@ namespace Slangc::Check {
                     result = false;
                 }
                 else {
+                    if (auto nilExpr = std::get_if<NilExprPtr>(&stmt->right)) {
+                        nilExpr->get()->type = getExprType(stmt->left, context, errors).value();
+                    }
                     errors.emplace_back(context.filename, "Implicit conversion from '" + rightTypeStr + "' to '" + leftTypeStr + "'.", stmt->loc, true, false);
                 }
             }

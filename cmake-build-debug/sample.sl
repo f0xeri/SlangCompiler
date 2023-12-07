@@ -4,6 +4,9 @@
         public virtual method foo(A a)()
             output "A::foo called";
         end foo;
+        public virtual method foo(A a)(in integer x)
+            output "A::foo(in integer) called";
+        end foo;
         public method bar(A a)()
             output "A::bar called";
         end bar;
@@ -12,9 +15,6 @@
         public virtual method foo(B b)()
             output "B::foo called";
         end foo;
-        public method bar(B a)()
-            output "B::bar called";
-        end bar;
     end B;
 start
     variable-A a;
@@ -23,7 +23,7 @@ start
     variable-B b2;
     variable-array[5] A arr;
     let arr[0] := a;
-    let arr[1] := a;
+    let arr[1] := b;
     let arr[2] := b2;
     let arr[3] := a2;
     let arr[4] := a;
@@ -35,8 +35,4 @@ start
         output arr[i].i;
         let i := i + 1;
     end while;
-    variable-array[10] integer arr2;
-    let arr2[0] := 1;
-    let arr2[1] := 2;
-    let arr2[2] := 3;
 end sample.

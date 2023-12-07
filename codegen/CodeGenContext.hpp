@@ -57,6 +57,8 @@ namespace Slangc {
         std::unique_ptr<IRBuilder<>> builder;
         std::unique_ptr<DIBuilder> debugBuilder;
         std::vector<CodeGenBlock*> blocks;
+        std::map<std::string, Value*> globalVars;
+        std::map<std::string, DeclPtrVariant> globalVarsDecls;
         Context& context;
 
         std::map<std::string, llvm::StructType *> allocatedClasses;
@@ -137,10 +139,22 @@ namespace Slangc {
         std::map<std::string, DeclPtrVariant>& localsDecls() {
             return blocks.back()->localsDecls;
         }
+
+        std::map<std::string, llvm::Value*>& globals() {
+            return globalVars;
+        }
+        std::map<std::string, DeclPtrVariant>& globalsDecls() {
+            return globalVarsDecls;
+        }
+
+        std::optional<DeclPtrVariant> globalsDeclsLookup(const std::string &name) const {
+            return globalVarsDecls.contains(name) ? std::make_optional(globalVarsDecls.at(name)) : std::nullopt;
+        }
     };
     Type* getIRType(const std::string& type, CodeGenContext& context);
     Type* getIRPtrType(const std::string& type, CodeGenContext& context);
     Type* getIRType(const ExprPtrVariant& expr, CodeGenContext& context);
+    Type* getIRPtrType(const ExprPtrVariant& expr, CodeGenContext& context);
     Type* getIRTypeForSize(const std::string& type, CodeGenContext& context);
     Type* getIRTypeForSize(const ExprPtrVariant& expr, CodeGenContext& context);
     Value* createMalloc(const std::string &type, Value* var, CodeGenContext &context);

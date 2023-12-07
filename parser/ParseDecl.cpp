@@ -31,7 +31,7 @@ namespace Slangc {
                     return std::nullopt;
                 }
             }
-            else if (token->type == TokenType::Variable) {
+            else if (token->type == TokenType::Variable || (token->type == TokenType::Extern && (token + 1)->type == TokenType::Variable)) {
                 auto varDecl = parseVarDecl();
                 if (!varDecl.has_value()) {
                     errors.emplace_back(filename, "Failed to parse variable declaration.", token->location, false, false);
@@ -66,6 +66,10 @@ namespace Slangc {
 
         if (token->value == "private") isPrivate = true;
         advance();
+        if (token->value == "extern") {
+            isExtern = true;
+            advance();
+        }
         std::optional<DeclPtrVariant> result = std::nullopt;
         consume(TokenType::Variable);
         consume(TokenType::Minus);

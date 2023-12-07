@@ -27,13 +27,16 @@ namespace Slangc {
         if (value->getType()->isIntegerTy() && type->isPointerTy()) {
             return context.builder->CreateIntToPtr(value, type);
         }
+        if (type->isVoidTy()) {
+            return value;
+        }
         std::string type_str = "";
         raw_string_ostream rso(type_str);
         value->getType()->print(rso);
         rso << " to ";
         type->print(rso);
         errors.emplace_back(context.context.filename, "Cannot cast from " + type_str + " .", loc, false, true);
-        return nullptr;
+        return value;
     }
 
     Type* getIRType(const std::string& type, CodeGenContext& context) {
@@ -49,6 +52,24 @@ namespace Slangc {
             return Type::getInt8Ty(*context.llvmContext);
         if (type == "void" || type == "")
             return Type::getVoidTy(*context.llvmContext);
+        if (context.allocatedClasses.contains(type))
+            return context.allocatedClasses[type]->getPointerTo();
+        return nullptr;
+    }
+
+    Type* getIRPtrType(const std::string& type, CodeGenContext& context) {
+        if (type == "integer")
+            return Type::getInt32Ty(*context.llvmContext)->getPointerTo();
+        if (type == "real")
+            return Type::getDoubleTy(*context.llvmContext)->getPointerTo();
+        if (type == "float")
+            return Type::getFloatTy(*context.llvmContext)->getPointerTo();
+        if (type == "boolean")
+            return Type::getInt1Ty(*context.llvmContext)->getPointerTo();
+        if (type == "character")
+            return Type::getInt8Ty(*context.llvmContext)->getPointerTo();
+        if (type == "void" || type == "")
+            return context.builder->getPtrTy();
         if (context.allocatedClasses.contains(type))
             return context.allocatedClasses[type]->getPointerTo();
         return nullptr;
@@ -72,13 +93,22 @@ namespace Slangc {
         return nullptr;
     }
 
-    Type* getIRPtrType(const std::string& type, CodeGenContext& context) {
-        return getIRType(type, context)->getPointerTo();
-    }
-
     Type* getIRType(const ExprPtrVariant& expr, CodeGenContext& context) {
         if (auto type = std::get_if<TypeExprPtr>(&expr)) {
             return getIRType(type->get()->type, context);
+        }
+        if (auto arr = std::get_if<ArrayExprPtr>(&expr)) {
+            return getIRType(arr->get()->type, context)->getPointerTo();
+        }
+        if (auto func = std::get_if<FuncExprPtr>(&expr)) {
+            return getFuncType(*func, context)->getPointerTo();
+        }
+        return nullptr;
+    }
+
+    Type* getIRPtrType(const ExprPtrVariant& expr, CodeGenContext& context) {
+        if (auto type = std::get_if<TypeExprPtr>(&expr)) {
+            return getIRPtrType(type->get()->type, context);
         }
         if (auto arr = std::get_if<ArrayExprPtr>(&expr)) {
             return getIRType(arr->get()->type, context)->getPointerTo();
@@ -325,8 +355,9 @@ namespace Slangc {
         for (auto& param : funcExpr->params) {
             if (param->parameterType == In || param->parameterType == None)
                 params.push_back(getIRType(param->type, context));
-            else
-                params.push_back(getIRType(param->type, context)->getPointerTo());
+            else {
+                params.push_back(getIRPtrType(param->type, context));
+            }
         }
         return FunctionType::get(getIRType(funcExpr->type, context), params, false);
     }
@@ -336,8 +367,10 @@ namespace Slangc {
         if (newType) result += "%";
         switch (parameterType) {
             case Out:
-            case Var:
                 result += "*";
+                break;
+            case Var:
+                result += "&";
                 break;
             default:
                 break;

@@ -38,7 +38,7 @@ namespace Slangc {
 
     auto NilExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         auto irType = context.loadAsRvalue ? getIRType(type.value(), context) : getIRType(type.value(), context)->getPointerTo();
-        return Constant::getNullValue(irType);
+        return irType->isVoidTy() ? Constant::getNullValue(context.builder->getPtrTy()) : Constant::getNullValue(irType);
     }
 
     auto ArrayExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
@@ -51,18 +51,25 @@ namespace Slangc {
 
     auto VarExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         auto var = context.localsLookup(name);
+        if (!var) var = context.globals()[name];
         std::optional<ExprPtrVariant> declType;
         bool isOut = false;
         bool isVar = false;
         bool isFunc = false;
-        bool isCustomType = false;
         if (auto localVar = context.localsDeclsLookup(name)) {
             declType = getDeclType(localVar.value(), context.context, errors);
-            if (std::holds_alternative<TypeExprPtr>(declType.value()) && context.allocatedClassesDecls.contains(std::get<TypeExprPtr>(declType.value())->type)) {
-                isCustomType = true;
-            }
-            else
             if (auto funcParam = std::get_if<FuncParamDecStmtPtr>(&localVar.value())) {
+                if (funcParam->get()->parameterType == Out) {
+                    isOut = true;
+                }
+                else if (funcParam->get()->parameterType == Var) {
+                    isVar = true;
+                }
+            }
+        }
+        else if (auto globalVar = context.globalsDeclsLookup(name)) {
+            declType = getDeclType(globalVar.value(), context.context, errors);
+            if (auto funcParam = std::get_if<FuncParamDecStmtPtr>(&globalVar.value())) {
                 if (funcParam->get()->parameterType == Out) {
                     isOut = true;
                 }
@@ -79,7 +86,8 @@ namespace Slangc {
         auto type = getIRType(declType.value(), context);
         // TODO: it looks really really bad
         if ((context.loadAsRvalue && !isFunc) || isVar /*|| isCustomType*/) {
-            if (isVar || isOut) type = type->getPointerTo();
+            if (isVar || isOut)
+                type = getIRPtrType(declType.value(), context);
             var = context.builder->CreateLoad(type, var);
             if (context.loadAsRvalue && isVar) {
                 type = getIRType(declType.value(), context);
@@ -125,7 +133,15 @@ namespace Slangc {
         context.loadAsRvalue = temp;
 
         if (leftValue->getType() != rightValue->getType()) {
-            rightValue = typeCast(rightValue, leftValue->getType(), context, errors, getExprLoc(left));
+            if (leftValue->getType()->isFloatingPointTy() && rightValue->getType()->isIntegerTy()) {
+                rightValue = typeCast(rightValue, leftValue->getType(), context, errors, getExprLoc(right));
+            }
+            else if (leftValue->getType()->isIntegerTy() && rightValue->getType()->isFloatingPointTy()) {
+                leftValue = typeCast(leftValue, rightValue->getType(), context, errors, getExprLoc(left));
+            }
+            else {
+                rightValue = typeCast(rightValue, leftValue->getType(), context, errors, getExprLoc(left));
+            }
         }
 
         if (!leftValue || !rightValue) return nullptr;
@@ -231,16 +247,28 @@ namespace Slangc {
             if (std::holds_alternative<FuncExprPtr>(currExpectedArg->type)) {
                 context.currentFuncSignature = std::get<FuncExprPtr>(currExpectedArg->type);
             }
-            auto isOutVar = currExpectedArg->parameterType == Out || currExpectedArg->parameterType == Var;
-            context.loadAsRvalue = !isOutVar;
             auto exprType = getExprType(currCallArg, context.context, errors).value();
+            auto isOutVar = currExpectedArg->parameterType == Out || currExpectedArg->parameterType == Var;
+            bool isVoid = std::holds_alternative<TypeExprPtr>(currExpectedArg->type) && std::get<TypeExprPtr>(currExpectedArg->type)->type == "void";
+
+            bool isArgCustomType = std::holds_alternative<TypeExprPtr>(exprType) && context.allocatedClassesDecls.contains(std::get<TypeExprPtr>(exprType)->type);
+            context.loadAsRvalue = !isOutVar;
+
+            // if func argument is void* and not build-in type, load it - TODO: check if it's correct
+            if (!(std::holds_alternative<TypeExprPtr>(exprType) && Context::isBuiltInType(std::get<TypeExprPtr>(exprType)->type))) {
+                if (isVoid && isOutVar)
+                    context.loadAsRvalue = true;
+            }
+
             // We should load custom types even if they are out or var, because they are saved as pointer to pointer
-            if (std::holds_alternative<TypeExprPtr>(exprType) && context.allocatedClassesDecls.contains(std::get<TypeExprPtr>(exprType)->type)) {
+            if (isArgCustomType) {
                 context.loadAsRvalue = true;
             }
             auto argVal = processNode(currCallArg, context, errors);
-            auto currExpectedIRType = isOutVar ? getIRType(currExpectedArg->type, context)->getPointerTo() : getIRType(currExpectedArg->type, context);
-            argVal = typeCast(argVal, currExpectedIRType, context, errors, getExprLoc(currCallArg));
+
+            auto currExpectedIRType = isOutVar ? getIRPtrType(currExpectedArg->type, context) : getIRType(currExpectedArg->type, context);
+            // if func argument is void*, we should not try to cast
+            if (!(isVoid && isOutVar)) argVal = typeCast(argVal, currExpectedIRType, context, errors, getExprLoc(currCallArg));
             argsRef.push_back(argVal);
             context.currentFuncSignature = tempSig;
         }
@@ -374,10 +402,10 @@ namespace Slangc {
 
     auto VarDecStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         auto type = getIRType(typeExpr.type, context);
-        type = Context::isBuiltInType(typeExpr.type) ? type : type->getPointerTo();
+        type = (Context::isBuiltInType(typeExpr.type) && typeExpr.type != "void") ? type : getIRPtrType(typeExpr.type, context);
         Value* var = nullptr;
         Value* rightVal = nullptr;
-        if (type) {
+        if (type && !isGlobal) {
             var = context.builder->CreateAlloca(type, nullptr, name);
             if (expr.has_value()) {
                 context.loadAsRvalue = true;
@@ -396,42 +424,136 @@ namespace Slangc {
                 auto constructor = context.module->getFunction(typeExpr.type + "._default_constructor");
                 if (constructor) context.builder->CreateCall(constructor, arg);
             }
+            context.locals()[name] = var;
+            context.localsDecls()[name] = shared_from_this();
         }
-        context.locals()[name] = var;
-        context.localsDecls()[name] = shared_from_this();
+        else if (type && isGlobal) {
+            auto global = new GlobalVariable(*context.module, type, false, GlobalValue::InternalLinkage, nullptr, name);
+            global->setDSOLocal(true);
+            if (isExtern) global->setLinkage(GlobalValue::ExternalLinkage);
+            if (!isExtern) {
+                if (expr.has_value()) {
+                    context.loadAsRvalue = true;
+                    rightVal = processNode(expr.value(), context, errors);
+                    context.loadAsRvalue = false;
+                    global->setInitializer(dyn_cast<Constant>(rightVal));
+                }
+                else {
+                    global->setInitializer(Constant::getNullValue(type));
+                }
+            }
+            if (!Context::isBuiltInType(typeExpr.type)) {
+                auto globalCtorFuncCallee = context.module->getOrInsertFunction(name + "._global_constructor", FunctionType::get(Type::getVoidTy(*context.llvmContext), false));
+                auto globalCtorFunc = context.module->getFunction(name + "._global_constructor");
+                auto block = BasicBlock::Create(*context.llvmContext, "entry", globalCtorFunc);
+                context.pushBlock(block);
+                context.builder->SetInsertPoint(block);
+                getOrCreateSanitizerCtorAndInitFunctions(
+                        *context.module, context.context.moduleName + "__GLOBAL__" + name,
+                        name + "._global_constructor", {}, {},
+                        [&](Function *Ctor, FunctionCallee) { appendToGlobalCtors(*context.module, Ctor, 65535); });
+
+                createMalloc(typeExpr.type, global, context);
+                auto arg = context.builder->CreateLoad(type, global);
+                auto constructor = context.module->getFunction(typeExpr.type + "._default_constructor");
+                if (constructor) context.builder->CreateCall(constructor, arg);
+                context.builder->CreateRetVoid();
+                context.popBlock();
+            }
+            context.globals()[name] = global;
+            context.globalsDecls()[name] = shared_from_this();
+            var = global;
+        }
         return var;
     }
 
     auto FuncPointerStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         auto type = getIRType(expr, context);
-        Value* var = context.builder->CreateAlloca(type, nullptr, name);
-        context.locals()[name] = var;
-        context.localsDecls()[name] = shared_from_this();
+        Value* var = nullptr;
+        Value* assignValue = nullptr;
         if (assignExpr.has_value()) {
             auto temp = context.loadAsRvalue;
             context.loadAsRvalue = false;
             auto tempSig = context.currentFuncSignature;
             context.currentFuncSignature = expr;
-            auto assignVal = processNode(assignExpr.value(), context, errors);
+            assignValue = processNode(assignExpr.value(), context, errors);
             context.currentFuncSignature = tempSig;
             context.loadAsRvalue = temp;
-            context.builder->CreateStore(assignVal, var);
+        }
+        if (!isGlobal) {
+            var = context.builder->CreateAlloca(type, nullptr, name);
+            context.locals()[name] = var;
+            context.localsDecls()[name] = shared_from_this();
+            if (assignExpr.has_value())
+                context.builder->CreateStore(assignValue, var);
+        }
+        else {
+            auto global = new GlobalVariable(*context.module, type, false, GlobalValue::InternalLinkage, nullptr, name);
+            global->setDSOLocal(true);
+            if (isExtern) global->setLinkage(GlobalValue::ExternalLinkage);
+            if (!isExtern) {
+                if (assignExpr.has_value()) {
+                    global->setInitializer(dyn_cast<Constant>(assignValue));
+                }
+                else {
+                    global->setInitializer(Constant::getNullValue(type));
+                }
+            }
+            context.globals()[name] = global;
+            context.globalsDecls()[name] = shared_from_this();
+            var = global;
         }
         return var;
     }
 
     auto ArrayDecStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         auto type = getIRType(expr, context);
-        Value* var = context.builder->CreateAlloca(type, nullptr, name);
-        context.locals()[name] = var;
-        context.localsDecls()[name] = shared_from_this();
-        if (assignExpr.has_value()) {
-            context.loadAsRvalue = true;
-            auto assignVal = processNode(assignExpr.value(), context, errors);
-            context.loadAsRvalue = false;
-            context.builder->CreateStore(assignVal, var);
+        Value* var = nullptr;
+        if (!isGlobal) {
+            var = context.builder->CreateAlloca(type, nullptr, name);
+            context.locals()[name] = var;
+            context.localsDecls()[name] = shared_from_this();
+            if (assignExpr.has_value()) {
+                context.loadAsRvalue = true;
+                auto assignVal = processNode(assignExpr.value(), context, errors);
+                context.loadAsRvalue = false;
+                context.builder->CreateStore(assignVal, var);
+            }
+            else createArrayMalloc(expr, var, context, errors);
         }
-        else createArrayMalloc(expr, var, context, errors);
+        else {
+            auto global = new GlobalVariable(*context.module, type, false, GlobalValue::InternalLinkage, nullptr, name);
+            global->setDSOLocal(true);
+            if (isExtern) global->setLinkage(GlobalValue::ExternalLinkage);
+            if (!isExtern) {
+                if (assignExpr.has_value()) {
+                    context.loadAsRvalue = true;
+                    auto assignVal = processNode(assignExpr.value(), context, errors);
+                    context.loadAsRvalue = false;
+                    global->setInitializer(dyn_cast<Constant>(assignVal));
+                }
+                else {
+                    global->setInitializer(Constant::getNullValue(type));
+
+                    auto globalCtorFuncCallee = context.module->getOrInsertFunction(name + "._global_constructor", FunctionType::get(Type::getVoidTy(*context.llvmContext), false));
+                    auto globalCtorFunc = context.module->getFunction(name + "._global_constructor");
+                    auto block = BasicBlock::Create(*context.llvmContext, "entry", globalCtorFunc);
+                    context.pushBlock(block);
+                    context.builder->SetInsertPoint(block);
+                    getOrCreateSanitizerCtorAndInitFunctions(
+                            *context.module, context.context.moduleName + "__GLOBAL__" + name,
+                            name + "._global_constructor", {}, {},
+                            [&](Function *Ctor, FunctionCallee) { appendToGlobalCtors(*context.module, Ctor, 65535); });
+
+                    createArrayMalloc(expr, global, context, errors);
+                    context.builder->CreateRetVoid();
+                    context.popBlock();
+                }
+            }
+            context.globals()[name] = global;
+            context.globalsDecls()[name] = shared_from_this();
+            var = global;
+        }
         return var;
     }
 
@@ -450,7 +572,7 @@ namespace Slangc {
             for (auto param = expr->params.begin(); param != expr->params.end(); ++param, ++argsValues) {
                 Value* var;
                 if (param->get()->parameterType == Out || param->get()->parameterType == Var)
-                    var = context.builder->CreateAlloca(getIRType(param->get()->type, context)->getPointerTo(), nullptr, param->get()->name);
+                    var = context.builder->CreateAlloca(getIRPtrType(param->get()->type, context), nullptr, param->get()->name);
                 else
                     var = context.builder->CreateAlloca(getIRType(param->get()->type, context), nullptr, param->get()->name);
                 context.locals()[param->get()->name] = var;

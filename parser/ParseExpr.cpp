@@ -157,7 +157,7 @@ namespace Slangc {
             else if (match(TokenType::Dot)) {
                 auto opToken = prevToken();
                 auto name = consume(TokenType::Identifier).value;
-                if (std::holds_alternative<VarExprPtr>(expr.value()) && std::ranges::find(imports, std::get<VarExprPtr>(expr.value())->name) != imports.end()) {
+                if (std::holds_alternative<VarExprPtr>(expr.value()) && std::ranges::find(context.imports, std::get<VarExprPtr>(expr.value())->name) != context.imports.end()) {
                     std::get<VarExprPtr>(expr.value())->name += "." + name;
                 }
                 else expr = createExpr<AccessExprNode>(opToken.location, std::move(expr.value()), name);
@@ -226,7 +226,7 @@ namespace Slangc {
             if (match(TokenType::Dot)) {
                 auto opToken = prevToken();
                 auto name = consume(TokenType::Identifier).value;
-                if (std::holds_alternative<VarExprPtr>(expr.value()) && std::ranges::find(imports, std::get<VarExprPtr>(expr.value())->name) != imports.end()) {
+                if (std::holds_alternative<VarExprPtr>(expr.value()) && std::ranges::find(context.imports, std::get<VarExprPtr>(expr.value())->name) != context.imports.end()) {
                     std::get<VarExprPtr>(expr.value())->name += "." + name;
                 }
                 else

@@ -7,7 +7,7 @@
 #include "codegen/CodeGen.hpp"
 
 namespace Slangc {
-    std::vector<std::string> imports;
+    std::map<std::filesystem::path, std::shared_ptr<Context>> globalImports;
     auto Parser::parse() -> bool {
         parseImports();
 
@@ -41,14 +41,16 @@ namespace Slangc {
             advance();
             expect(TokenType::Semicolon);
             advance();
-            if (std::find(imports.begin(), imports.end(), importStr) == imports.end()) {
-                imports.emplace_back(importStr.stem().string());
-                auto importContext = driver.processUnit(importStr, false);
-                // copy declarations from imported module to current module
-                for (const auto& symbol: importContext->symbolTable.symbols) {
-                    if (symbol.moduleName == importStr.stem().string() && !symbol.isPrivate) {
-                        context.symbolTable.insert(symbol.name, symbol.moduleName, symbol.declaration, symbol.isPrivate, true);
-                    }
+
+            if (!globalImports.contains(importStr)) {
+                globalImports.insert({importStr, nullptr});
+                globalImports[importStr] = std::move(driver.processUnit(importStr, false));
+            }
+            context.imports.emplace_back(importStr.stem().string());
+            // copy declarations from imported module to current module
+            for (const auto& symbol: globalImports[importStr]->symbolTable.symbols) {
+                if (symbol.moduleName == importStr.stem().string() && !symbol.isPrivate) {
+                    context.symbolTable.insert(symbol.name, symbol.moduleName, symbol.declaration, symbol.isPrivate, true);
                 }
             }
         }

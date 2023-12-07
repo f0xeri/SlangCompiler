@@ -8,13 +8,14 @@
 #include <memory>
 #include <map>
 #include <optional>
+#include <filesystem>
 #include "parser/Scope.hpp"
 #include "SymbolTable.hpp"
 #include "common.hpp"
 #include "lexer/TokenType.hpp"
 
 namespace Slangc {
-    extern std::vector<std::string> imports;
+    extern std::map<std::filesystem::path, std::shared_ptr<Context>> globalImports;
     class Context {
         std::shared_ptr<Scope> currScope = std::make_unique<Scope>();
     public:
@@ -24,6 +25,7 @@ namespace Slangc {
         std::string currType;
         std::string moduleName;
         std::string filename;
+        std::vector<std::string> imports;
         auto enterScope(const std::string &name) -> void {
             if (currScope->children[name] == nullptr) {
                 currScope->children[name] = std::make_shared<Scope>(currScope);

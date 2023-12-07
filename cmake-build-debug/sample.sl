@@ -47,7 +47,4 @@ start
     //call procPointerVar(testFunc);       // should give error         // crashes here because var func() is loaded twice inside function
     call procPointerVar(funcPointer);    // should work
     output funcPointer;
-    variable-integer _width := 800;
-    variable-integer _height := 600;
-    variable-float x :=  _width * 1.0f / _height;
 end sample.

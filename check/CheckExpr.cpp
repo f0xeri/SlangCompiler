@@ -113,7 +113,7 @@ namespace Slangc::Check {
             if (context.lookup(context.moduleName + "." + expr->name)) {
                 expr->name = context.moduleName + "." + expr->name;
             }
-            else if (std::ranges::find(imports, expr->name) == imports.end()) {
+            else if (std::ranges::find(context.imports, expr->name) == context.imports.end()) {
                 errors.emplace_back(context.filename, "Variable, type, or function with name '" + expr->name + "' does not exist.", expr->loc, false, false);
                 result = false;
             }

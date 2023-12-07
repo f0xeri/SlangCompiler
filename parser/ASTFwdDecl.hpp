@@ -119,7 +119,7 @@ namespace Slangc {
 
     class Context;
 
-    bool compareTypes(const ExprPtrVariant &type1, const ExprPtrVariant &type2, const Context &context, bool checkCast = false);
+    bool compareTypes(const ExprPtrVariant &type1, const ExprPtrVariant &type2, const Context &context, bool checkCast = false, ParameterType parameterType1 = ParameterType::None, ParameterType parameterType2 = ParameterType::None);
     bool compareFuncSignatures(const FuncExprPtr &func1, const FuncExprPtr &func2, const Context &context, bool checkReturnTypes = true, bool checkCast = false);
     bool compareFuncSignatures(const FuncDecStatementPtr &func1, const FuncDecStatementPtr &func2, const Context &context, bool checkReturnTypes = true, bool checkCast = false);
     bool compareFuncSignatures(const MethodDecPtr &func1, const MethodDecPtr &func2, const Context &context, bool checkReturnTypes = true, bool checkCast = false);

@@ -95,6 +95,7 @@ namespace Slangc {
         }
         else if (std::holds_alternative<FuncExprPtr>(type.value())) {
             auto funcExpr = std::get<FuncExprPtr>(type.value());
+            funcExpr->isFunctionPtr = true;
             if (!hasError) {
                 result = createDecl<FuncPointerStatementNode>(loc, name, funcExpr, std::move(value), funcExpr->isFunction, isGlobal, isPrivate, isExtern);
             }
@@ -245,6 +246,7 @@ namespace Slangc {
         }
         else if (std::holds_alternative<FuncExprPtr>(type.value())) {
             auto funcExpr = std::get<FuncExprPtr>(type.value());
+            funcExpr->isFunctionPtr = true;
             if (!hasError) {
                 result = createDecl<FieldFuncPointerStatementNode>(loc, name, typeName, fieldId, funcExpr, funcExpr->isFunction, isPrivate, std::move(value));
                 //context.insert(name, std::get<FieldFuncPointerStmtPtr>(result.assignExpr()));

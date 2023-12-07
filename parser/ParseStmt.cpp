@@ -102,6 +102,7 @@ namespace Slangc {
         }
         else if (std::holds_alternative<FuncExprPtr>(type.value())) {
             auto funcExpr = std::get<FuncExprPtr>(type.value());
+            funcExpr->isFunctionPtr = true;
             if (!hasError) {
                 result = createStmt<FuncPointerStatementNode>(loc, name, funcExpr, std::move(value), funcExpr->isFunction);
             }

@@ -225,7 +225,12 @@ namespace Slangc {
                 op == TokenType::Equal || op == TokenType::NotEqual || op == TokenType::And || op == TokenType::Or) {
                 return std::make_unique<TypeExprNode>("boolean");
             }
-            return getExprType(left, analysis, errors);
+            auto leftType = typeToString(getExprType(left, analysis, errors).value());
+            auto rightType = typeToString(getExprType(right, analysis, errors).value());
+            if (Context::isCastToLeft(leftType, rightType, analysis)) {
+                return getExprType(left, analysis, errors);
+            }
+            return getExprType(right, analysis, errors);
         }
     };
 
@@ -233,6 +238,7 @@ namespace Slangc {
         SourceLoc loc{0, 0};
         ExprPtrVariant type;
         bool isFunction = true;
+        bool isFunctionPtr = false;
         std::vector<FuncParamDecStmtPtr> params;
         bool isConst = false;
 

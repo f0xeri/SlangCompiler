@@ -30,6 +30,15 @@ namespace Slangc {
             if (func1->params[i]->parameterType != None && func2->params[i]->parameterType != None) {
                 if (func1->params[i]->parameterType != func2->params[i]->parameterType) return false;
             }
+            // if true, we're in call expr trying to pass func pointer to func
+            // if func1 is out or var param and func2 is func (not func pointer), we can proceed
+            if (func2->params[i]->parameterType == None && std::holds_alternative<FuncExprPtr>(func1->params[i]->type)) {
+                if (func1->params[i]->parameterType == Out || func1->params[i]->parameterType == Var) {
+                    if (!std::get<FuncExprPtr>(func2->params[i]->type)->isFunctionPtr) {
+                        return false;
+                    }
+                }
+            }
         }
         return true;
     }
@@ -46,7 +55,7 @@ namespace Slangc {
         return compareFuncSignatures(func1->expr, func2, context, checkReturnTypes, checkCast);
     }
 
-    bool compareTypes(const ExprPtrVariant &type1, const ExprPtrVariant &type2, const Context &context, bool checkCast) {
+    bool compareTypes(const ExprPtrVariant &type1, const ExprPtrVariant &type2, const Context &context, bool checkCast, ParameterType parameterType1, ParameterType parameterType2) {
         bool result = false;
         if (auto type1Ptr = std::get_if<TypeExprPtr>(&type1)) {
             if (auto type2Ptr = std::get_if<TypeExprPtr>(&type2)) {
@@ -174,15 +183,6 @@ namespace Slangc {
                 }
             }
         }
-        // fix type of possible nil argument (THIS WAS MOVED TO CHECK OF CALLEXPR)
-        /*if (bestOverload) {
-            auto funcDec = std::get<FuncDecStatementPtr>(bestOverload.value());
-            for (auto i = 0; i < func->params.size(); i++) {
-                if (auto nil = std::get_if<NilExprPtr>(&func->params[i]->type)) {
-                    (*nil)->type = funcDec->expr->params[i]->type;
-                }
-            }
-        }*/
         return bestOverload;
     }
 

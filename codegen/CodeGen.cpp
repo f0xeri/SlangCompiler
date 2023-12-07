@@ -133,14 +133,13 @@ namespace Slangc {
         context.loadAsRvalue = temp;
 
         if (leftValue->getType() != rightValue->getType()) {
-            if (leftValue->getType()->isFloatingPointTy() && rightValue->getType()->isIntegerTy()) {
+            auto leftType = typeToString(getExprType(left, context.context, errors).value());
+            auto rightType = typeToString(getExprType(right, context.context, errors).value());
+            if (Context::isCastToLeft(leftType, rightType, context.context)) {
                 rightValue = typeCast(rightValue, leftValue->getType(), context, errors, getExprLoc(right));
             }
-            else if (leftValue->getType()->isIntegerTy() && rightValue->getType()->isFloatingPointTy()) {
-                leftValue = typeCast(leftValue, rightValue->getType(), context, errors, getExprLoc(left));
-            }
             else {
-                rightValue = typeCast(rightValue, leftValue->getType(), context, errors, getExprLoc(left));
+                leftValue = typeCast(leftValue, rightValue->getType(), context, errors, getExprLoc(left));
             }
         }
 

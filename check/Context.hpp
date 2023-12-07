@@ -74,6 +74,27 @@ namespace Slangc {
             return name == "integer" || name == "float" || name == "real" || name == "boolean" || name == "character" || name == "void";
         }
 
+        static bool isCastToLeft(const std::string& left, const std::string& right, const Context& context) {
+            if (!isBuiltInType(left) || !isBuiltInType(right)) {
+                if (isParentType(right, left, context))
+                    return true;
+                else return false;
+            }
+            static std::map<std::string, int> typeStrengthMap = {
+                    {"real", 6},
+                    {"float", 5},
+                    {"integer", 4},
+                    {"character", 3},
+                    {"boolean", 2},
+                    {"void", 1},
+                    {"nil", 1}
+            };
+            if (typeStrengthMap[left] > typeStrengthMap[right]) {
+                return true;
+            }
+            return false;
+        }
+
         static bool isCastable(const std::string& from, const std::string& to, const Context& context) {
             if (from == "nil" || to == "nil")
                 return true;

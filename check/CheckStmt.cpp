@@ -37,13 +37,23 @@ namespace Slangc::Check {
             }
             auto exprType = typeToString(getExprType(stmt->expr.value(), context, errors).value());
             if (exprType != stmt->typeExpr.type) {
-                if (!Context::isCastable(exprType, stmt->typeExpr.type, context)) {
-                    errors.emplace_back(context.filename, "Type mismatch: cannot assign '" + exprType + "' to '" + stmt->typeExpr.type + "'.", stmt->loc, false, false);
+                bool isCastable = Context::isCastable(exprType, stmt->typeExpr.type, context);
+                if (!isCastable || stmt->isGlobal) {
+                    if (isCastable && stmt->isGlobal) {
+                        errors.emplace_back(context.filename, "Type mismatch: cannot convert '" + exprType + "' to '" + stmt->typeExpr.type + "' in global scope.", stmt->loc, false, false);
+                    }
+                    else {
+                        errors.emplace_back(context.filename, "Type mismatch: cannot assign '" + exprType + "' to '" + stmt->typeExpr.type + "'.", stmt->loc, false, false);
+                    }
                     result = false;
                 }
                 else {
                     errors.emplace_back(context.filename, "Implicit conversion from '" + exprType + "' to '" + stmt->typeExpr.type + "'.", stmt->loc, true, false);
                 }
+            }
+            if (!isConstExpr(stmt->expr.value()) && stmt->isGlobal) {
+                errors.emplace_back(context.filename, "Global variable '" + stmt->name + "' can be initialized only with constant expression.", stmt->loc, false, false);
+                result = false;
             }
         }
         return result;

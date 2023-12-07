@@ -11,6 +11,15 @@ namespace Slangc::Check {
         bool result = true;
         auto type = expr->type;
         while (std::holds_alternative<ArrayExprPtr>(type)) {
+            auto size = std::get<ArrayExprPtr>(type)->size;
+            if (checkExpr(size, context, errors)) {
+                auto sizeType = typeToString(getExprType(size, context, errors).value());
+                if (sizeType != "integer") {
+                    errors.emplace_back(context.filename, "Array size must be of type 'integer', not '" + sizeType + "'.", expr->loc, false, false);
+                    result = false;
+                }
+            }
+            else result = false;
             type = std::get<ArrayExprPtr>(type)->type;
         }
         return checkExpr(type, context, errors);
@@ -69,8 +78,14 @@ namespace Slangc::Check {
                     errors.emplace_back(context.filename, std::string("Cannot apply operator '") + Context::operatorToString(expr->op) + "' to '" + leftType + "' and '" + rightType + "'.", expr->loc, false, false);
                     result = false;
                 }
-                else
-                    errors.emplace_back(context.filename, "Implicit conversion from '" + rightType + "' to '" + leftType + "'.", expr->loc, true, false);
+                else {
+                    if (Context::isCastToLeft(leftType, rightType, context)) {
+                        errors.emplace_back(context.filename, "Implicit conversion from '" + rightType + "' to '" + leftType + "'.", getExprLoc(expr->right), true, false);
+                    }
+                    else {
+                        errors.emplace_back(context.filename, "Implicit conversion from '" + leftType + "' to '" + rightType + "'.", getExprLoc(expr->left), true, false);
+                    }
+                }
             }
             if (result && (!Context::isBuiltInType(leftType) || !Context::isBuiltInType(rightType)) && !(expr->op == TokenType::Equal || expr->op == TokenType::NotEqual)) {
                 errors.emplace_back(context.filename, std::string("Cannot apply operator '") + Context::operatorToString(expr->op) + "' to '" + leftType + "' and '" + rightType + "'.", expr->loc, false, false);
@@ -223,8 +238,15 @@ namespace Slangc::Check {
                         if (std::holds_alternative<FuncExprPtr>(param->type)) {
                             overloaded = true;
                             if (compareFuncSignatures(std::get<FuncExprPtr>(param->type), funcExpr, context, false, true)) {
-                                func = *funcPointer;
-                                expr->funcType = std::get<FuncExprPtr>(param->type);
+                                if (param->parameterType != Out) {
+                                    func = *funcPointer;
+                                    expr->funcType = std::get<FuncExprPtr>(param->type);
+                                }
+                                else {
+                                    overloaded = false;  // suppress "no matching function" error
+                                    errors.emplace_back(context.filename, "Cannot call function using function pointer '" + param->name + "' passed as 'out' parameter.", expr->loc, false, false);
+                                    result = false;
+                                }
                             }
                         }
                     }

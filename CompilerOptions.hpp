@@ -56,7 +56,7 @@ namespace Slangc {
 
             cl::HideUnrelatedOptions(options);
             cl::SetVersionPrinter([](raw_ostream &OS) {
-                OS << "Slangc LLVM compiler version 1.0\n";
+                OS << "Slangc LLVM compiler version 2.0\n";
                 OS << "Target:" LLVM_DEFAULT_TARGET_TRIPLE << "\n";
                 OS << "InstalledDir: " << std::filesystem::current_path().generic_string() << "\n";
             });

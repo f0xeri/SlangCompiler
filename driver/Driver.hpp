@@ -15,7 +15,6 @@ namespace Slangc {
     class Driver {
         CompilerOptions options;
         std::vector<Slangc::ErrorMessage> errors;
-        Context context;
     public:
         Driver(int argc, char **argv) : options(argc, argv) {};
         ~Driver() = default;

@@ -27,11 +27,11 @@ namespace Slangc {
         auto lexer = Lexer(std::move(buffer.get()), errors);
         lexer.tokenize();
         auto context = std::make_unique<Context>();
-        auto parser = Parser(filepath, lexer.tokens, *this, *context.get(), errors);
+        auto parser = Parser(filepath, lexer.tokens, *this, *context, errors);
         parser.parse();
 
-        Check::checkAST(parser.moduleAST, *context.get(), errors);
-        auto codeGen = CodeGen(*context.get(), std::move(parser.moduleAST), isMainModule);
+        Check::checkAST(parser.moduleAST, *context, errors);
+        auto codeGen = CodeGen(*context, std::move(parser.moduleAST), isMainModule);
         if (!containsErrors(errors))
             codeGen.process(errors);
         codeGen.dumpIRToFile(filepath.string() + ".ll");

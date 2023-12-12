@@ -71,7 +71,7 @@ namespace Slangc {
         bool loadAsRvalue = false;
         bool currentDeclImported = false;
 
-        CodeGenContext(Context &context) : context(context) {
+        explicit CodeGenContext(Context &context) : context(context) {
             InitializeAllTargetInfos();
             InitializeAllTargets();
             InitializeAllTargetMCs();
@@ -85,7 +85,7 @@ namespace Slangc {
             //LLVMInitializeX86AsmParser();
             //LLVMInitializeX86AsmPrinter();
 
-            auto targetTriple = sys::getDefaultTargetTriple();
+            auto targetTriple = /*sys::getDefaultTargetTriple()*/"x86_64-w64-windows-gnu";
             std::string error;
             auto target = TargetRegistry::lookupTarget(targetTriple, error);
 

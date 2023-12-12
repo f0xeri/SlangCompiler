@@ -5,6 +5,7 @@
 #ifndef SLANGCREFACTORED_CODEGEN_HPP
 #define SLANGCREFACTORED_CODEGEN_HPP
 
+#include <llvm/IR/LegacyPassManager.h>
 #include "parser/AST.hpp"
 #include "check/Context.hpp"
 
@@ -15,9 +16,9 @@ namespace Slangc {
     }
     class CodeGen {
     public:
-        CodeGen(Context& context, ModuleDeclPtr&&moduleAST, bool isMainModule) : context(context),
+        CodeGen(Context& context, ModuleDeclPtr&& moduleAST, bool isMainModule) : context(context),
             moduleAST(std::move(moduleAST)), isMainModule(isMainModule),
-            codeGenContext(context, isMainModule) {}
+            codeGenContext(context) {}
 
         void process(std::vector<ErrorMessage>& errors) {
 
@@ -34,12 +35,30 @@ namespace Slangc {
                 }
                 codeGenContext.endMainFunc();
             }
+            llvm::verifyModule(*codeGenContext.module, &llvm::errs());
         }
 
         void dumpIRToFile(const std::string&filename) const {
             std::error_code EC;
             auto outFileStream = raw_fd_ostream(filename, EC, llvm::sys::fs::OF_None);
             codeGenContext.module->print(outFileStream, nullptr);
+        }
+
+        // generate object file
+        void generateObjectFile(const std::string& filename) const {
+            std::error_code EC;
+            auto outFileStream = raw_fd_ostream(filename, EC, llvm::sys::fs::OF_None);
+            legacy::PassManager pass;
+            auto fileType = llvm::CodeGenFileType::ObjectFile;
+            if (codeGenContext.targetMachine->addPassesToEmitFile(pass, outFileStream, nullptr, fileType)) {
+                errs() << "TargetMachine can't emit a file of this type";
+            }
+            pass.run(*codeGenContext.module);
+            outFileStream.flush();
+        }
+
+        llvm::Module* getModule() const {
+            return codeGenContext.module.get();
         }
 
 

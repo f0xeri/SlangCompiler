@@ -35,10 +35,11 @@
 #include <llvm/Pass.h>
 #include <llvm/Support/DynamicLibrary.h>
 #include <llvm/IR/DIBuilder.h>
-
-#include "check/Context.hpp"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/Host.h"
+#include "llvm/MC/TargetRegistry.h"
+#include "check/Context.hpp"
 #include "parser/ASTFwdDecl.hpp"
 
 namespace Slangc {
@@ -54,6 +55,7 @@ namespace Slangc {
     public:
         std::unique_ptr<LLVMContext> llvmContext;
         std::unique_ptr<Module> module;
+        std::unique_ptr<TargetMachine> targetMachine;
         std::unique_ptr<IRBuilder<>> builder;
         std::unique_ptr<DIBuilder> debugBuilder;
         std::vector<CodeGenBlock*> blocks;
@@ -69,10 +71,31 @@ namespace Slangc {
         bool loadAsRvalue = false;
         bool currentDeclImported = false;
 
-        CodeGenContext(Context &context, bool isMainModule) : context(context) {
+        CodeGenContext(Context &context) : context(context) {
+            InitializeAllTargetInfos();
+            InitializeAllTargets();
+            InitializeAllTargetMCs();
+            InitializeAllAsmParsers();
+            InitializeAllAsmPrinters();
+
+            // only for x86
+            //LLVMInitializeX86TargetInfo();
+            //LLVMInitializeX86Target();
+            //LLVMInitializeX86TargetMC();
+            //LLVMInitializeX86AsmParser();
+            //LLVMInitializeX86AsmPrinter();
+
+            auto targetTriple = sys::getDefaultTargetTriple();
+            std::string error;
+            auto target = TargetRegistry::lookupTarget(targetTriple, error);
+
             llvmContext = std::make_unique<LLVMContext>();
             module = std::make_unique<Module>(context.moduleName, *llvmContext);
             module->setSourceFileName(context.filename);
+            module->setTargetTriple(targetTriple);
+            TargetOptions opt;
+            targetMachine = std::unique_ptr<TargetMachine>(target->createTargetMachine(targetTriple, "generic", "", opt, Reloc::PIC_));
+            module->setDataLayout(targetMachine->createDataLayout());
             builder = std::make_unique<IRBuilder<>>(*llvmContext);
             debugBuilder = std::make_unique<DIBuilder>(*module);
         }

@@ -8,6 +8,7 @@
 #include "parser/Parser.hpp"
 #include "check/Check.hpp"
 #include "codegen/CodeGen.hpp"
+#include "opt/Optimizer.hpp"
 
 namespace Slangc {
 
@@ -34,7 +35,11 @@ namespace Slangc {
         auto codeGen = CodeGen(*context, std::move(parser.moduleAST), isMainModule);
         if (!containsErrors(errors))
             codeGen.process(errors);
+        //codeGen.dumpIRToFile(filepath.string() + ".ll");
+        Optimizer optimizer(options.getOptimizationLevel());
+        optimizer.run(*codeGen.getModule());
         codeGen.dumpIRToFile(filepath.string() + ".ll");
+        codeGen.generateObjectFile(filepath.string() + ".o");
         return context;
     }
 } // Slangc

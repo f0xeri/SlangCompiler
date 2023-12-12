@@ -9,6 +9,7 @@
 #include "CompilerOptions.hpp"
 #include "log/Logger.hpp"
 #include "check/Context.hpp"
+#include "opt/Optimizer.hpp"
 
 namespace Slangc {
 

@@ -9,3 +9,5 @@
 /cmake-build-debug/SlangcRefactored.ilk
 /cmake-build-debug/SlangcRefactored.pdb
 /.vs/
+*.o
+*.ll

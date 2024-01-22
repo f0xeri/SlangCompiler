@@ -105,6 +105,7 @@ namespace Slangc::Check {
 
     bool checkExpr(const UnaryOperatorExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
         auto result = checkExpr(expr->expr, context, errors);
+        if (!result) return false;
         auto type = typeToString(getExprType(expr->expr, context, errors).value());
         if (expr->op == TokenType::Minus) {
             if (type != "integer" && type != "character" && type != "float" && type != "boolean" && type != "real") {

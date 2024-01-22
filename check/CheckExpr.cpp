@@ -104,7 +104,21 @@ namespace Slangc::Check {
     }
 
     bool checkExpr(const UnaryOperatorExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
-        return true;
+        auto result = checkExpr(expr->expr, context, errors);
+        auto type = typeToString(getExprType(expr->expr, context, errors).value());
+        if (expr->op == TokenType::Minus) {
+            if (type != "integer" && type != "character" && type != "float" && type != "boolean" && type != "real") {
+                errors.emplace_back(context.filename, "Cannot apply operator '-' to '" + type + "'.", expr->loc, false, false);
+                result = false;
+            }
+        }
+        else if (expr->op == TokenType::Neg) {
+            if (type != "boolean") {
+                errors.emplace_back(context.filename, "Cannot apply operator '!' to '" + type + "'.", expr->loc, false, false);
+                result = false;
+            }
+        }
+        return result;
     }
 
     bool checkExpr(const VarExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {

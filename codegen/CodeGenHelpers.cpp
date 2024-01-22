@@ -246,10 +246,10 @@ namespace Slangc {
     Value* createArrayMalloc(ArrayExprPtr& array, Value* var, CodeGenContext &context, std::vector<ErrorMessage> &errors) {
         auto intType = Type::getInt32Ty(*context.llvmContext);
         auto structType = getIRType(array->type, context);
-        auto temp = context.loadAsRvalue;
-        context.loadAsRvalue = true;
+        auto temp = context.loadValue;
+        context.loadValue = true;
         auto arraySize = processNode(array->size, context, errors);
-        context.loadAsRvalue = temp;
+        context.loadValue = temp;
         auto allocSize = context.builder->CreateMul(arraySize, ConstantInt::get(intType, context.module->getDataLayout().getTypeAllocSize(structType)));
         auto mallocCall = context.builder->CreateMalloc(intType, structType, allocSize, nullptr);
         auto indicesCount = array->getIndicesCount();
@@ -260,12 +260,12 @@ namespace Slangc {
         sizes.reserve(indicesCount);
         sizes.push_back(arraySize);
         auto currArray = array->type;
-        context.loadAsRvalue = true;
+        context.loadValue = true;
         while (auto arr = std::get_if<ArrayExprPtr>(&currArray)) {
             sizes.push_back(processNode(arr->get()->size, context, errors));
             currArray = arr->get()->type;
         }
-        context.loadAsRvalue = temp;
+        context.loadValue = temp;
         std::vector<Value*> jvars;
         jvars.reserve(indicesCount);
         for (int i = 0; i < indicesCount; ++i) {

@@ -21,7 +21,7 @@
         output func;
         let func := testFunc;
         output func;
-        //output func(1, 2);
+        // output func(1, 2);    // should give error: Cannot call function using function pointer 'func' passed as 'out' parameter.
     end testProc;
     public procedure testProc(var function(in integer, in integer): integer func)
         output "\ntestProc(var function(in integer, in integer): integer func)";
@@ -42,9 +42,9 @@ start
     call procPointerIn(testFunc);        // should work
     call procPointerIn(funcPointer);     // should work
     output funcPointer;
-    //call procPointerOut(testFunc);       // should give error
-    call procPointerOut(funcPointer);    // should work but throw error in call         // crashes here because out func() is not loaded inside function
-    //call procPointerVar(testFunc);       // should give error         // crashes here because var func() is loaded twice inside function
+    // call procPointerOut(testFunc);    // should give error: No matching function for call (can't pass function as 'out' parameter)
+    call procPointerOut(funcPointer);    // should work but throw error in call inside
+    // call procPointerVar(testFunc);    // should give error: No matching function for call (can't pass function as 'var' parameter)
     call procPointerVar(funcPointer);    // should work
     output funcPointer;
 end sample.

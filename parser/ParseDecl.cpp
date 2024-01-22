@@ -62,9 +62,15 @@ namespace Slangc {
         SourceLoc loc = token->location;
         bool isPrivate = false;
         bool isExtern = false;
-        bool isGlobal = true;
+        bool isGlobal = false;
 
-        if (token->value == "private") isPrivate = true;
+        if (token->value == "private") {
+            isPrivate = true;
+            isGlobal = true;
+        }
+        else if (token->value == "public") {
+            isGlobal = true;
+        }
         advance();
         if (token->value == "extern") {
             isExtern = true;
@@ -80,6 +86,7 @@ namespace Slangc {
             return std::nullopt;
         }
         auto name = consume(TokenType::Identifier).value;
+        if (isGlobal) name = moduleAST->name + "." + name;
         std::optional<ExprPtrVariant> value;
         if (match(TokenType::Assign)) {
             value = parseExpr();

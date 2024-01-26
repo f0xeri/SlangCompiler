@@ -7,7 +7,8 @@
 #include "parser/AST.hpp"
 
 namespace Slangc {
-    Value* typeCast(Value* value, Type* type, CodeGenContext &context, std::vector<ErrorMessage> &errors, SourceLoc loc) {
+    Value *
+    typeCast(Value *value, Type *type, CodeGenContext &context, std::vector<ErrorMessage> &errors, SourceLoc loc) {
         if (value->getType() == type) return value;
         if (value->getType()->isIntegerTy() && type->isIntegerTy()) {
             return context.builder->CreateIntCast(value, type, true);
@@ -39,7 +40,7 @@ namespace Slangc {
         return value;
     }
 
-    Type* getIRType(const std::string& type, CodeGenContext& context) {
+    Type *getIRType(const std::string &type, CodeGenContext &context) {
         if (type == "integer")
             return Type::getInt32Ty(*context.llvmContext);
         if (type == "real")
@@ -57,7 +58,7 @@ namespace Slangc {
         return nullptr;
     }
 
-    Type* getIRPtrType(const std::string& type, CodeGenContext& context) {
+    Type *getIRPtrType(const std::string &type, CodeGenContext &context) {
         if (type == "integer")
             return Type::getInt32Ty(*context.llvmContext)->getPointerTo();
         if (type == "real")
@@ -75,7 +76,7 @@ namespace Slangc {
         return nullptr;
     }
 
-    Type* getIRTypeForSize(const std::string& type, CodeGenContext& context) {
+    Type *getIRTypeForSize(const std::string &type, CodeGenContext &context) {
         if (type == "integer")
             return Type::getInt32Ty(*context.llvmContext);
         if (type == "real")
@@ -93,7 +94,7 @@ namespace Slangc {
         return nullptr;
     }
 
-    Type* getIRType(const ExprPtrVariant& expr, CodeGenContext& context) {
+    Type *getIRType(const ExprPtrVariant &expr, CodeGenContext &context) {
         if (auto type = std::get_if<TypeExprPtr>(&expr)) {
             return getIRType(type->get()->type, context);
         }
@@ -106,7 +107,7 @@ namespace Slangc {
         return nullptr;
     }
 
-    Type* getIRPtrType(const ExprPtrVariant& expr, CodeGenContext& context) {
+    Type *getIRPtrType(const ExprPtrVariant &expr, CodeGenContext &context) {
         if (auto type = std::get_if<TypeExprPtr>(&expr)) {
             return getIRPtrType(type->get()->type, context);
         }
@@ -119,7 +120,7 @@ namespace Slangc {
         return nullptr;
     }
 
-    Type* getIRTypeForSize(const ExprPtrVariant& expr, CodeGenContext& context) {
+    Type *getIRTypeForSize(const ExprPtrVariant &expr, CodeGenContext &context) {
         if (auto type = std::get_if<TypeExprPtr>(&expr)) {
             return getIRTypeForSize(type->get()->type, context);
         }
@@ -132,33 +133,37 @@ namespace Slangc {
         return nullptr;
     }
 
-    DIType* getDebugType(const std::string& type, CodeGenContext& context) {
+    DIType *getDebugType(const std::string &type, CodeGenContext &context) {
         auto dbgType = context.debugBuilder->typeCache[type];
         return context.allocatedClasses.contains(type) ? context.debugBuilder->getPointerType(dbgType) : dbgType;
     }
 
-    DIType* getDebugType(const ExprPtrVariant& expr, CodeGenContext& context) {
+    DIType *getDebugType(const ExprPtrVariant &expr, CodeGenContext &context, std::vector<ErrorMessage> &errors) {
         if (auto type = std::get_if<TypeExprPtr>(&expr)) {
             return getDebugType(type->get()->type, context);
         }
         if (auto arr = std::get_if<ArrayExprPtr>(&expr)) {
-            return context.debugBuilder->getArrayType(*arr, typeToString(arr->get()->type));
+            return context.debugBuilder->getPointerType(getDebugType(arr->get()->type, context, errors));
         }
         if (auto func = std::get_if<FuncExprPtr>(&expr)) {
-            return context.debugBuilder->getFunctionType(*func, context);
+            return context.debugBuilder->getPointerType(context.debugBuilder->getFunctionType(*func, context, errors));
         }
         return nullptr;
     }
 
-    Value* createMalloc(const std::string &type, Value* var, CodeGenContext &context) {
+    Value *createMalloc(const std::string &type, Value *var, CodeGenContext &context) {
         auto intType = Type::getInt32Ty(*context.llvmContext);
         auto structType = context.allocatedClasses[type];
-        auto mallocCall = context.builder->CreateMalloc(intType, structType, ConstantInt::get(intType, context.module->getDataLayout().getTypeAllocSize(structType)), nullptr);
+        auto mallocCall = context.builder->CreateMalloc(intType, structType, ConstantInt::get(intType,
+                                                                                              context.module->getDataLayout().getTypeAllocSize(
+                                                                                                      structType)),
+                                                        nullptr);
         context.builder->CreateStore(mallocCall, var);
         return var;
     }
 
-    void callArrayElementsConstructors(ArrayExprPtr& array, Value* var, Value* size, CodeGenContext &context, std::vector<ErrorMessage> &errors) {
+    void callArrayElementsConstructors(ArrayExprPtr &array, Value *var, Value *size, CodeGenContext &context,
+                                       std::vector<ErrorMessage> &errors) {
         auto int32Type = Type::getInt32Ty(*context.llvmContext);
         auto int64Type = Type::getInt64Ty(*context.llvmContext);
         auto jvar = context.builder->CreateAlloca(int32Type, nullptr, "j");
@@ -184,7 +189,7 @@ namespace Slangc {
         auto arrLoad = context.builder->CreateLoad(loadArrType, var);
         auto jLoad = context.builder->CreateLoad(int32Type, jvar);
         auto jext = context.builder->CreateSExt(jLoad, int64Type);
-        auto arrPtr = context.builder->CreateInBoundsGEP(loadArrType, arrLoad, jext);
+        auto arrPtr = context.builder->CreateInBoundsGEP(elementType, arrLoad, jext);
 
         if (auto type = std::get_if<TypeExprPtr>(&array->type)) {
             if (!Context::isBuiltInType(type->get()->type)) {
@@ -192,6 +197,8 @@ namespace Slangc {
                 auto constructor = context.module->getFunction(type->get()->type + "._default_constructor");
                 auto load = context.builder->CreateLoad(elementType, arrPtr);
                 context.builder->CreateCall(constructor, {load});
+            } else {
+                context.builder->CreateStore(Constant::getNullValue(elementType), arrPtr);
             }
         }
 
@@ -203,7 +210,8 @@ namespace Slangc {
         context.builder->SetInsertPoint(whileEnd);
     }
 
-    void createMallocLoops(int i, ArrayExprPtr &array, int indicesCount, Value *var, std::vector<Value*> jvars, std::vector<Value*> sizes, CodeGenContext &context, std::vector<ErrorMessage> &errors) {
+    void createMallocLoops(int i, ArrayExprPtr &array, int indicesCount, Value *var, std::vector<Value *> jvars,
+                           std::vector<Value *> sizes, CodeGenContext &context, std::vector<ErrorMessage> &errors) {
         if (i == indicesCount) return;
         auto intType = Type::getInt32Ty(*context.llvmContext);
         auto func = context.builder->GetInsertBlock()->getParent();
@@ -225,11 +233,14 @@ namespace Slangc {
         auto arrayType = getIRType(array->type, context);
         auto loadArrType = getIRType(array, context);
 
-        auto allocSize = context.builder->CreateMul(sizes[i], ConstantInt::get(intType, context.module->getDataLayout().getTypeAllocSize(getIRType(array->type, context))));
+        auto allocSize = context.builder->CreateMul(sizes[i], ConstantInt::get(intType,
+                                                                               context.module->getDataLayout().getTypeAllocSize(
+                                                                                       getIRType(array->type,
+                                                                                                 context))));
         auto mallocCall = context.builder->CreateMalloc(intType, arrayType, allocSize, nullptr);
 
         auto arrLoad = context.builder->CreateLoad(loadArrType, var);
-        Value* arrPtr = nullptr;
+        Value *arrPtr = nullptr;
         for (int k = 1; k <= i; ++k) {
             jvar = context.builder->CreateLoad(intType, jvars[k]);
             auto sext = context.builder->CreateSExt(jvar, Type::getInt64Ty(*context.llvmContext));
@@ -243,8 +254,7 @@ namespace Slangc {
             auto add = context.builder->CreateAdd(jvar, ConstantInt::get(intType, 1));
             context.builder->CreateStore(add, jvars[i]);
             callArrayElementsConstructors(array, arrPtr, sizes[i], context, errors);
-        }
-        else context.builder->CreateStore(ConstantInt::get(intType, 0), jvars[i + 1]);
+        } else context.builder->CreateStore(ConstantInt::get(intType, 0), jvars[i + 1]);
 
         auto nextArray = std::get_if<ArrayExprPtr>(&array->type);
         createMallocLoops(i + 1, *nextArray, indicesCount, var, jvars, sizes, context, errors);
@@ -261,20 +271,20 @@ namespace Slangc {
         }
     }
 
-    Value* createArrayMalloc(ArrayExprPtr& array, Value* var, CodeGenContext &context, std::vector<ErrorMessage> &errors) {
+    Value* createArrayMalloc(ArrayExprPtr &array, Value *var, CodeGenContext &context, std::vector<ErrorMessage> &errors) {
         auto intType = Type::getInt32Ty(*context.llvmContext);
         auto structType = getIRType(array->type, context);
         auto temp = context.loadValue;
         context.loadValue = true;
         auto arraySize = processNode(array->size, context, errors);
         context.loadValue = temp;
-        auto allocSize = context.builder->CreateMul(arraySize, ConstantInt::get(intType, context.module->getDataLayout().getTypeAllocSize(structType)));
+        auto allocSize = context.builder->CreateMul(arraySize,ConstantInt::get(intType,context.module->getDataLayout().getTypeAllocSize(structType)));
         auto mallocCall = context.builder->CreateMalloc(intType, structType, allocSize, nullptr);
         auto indicesCount = array->getIndicesCount();
         context.builder->CreateStore(mallocCall, var);
         callArrayElementsConstructors(array, var, arraySize, context, errors);
         if (indicesCount == 1) return var;
-        std::vector<Value*> sizes;
+        std::vector<Value *> sizes;
         sizes.reserve(indicesCount);
         sizes.push_back(arraySize);
         auto currArray = array->type;
@@ -284,7 +294,7 @@ namespace Slangc {
             currArray = arr->get()->type;
         }
         context.loadValue = temp;
-        std::vector<Value*> jvars;
+        std::vector<Value *> jvars;
         jvars.reserve(indicesCount);
         for (int i = 0; i < indicesCount; ++i) {
             jvars.push_back(context.builder->CreateAlloca(intType, nullptr, "j" + std::to_string(i)));
@@ -295,11 +305,21 @@ namespace Slangc {
         return var;
     }
 
-    Function* createDefaultConstructor(TypeDecStatementNode* type, CodeGenContext &context, std::vector<ErrorMessage>& errors, bool isImported) {
+    Function* createDefaultConstructor(TypeDecStatementNode *type, CodeGenContext &context, std::vector<ErrorMessage> &errors,
+                             bool isImported) {
         auto structType = getIRType(type->name, context);
         auto intType = Type::getInt32Ty(*context.llvmContext);
-        auto constructorType = FunctionType::get(Type::getVoidTy(*context.llvmContext), {structType->getPointerTo()}, false);
-        auto constructor = Function::Create(constructorType, Function::ExternalLinkage, type->name + "._default_constructor", context.module.get());
+        auto constructorType = FunctionType::get(Type::getVoidTy(*context.llvmContext), {structType->getPointerTo()},false);
+        auto constructor = Function::Create(constructorType, Function::ExternalLinkage,type->name + "._default_constructor", context.module.get());
+        DISubprogram *dbgCtor = nullptr;
+        if (context.debug) {
+            dbgCtor = context.debugBuilder->createDefaultConstructor(
+                    type->name + "._default_constructor",
+                    getDebugType(type->name, context),
+                    type->loc);
+            context.debugBuilder->lexicalBlocks.push_back(dbgCtor);
+            context.debugBuilder->emitLocation(type->loc);
+        }
         if (isImported) return constructor;
         auto block = BasicBlock::Create(*context.llvmContext, "entry", constructor);
         context.builder->SetInsertPoint(block);
@@ -319,58 +339,66 @@ namespace Slangc {
         if (type->vtableRequired) {
             auto vtable = context.module->getGlobalVariable("vtable_" + type->name);
             // gep to vtable
-            context.builder->CreateStore(context.builder->CreateInBoundsGEP(vtable->getValueType(), vtable, {ConstantInt::get(intType, 0), ConstantInt::get(intType, 0), ConstantInt::get(intType, 1)}), loadThis);
+            context.builder->CreateStore(context.builder->CreateInBoundsGEP(vtable->getValueType(), vtable,
+                                                                            {ConstantInt::get(intType, 0),
+                                                                             ConstantInt::get(intType, 0),
+                                                                             ConstantInt::get(intType, 1)}), loadThis);
         }
         for (; index < type->fields.size(); ++index) {
             processNode(type->fields[index], context, errors);
         }
         context.builder->CreateRetVoid();
         context.popBlock();
+        if (context.debug) {
+            context.debugBuilder->lexicalBlocks.pop_back();
+            constructor->setSubprogram(dbgCtor);
+        }
         return constructor;
     }
 
-    void createVTable(TypeDecStatementNode* type, CodeGenContext &context, std::vector<ErrorMessage>& errors) {
+    void createVTable(TypeDecStatementNode *type, CodeGenContext &context, std::vector<ErrorMessage> &errors) {
         auto vtableName = "vtable_" + type->name;
-        auto vtableMethods = std::vector<Constant*>();
+        auto vtableMethods = std::vector<Constant *>();
         auto vtableMethodsDecls = std::vector<MethodDecPtr>();
         // TODO: first element will be required only if we add multiple inheritance to Slang. For now, it's just useless
         vtableMethods.push_back(ConstantPointerNull::get(context.builder->getPtrTy()));
         // add all parent virtual methods
         if (type->parentTypeName != "Object") {
             auto parentType = context.allocatedClassesDecls[type->parentTypeName.value()];
-            for (auto &method : parentType->methods | std::views::filter([](auto& method) { return method->isVirtual; })) {
+            for (auto &method: parentType->methods |
+                               std::views::filter([](auto &method) { return method->isVirtual; })) {
                 auto func = context.module->getFunction(method->name + "." + getMangledFuncName(method->expr));
                 vtableMethods.push_back(func);
                 vtableMethodsDecls.push_back(method);
             }
         }
         // replace parent virtual methods with child virtual methods if they exist in child and add new child virtual methods
-        for (auto &method : type->methods | std::views::filter([](auto& method) { return method->isVirtual; })) {
+        for (auto &method: type->methods | std::views::filter([](auto &method) { return method->isVirtual; })) {
             auto func = context.module->getFunction(method->name + "." + getMangledFuncName(method->expr));
-            auto it = std::find_if(vtableMethodsDecls.begin(), vtableMethodsDecls.end(), [&](MethodDecPtr& val) {
+            auto it = std::find_if(vtableMethodsDecls.begin(), vtableMethodsDecls.end(), [&](MethodDecPtr &val) {
                 return val->vtableIndex == method->vtableIndex;
             });
             if (it != vtableMethodsDecls.end()) {
                 *it = method;
                 vtableMethods[std::distance(vtableMethodsDecls.begin(), it) + 1] = func;
-            }
-            else {
+            } else {
                 vtableMethods.push_back(func);
                 vtableMethodsDecls.push_back(method);
             }
         }
         auto arrayType = ArrayType::get(context.builder->getPtrTy(), vtableMethods.size());
         auto constant = ConstantStruct::getAnon(ConstantArray::get(arrayType, vtableMethods));
-        auto global = new GlobalVariable(*context.module, constant->getType(), false, GlobalValue::LinkOnceODRLinkage, constant, vtableName);
+        auto global = new GlobalVariable(*context.module, constant->getType(), false, GlobalValue::LinkOnceODRLinkage,
+                                         constant, vtableName);
         global->setAlignment(llvm::MaybeAlign(8));
         global->setUnnamedAddr(GlobalValue::UnnamedAddr::None);
         global->setDSOLocal(true);
         global->setComdat(context.module->getOrInsertComdat(vtableName));
     }
 
-    FunctionType* getFuncType(const FuncExprPtr& funcExpr, CodeGenContext &context) {
-        std::vector<Type*> params;
-        for (auto& param : funcExpr->params) {
+    FunctionType *getFuncType(const FuncExprPtr &funcExpr, CodeGenContext &context) {
+        std::vector<Type *> params;
+        for (auto &param: funcExpr->params) {
             if (param->parameterType == In || param->parameterType == None)
                 params.push_back(getIRType(param->type, context));
             else {
@@ -380,7 +408,7 @@ namespace Slangc {
         return FunctionType::get(getIRType(funcExpr->type, context), params, false);
     }
 
-    std::string typeToMangledString(const ExprPtrVariant& type, ParameterType parameterType, bool newType = false) {
+    std::string typeToMangledString(const ExprPtrVariant &type, ParameterType parameterType, bool newType = false) {
         std::string result;
         if (newType) result += "%";
         switch (parameterType) {
@@ -413,9 +441,9 @@ namespace Slangc {
         return "unknown";
     }
 
-    std::string getMangledFuncName(const FuncExprPtr& funcExpr) {
+    std::string getMangledFuncName(const FuncExprPtr &funcExpr) {
         std::string result = "_";
-        for (auto& param : funcExpr->params) {
+        for (auto &param: funcExpr->params) {
             result += typeToMangledString(param->type, param->parameterType, true);
         }
         result += "_";
@@ -423,7 +451,7 @@ namespace Slangc {
         return result;
     }
 
-    Function* getFuncFromExpr(const DeclPtrVariant& funcExpr, CodeGenContext &context) {
+    Function *getFuncFromExpr(const DeclPtrVariant &funcExpr, CodeGenContext &context) {
         if (auto func = std::get_if<FuncDecStatementPtr>(&funcExpr)) {
             if (func->get()->isExtern) return context.module->getFunction(func->get()->name);
             return context.module->getFunction(func->get()->name + "." + getMangledFuncName(func->get()->expr));

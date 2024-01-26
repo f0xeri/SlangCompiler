@@ -24,13 +24,15 @@ namespace Slangc {
         std::map<std::string, llvm::DIType *> typeCache;
         explicit DebugInfoBuilder(const llvm::DataLayout& dataLayout, std::string_view filename, std::unique_ptr<llvm::DIBuilder> diBuilder, llvm::IRBuilder<>& builder);
         llvm::DIType *createType(TypeDecStatementNode* type, CodeGenContext &context, std::vector<ErrorMessage> &errors);
-        llvm::DISubprogram *createFunction(FuncDecStatementNode* func, CodeGenContext &context);
+        llvm::DISubprogram *createFunction(FuncDecStatementNode* func, CodeGenContext &context, std::vector<ErrorMessage> &errors);
         llvm::DISubprogram *createMainFunction(CodeGenContext &context);
         void createLocalVar(std::string_view name, llvm::DIType* type, llvm::Value* value, SourceLoc loc);
-        llvm::DIGlobalVariableExpression* createGlobalVar(std::string_view name, llvm::DIType* type, llvm::Value* value, SourceLoc loc, bool isPrivate);
+        void createLocalFuncParam(std::string_view name, llvm::DIType* type, llvm::Value* value, SourceLoc loc, llvm::DISubprogram* dbgFunc, uint64_t argNo);
+        llvm::DISubprogram *createDefaultConstructor(std::string_view name, llvm::DIType *type, SourceLoc loc);
+        llvm::DIGlobalVariableExpression* createGlobalVar(std::string_view name, llvm::DIType* type, SourceLoc loc, bool isPrivate);
         llvm::DIType *getPointerType(llvm::DIType *type);
-        llvm::DIType *getArrayType(ArrayExprPtr arrayExpr, std::string_view finalType);
-        llvm::DISubroutineType *getFunctionType(FuncExprPtr func, CodeGenContext &context);
+        llvm::DIType *getArrayType(ArrayExprPtr arrayExpr, Slangc::CodeGenContext &context);
+        llvm::DISubroutineType *getFunctionType(FuncExprPtr func, CodeGenContext &context, std::vector<ErrorMessage> &errors);
         void finalize();
 
         void emitLocation();

@@ -312,7 +312,8 @@ namespace Slangc::Check {
         }
         else {
             errors.emplace_back(context.filename, "Type '" + typeToString(exprType.value()) + "' is not accessible.", expr->loc, false, false);
-            result = false;
+            // result = false;
+            return false;
         }
         auto found = false;
         size_t index = 0;

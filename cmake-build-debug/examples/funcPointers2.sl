@@ -19,7 +19,8 @@
     public procedure testProc(out function(in integer, in integer): integer func)
         output "\ntestProc(out function(in integer, in integer): integer func)";
         output func;
-        let func := testFunc;
+        // output func(1, 2);    // should give error: Cannot call function using function pointer 'func' passed as 'out' parameter.
+        let func := testFunc;    // should not work, but does (casts (int(*)(int, int) to (int(**)(int, int))
         output func;
         // output func(1, 2);    // should give error: Cannot call function using function pointer 'func' passed as 'out' parameter.
     end testProc;

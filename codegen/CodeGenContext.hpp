@@ -197,7 +197,7 @@ namespace Slangc {
     Type* getIRTypeForSize(const std::string& type, CodeGenContext& context);
     Type* getIRTypeForSize(const ExprPtrVariant& expr, CodeGenContext& context);
     DIType* getDebugType(const std::string& type, CodeGenContext& context);
-    DIType* getDebugType(const ExprPtrVariant& expr, CodeGenContext& context);
+    DIType* getDebugType(const ExprPtrVariant& expr, CodeGenContext& context, std::vector<ErrorMessage> &errors);
     Value* createMalloc(const std::string &type, Value* var, CodeGenContext &context);
     Function* createDefaultConstructor(TypeDecStatementNode* type, CodeGenContext &context, std::vector<ErrorMessage>& errors, bool isImported);
     Value* typeCast(Value* value, Type* type, CodeGenContext &context, std::vector<ErrorMessage> &errors, SourceLoc loc);

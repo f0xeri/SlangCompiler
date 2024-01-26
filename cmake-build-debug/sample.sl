@@ -1,46 +1,32 @@
-﻿module sample
-    public class A inherits Object
-        public field-integer i := 10;
-        public field-real r := 11.02;
-        public virtual method foo(A a)()
-            output "A::foo called";
-        end foo;
-        public virtual method foo(A a)(in integer x)
-            output "A::foo(in integer) called";
-        end foo;
-        public method bar(A a)()
-            output "A::bar called";
-        end bar;
-    end A;
-    public class B inherits A
-        public field-integer i2 := 20;
-        public virtual method foo(B b)()
-            output "B::foo called";
-        end foo;
-    end B;
+﻿module swap
+    private procedure test(var integer a, var integer b)
+        variable-integer temp := a;
+        let a := b;
+        let b := temp;
+        output a;
+        output b;
+    end test;
+
+    public procedure testFunc(out integer x, out integer y)
+        output x;
+        output y;
+        variable-integer z := x;
+        output z;
+        let x := 100;
+        output x;
+        let x := z;
+        output x;
+        let x := y;
+        output x;
+    end testFunc;
 start
-    variable-A a;
-    variable-B b;
-    let b.i2 := 30;
-    let b.i := 40;
-    let b.r := 50.0;
-    output b.i2;
-    output b.i;
-    output b.r;
-    variable-A a2;
-    variable-B b2;
-    variable-array[5] A arr;
-    let arr[0] := a;
-    let arr[1] := b;
-    let arr[2] := b2;
-    let arr[3] := a2;
-    let arr[4] := a;
-    variable-integer i := 0;
-    while i < 5 repeat
-        call arr[i].foo();
-        call arr[i].bar();
-        let arr[i].i := i;
-        output arr[i].i;
-        let i := i + 1;
-    end while;
-end sample.
+    variable-integer c := 5;
+    variable-integer d := 10;
+    call test(c, d);
+    output "\n";
+    output c;
+    output "\n";
+    output d;
+    call testFunc(c, d);
+end swap.
+

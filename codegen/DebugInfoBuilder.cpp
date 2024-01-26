@@ -31,7 +31,7 @@ llvm::DIType *Slangc::DebugInfoBuilder::createType(Slangc::TypeDecStatementNode 
     for (; index < type->fields.size(); index++) {
         auto loc = getDeclLoc(type->fields[index]);
         auto fieldType = getDeclType(type->fields[index], context.context, errors).value();
-        auto fieldDbgType = getDebugType(fieldType, context);
+        auto fieldDbgType = getDebugType(fieldType, context, errors);
         uint64_t offset = dataLayout.getStructLayout(context.allocatedClasses[type->name])->getElementOffsetInBits(
                 getFieldIndex(getDeclName(type->fields[index]).data(), type->fields));
         members.push_back(debugBuilder->createMemberType(
@@ -73,22 +73,25 @@ llvm::DIType *Slangc::DebugInfoBuilder::getPointerType(llvm::DIType *type) {
     return debugBuilder->createPointerType(type, dataLayout.getPointerSizeInBits());
 }
 
-llvm::DIType *Slangc::DebugInfoBuilder::getArrayType(Slangc::ArrayExprPtr arrayExpr, std::string_view finalType) {
-    auto type = arrayExpr->type;
-    auto dbgType = typeCache[finalType.data()];
+llvm::DIType *Slangc::DebugInfoBuilder::getArrayType(Slangc::ArrayExprPtr arrayExpr, Slangc::CodeGenContext &context) {
+    /*auto type = arrayExpr->type;
+    auto dbgType = getPointerType(getDebugType(finalType.data(), context));
     while (auto arrayType = std::get_if<ArrayExprPtr>(&type)) {
         type = arrayType->get()->type;
         dbgType = getPointerType(dbgType);
     }
-    return dbgType;
+    return dbgType;*/
+    return nullptr;
 }
 
-llvm::DISubroutineType *
-Slangc::DebugInfoBuilder::getFunctionType(Slangc::FuncExprPtr func, Slangc::CodeGenContext &context) {
+llvm::DISubroutineType* Slangc::DebugInfoBuilder::getFunctionType(Slangc::FuncExprPtr func, Slangc::CodeGenContext &context, std::vector<ErrorMessage> &errors) {
     std::vector<llvm::Metadata *> paramTypes;
-    paramTypes.push_back(getDebugType(func->type, context));
+    paramTypes.push_back(getDebugType(func->type, context, errors));
     for (auto &param: func->params) {
-        paramTypes.push_back(getDebugType(param->type, context));
+        if (param->parameterType == In)
+            paramTypes.push_back(getDebugType(param->type, context, errors));
+        else
+            paramTypes.push_back(getPointerType(getDebugType(param->type, context, errors)));
     }
     return debugBuilder->createSubroutineType(debugBuilder->getOrCreateTypeArray(paramTypes));
 }
@@ -124,26 +127,25 @@ void Slangc::DebugInfoBuilder::emitLocation(Slangc::SourceLoc loc) {
     builder.SetCurrentDebugLocation(DILocation::get(scope->getContext(), loc.line, loc.column, scope));
 }
 
-llvm::DISubprogram *
-Slangc::DebugInfoBuilder::createFunction(FuncDecStatementNode *func, Slangc::CodeGenContext &context) {
+llvm::DISubprogram* Slangc::DebugInfoBuilder::createFunction(FuncDecStatementNode *func, Slangc::CodeGenContext &context, std::vector<ErrorMessage> &errors) {
     auto file = compileUnit->getFile();
     auto debugFunc = debugBuilder->createFunction(
-            compileUnit,
+            file,
             func->name,
             func->name + "." + getMangledFuncName(func->expr),
             file,
             func->loc.line,
-            getFunctionType(func->expr, context),
+            getFunctionType(func->expr, context, errors),
             func->loc.line,
             func->isPrivate ? llvm::DINode::FlagPrivate : llvm::DINode::FlagPublic,
-            func->isExtern ? llvm::DISubprogram::SPFlagDefinition : llvm::DISubprogram::SPFlagZero);
+            llvm::DISubprogram::SPFlagDefinition);
     return debugFunc;
 }
 
 llvm::DISubprogram *Slangc::DebugInfoBuilder::createMainFunction(Slangc::CodeGenContext &context) {
     auto file = compileUnit->getFile();
     auto debugFunc = debugBuilder->createFunction(
-            compileUnit,
+            file,
             "main",
             "main",
             file,
@@ -169,7 +171,7 @@ Slangc::DebugInfoBuilder::createLocalVar(std::string_view name, llvm::DIType *ty
 }
 
 llvm::DIGlobalVariableExpression *
-Slangc::DebugInfoBuilder::createGlobalVar(std::string_view name, llvm::DIType *type, llvm::Value *value, SourceLoc loc,
+Slangc::DebugInfoBuilder::createGlobalVar(std::string_view name, llvm::DIType *type, SourceLoc loc,
                                           bool isPrivate) {
     auto file = compileUnit->getFile();
     return debugBuilder->createGlobalVariableExpression(
@@ -179,10 +181,37 @@ Slangc::DebugInfoBuilder::createGlobalVar(std::string_view name, llvm::DIType *t
             file,
             loc.line,
             type,
-            true,
-            value);
+            isPrivate);
 }
 
 void Slangc::DebugInfoBuilder::finalize() {
     debugBuilder->finalize();
+}
+
+void Slangc::DebugInfoBuilder::createLocalFuncParam(std::string_view name, llvm::DIType *type, llvm::Value *value,
+                                                    Slangc::SourceLoc loc, llvm::DISubprogram *dbgFunc, uint64_t argNo) {
+    auto file = compileUnit->getFile();
+    auto scope = dbgFunc;
+    auto dbgVar = debugBuilder->createParameterVariable(scope, name, argNo, file, loc.line, type, true);
+    debugBuilder->insertDeclare(
+            value,
+            dbgVar,
+            debugBuilder->createExpression(),
+            DILocation::get(scope->getContext(), loc.line, loc.column, scope),
+            builder.GetInsertBlock());
+}
+
+llvm::DISubprogram* Slangc::DebugInfoBuilder::createDefaultConstructor(std::string_view name, llvm::DIType *type, Slangc::SourceLoc loc) {
+    auto file = compileUnit->getFile();
+    auto debugFunc = debugBuilder->createFunction(
+            file,
+            name,
+            name,
+            file,
+            loc.line,
+            debugBuilder->createSubroutineType(debugBuilder->getOrCreateTypeArray({type})),
+            loc.line,
+            llvm::DINode::FlagPublic,
+            llvm::DISubprogram::SPFlagDefinition);
+    return debugFunc;
 }

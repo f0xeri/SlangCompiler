@@ -20,7 +20,7 @@ namespace Slangc::Check {
         if (!checkExpr(decl->expr, context, errors)) result = false;
         auto type = context.symbolTable.lookupType(decl->typeName.type);
         for (int i = 0; i < decl->index; ++i) {
-            if (getDeclarationName(type.value()->fields[i]) == decl->name) {
+            if (getDeclName(type.value()->fields[i]) == decl->name) {
                 errors.emplace_back(context.filename, "Field with name '" + decl->name + "' already exists.", decl->loc, false, false);
                 result = false;
             }
@@ -44,7 +44,7 @@ namespace Slangc::Check {
         // check if field with the same name already exists
         // check only previous field names [0; currentFieldIndex)
         for (int i = 0; i < decl->index; ++i) {
-            if (getDeclarationName(type.value()->fields[i]) == decl->name) {
+            if (getDeclName(type.value()->fields[i]) == decl->name) {
                 errors.emplace_back(context.filename, "Field with name '" + decl->name + "' already exists.", decl->loc, false, false);
                 result = false;
             }
@@ -72,7 +72,7 @@ namespace Slangc::Check {
         bool result = true;
         auto type = context.symbolTable.lookupType(decl->typeName.type);
         for (int i = 0; i < decl->index; ++i) {
-            if (getDeclarationName(type.value()->fields[i]) == decl->name) {
+            if (getDeclName(type.value()->fields[i]) == decl->name) {
                 errors.emplace_back(context.filename, "Field with name '" + decl->name + "' already exists.", decl->loc, false, false);
                 result = false;
             }
@@ -165,7 +165,7 @@ namespace Slangc::Check {
         }
         auto thisType = context.symbolTable.lookupType(context.currType);
         for (const auto& field : thisType.value()->fields) {
-            auto str = context.currType + "." + std::string(getDeclarationName(field));
+            auto str = context.currType + "." + std::string(getDeclName(field));
             if (str == decl->name) {
                 errors.emplace_back(context.filename, "Type '" + context.currType + "' already contains definition for '" + decl->name + "'.", decl->loc, false, false);
                 result = false;

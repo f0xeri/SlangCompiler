@@ -68,6 +68,8 @@ add_executable(SlangcRefactored main.cpp common.hpp source/SourceBuffer.cpp sour
         log/Logger.hpp
         opt/Optimizer.cpp
         opt/Optimizer.hpp
+        codegen/DebugInfoBuilder.cpp
+        codegen/DebugInfoBuilder.hpp
 )
 target_link_libraries(SlangcRefactored PRIVATE ${llvm_libs})
 

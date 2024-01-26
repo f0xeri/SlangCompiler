@@ -14,10 +14,9 @@
 #include <ranges>
 #include "llvm/IR/Value.h"
 #include "lexer/TokenType.hpp"
-#include "codegen/CodeGenContext.hpp"
 #include "ASTFwdDecl.hpp"
 #include "check/Context.hpp"
-
+#include "codegen/CodeGenContext.hpp"
 
 namespace Slangc {
     struct ExprTypeVisitor {
@@ -693,25 +692,31 @@ namespace Slangc {
         }
     };
 
-    static auto getDeclarationName(const DeclPtrVariant &declaration) -> std::string_view {
+    static auto getDeclName(const DeclPtrVariant &declaration) -> std::string_view {
         return std::visit(DeclarationNameVisitor{}, declaration);
     }
 
-    static auto getFieldIndex(const std::string &name, const std::vector<DeclPtrVariant> &fields) -> int {
+    static auto getFieldIndex(const std::string &name, const std::vector<DeclPtrVariant> &fields) -> uint32_t {
         for (auto &field : fields) {
-            if (std::get<FieldVarDecPtr>(field)->name == name) return std::get<FieldVarDecPtr>(field)->index;
+            if (std::get_if<FieldVarDecPtr>(&field) && std::get_if<FieldVarDecPtr>(&field)->get()->name == name) return std::get<FieldVarDecPtr>(field)->index;
+            if (std::get_if<FieldArrayVarDecPtr>(&field) && std::get_if<FieldArrayVarDecPtr>(&field)->get()->name == name) return std::get<FieldArrayVarDecPtr>(field)->index;
+            if (std::get_if<FieldFuncPointerStmtPtr>(&field) && std::get_if<FieldFuncPointerStmtPtr>(&field)->get()->name == name) return std::get<FieldFuncPointerStmtPtr>(field)->index;
         }
         return -1;
     }
 
-    struct ExprLocVisitor {
+    struct LocVisitor {
         auto operator()(const auto &x) const -> SourceLoc {
             return x->loc;
         }
     };
 
     static auto getExprLoc(const ExprPtrVariant &expr) -> SourceLoc {
-        return std::visit(ExprLocVisitor{}, expr);
+        return std::visit(LocVisitor{}, expr);
+    }
+
+    static auto getDeclLoc(const DeclPtrVariant &decl) -> SourceLoc {
+        return std::visit(LocVisitor{}, decl);
     }
 }
 

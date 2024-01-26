@@ -41,6 +41,7 @@
 #include "llvm/MC/TargetRegistry.h"
 #include "check/Context.hpp"
 #include "parser/ASTFwdDecl.hpp"
+#include "DebugInfoBuilder.hpp"
 
 namespace Slangc {
     using namespace llvm;
@@ -57,7 +58,8 @@ namespace Slangc {
         std::unique_ptr<Module> module;
         std::unique_ptr<TargetMachine> targetMachine;
         std::unique_ptr<IRBuilder<>> builder;
-        std::unique_ptr<DIBuilder> debugBuilder;
+        //std::unique_ptr<DIBuilder> debugBuilder;
+        std::unique_ptr<DebugInfoBuilder> debugBuilder;
         std::vector<CodeGenBlock*> blocks;
         std::map<std::string, Value*> globalVars;
         std::map<std::string, DeclPtrVariant> globalVarsDecls;
@@ -70,6 +72,7 @@ namespace Slangc {
         Type* currentReturnType = nullptr;
         bool loadValue = false;
         bool currentDeclImported = false;
+        bool debug = true;
 
         explicit CodeGenContext(Context &context) : context(context) {
             InitializeAllTargetInfos();
@@ -97,7 +100,11 @@ namespace Slangc {
             targetMachine = std::unique_ptr<TargetMachine>(target->createTargetMachine(targetTriple, "generic", "", opt, Reloc::PIC_));
             module->setDataLayout(targetMachine->createDataLayout());
             builder = std::make_unique<IRBuilder<>>(*llvmContext);
-            debugBuilder = std::make_unique<DIBuilder>(*module);
+            if (debug) {
+                debugBuilder = std::make_unique<DebugInfoBuilder>(module->getDataLayout(), context.filename, std::make_unique<DIBuilder>(*module), *builder);
+                module->addModuleFlag(Module::Warning, "Debug Info Version", DEBUG_METADATA_VERSION);
+            }
+
         }
         ~CodeGenContext() = default;
 
@@ -107,12 +114,21 @@ namespace Slangc {
             auto mainBlock = BasicBlock::Create(*llvmContext, "entry", mainFunc);
             builder->SetInsertPoint(mainBlock);
             pushBlock(mainBlock);
+            if (debug) {
+                auto dbgFunc = debugBuilder->createMainFunction(*this);
+                mainFunc->setSubprogram(dbgFunc);
+                debugBuilder->lexicalBlocks.push_back(dbgFunc);
+            }
             return mainFunc;
         }
 
         void endMainFunc() {
             builder->CreateRet(ConstantInt::get(Type::getInt32Ty(*llvmContext), 0));
             popBlock();
+            if (debug) {
+                debugBuilder->lexicalBlocks.pop_back();
+                debugBuilder->finalize();
+            }
         }
 
         void pushBlock(BasicBlock *block) {
@@ -180,6 +196,8 @@ namespace Slangc {
     Type* getIRPtrType(const ExprPtrVariant& expr, CodeGenContext& context);
     Type* getIRTypeForSize(const std::string& type, CodeGenContext& context);
     Type* getIRTypeForSize(const ExprPtrVariant& expr, CodeGenContext& context);
+    DIType* getDebugType(const std::string& type, CodeGenContext& context);
+    DIType* getDebugType(const ExprPtrVariant& expr, CodeGenContext& context);
     Value* createMalloc(const std::string &type, Value* var, CodeGenContext &context);
     Function* createDefaultConstructor(TypeDecStatementNode* type, CodeGenContext &context, std::vector<ErrorMessage>& errors, bool isImported);
     Value* typeCast(Value* value, Type* type, CodeGenContext &context, std::vector<ErrorMessage> &errors, SourceLoc loc);

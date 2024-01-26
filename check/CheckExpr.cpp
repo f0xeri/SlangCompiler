@@ -55,13 +55,8 @@ namespace Slangc::Check {
     }
 
     bool checkExpr(const OperatorExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
-        bool result = true;
-        if (!checkExpr(expr->left, context, errors)) {
-            result = false;
-        }
-        if (!checkExpr(expr->right, context, errors)) {
-            result = false;
-        }
+        bool result = checkExpr(expr->left, context, errors);
+        result &= checkExpr(expr->right, context, errors);
         if (result) {
             auto leftType = typeToString(getExprType(expr->left, context, errors).value());
             auto rightType = typeToString(getExprType(expr->right, context, errors).value());

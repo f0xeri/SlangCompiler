@@ -312,6 +312,7 @@ namespace Slangc {
     }
 
     auto AssignExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+        if (context.debug) context.debugBuilder->emitLocation(loc);
         auto ltype = getIRType(getExprType(left, context.context, errors).value(), context);
         auto rtype = getIRType(getExprType(right, context.context, errors).value(), context);
         auto leftVal = processNode(left, context, errors);
@@ -400,11 +401,12 @@ namespace Slangc {
     }
 
     auto VarDecStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+        if (context.debug) context.debugBuilder->emitLocation(loc);
         auto type = getIRType(typeExpr.type, context);
         type = (Context::isBuiltInType(typeExpr.type) && typeExpr.type != "void") ? type : getIRPtrType(typeExpr.type, context);
         Value* var = nullptr;
         Value* rightVal = nullptr;
-        if (type && !isGlobal) {
+        if (!isGlobal) {
             var = context.builder->CreateAlloca(type, nullptr, name);
             if (expr.has_value()) {
                 context.loadValue = true;
@@ -425,8 +427,11 @@ namespace Slangc {
             }
             context.locals()[name] = var;
             context.localsDecls()[name] = shared_from_this();
+            if (context.debug) {
+                context.debugBuilder->createLocalVar(name, getDebugType(typeExpr.type, context), var, loc);
+            }
         }
-        else if (type && isGlobal) {
+        else if (isGlobal) {
             auto global = new GlobalVariable(*context.module, type, false, GlobalValue::InternalLinkage, nullptr, name);
             global->setDSOLocal(true);
             if (isExtern) global->setLinkage(GlobalValue::ExternalLinkage);
@@ -461,6 +466,10 @@ namespace Slangc {
             }
             context.globals()[name] = global;
             context.globalsDecls()[name] = shared_from_this();
+            if (context.debug) {
+                auto dbgInfo = context.debugBuilder->createGlobalVar(name, getDebugType(typeExpr.type, context), var, loc, isPrivate);
+                global->addDebugInfo(dbgInfo);
+            }
             var = global;
         }
         return var;
@@ -698,6 +707,7 @@ namespace Slangc {
         if (vtableRequired) createVTable(this, context, errors);
         createDefaultConstructor(this, context, errors, context.currentDeclImported);
         context.context.exitScope();
+        if (context.debug) context.debugBuilder->createType(this, context, errors);
         return nullptr;
     }
 

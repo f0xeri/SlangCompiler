@@ -132,6 +132,24 @@ namespace Slangc {
         return nullptr;
     }
 
+    DIType* getDebugType(const std::string& type, CodeGenContext& context) {
+        auto dbgType = context.debugBuilder->typeCache[type];
+        return context.allocatedClasses.contains(type) ? context.debugBuilder->getPointerType(dbgType) : dbgType;
+    }
+
+    DIType* getDebugType(const ExprPtrVariant& expr, CodeGenContext& context) {
+        if (auto type = std::get_if<TypeExprPtr>(&expr)) {
+            return getDebugType(type->get()->type, context);
+        }
+        if (auto arr = std::get_if<ArrayExprPtr>(&expr)) {
+            return context.debugBuilder->getArrayType(*arr, typeToString(arr->get()->type));
+        }
+        if (auto func = std::get_if<FuncExprPtr>(&expr)) {
+            return context.debugBuilder->getFunctionType(*func, context);
+        }
+        return nullptr;
+    }
+
     Value* createMalloc(const std::string &type, Value* var, CodeGenContext &context) {
         auto intType = Type::getInt32Ty(*context.llvmContext);
         auto structType = context.allocatedClasses[type];

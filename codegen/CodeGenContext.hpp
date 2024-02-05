@@ -37,7 +37,7 @@
 #include <llvm/IR/DIBuilder.h>
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Support/TargetSelect.h"
-#include "llvm/Support/Host.h"
+#include "llvm/TargetParser/Host.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "check/Context.hpp"
 #include "parser/ASTFwdDecl.hpp"

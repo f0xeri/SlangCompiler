@@ -119,7 +119,7 @@ namespace Slangc::Check {
                 result = false;
             }
             context.insert(decl->name, decl);
-            context.enterScope(decl->name + "." + getMangledFuncName(decl->expr));
+            context.enterScope(decl->isExtern ? decl->name : decl->name + "." + getMangledFuncName(decl->expr));
             for (const auto &param: decl->expr->params) {
                 context.insert(param->name, param);
             }

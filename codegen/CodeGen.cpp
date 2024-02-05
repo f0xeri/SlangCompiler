@@ -615,7 +615,7 @@ namespace Slangc {
             context.debugBuilder->lexicalBlocks.push_back(dbgFunc);
             context.debugBuilder->emitLocation(loc);
         }
-        if (context.currentDeclImported || isExtern) return func;
+        if (context.currentDeclImported || (isExtern && block.value()->statements.empty())) return func;
         context.context.enterScope(funcName);   // scope name is mangled
         if (block.has_value()) {
             BasicBlock *block = BasicBlock::Create(*context.llvmContext, "entry", context.module->getFunction(funcName));

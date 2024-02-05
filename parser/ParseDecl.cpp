@@ -211,10 +211,10 @@ namespace Slangc {
             hasError = true;
             return std::nullopt;
         }
-        if (!isExtern) {
+        //if (!isExtern) {
             auto func = std::get<FuncDecStatementPtr>(funcDecl);
             func->block = std::move(block.value());
-        }
+        //}
         if (token->type != TokenType::Semicolon) {
             errors.emplace_back(filename, "Expected semicolon after function declaration.", token->location, false, false);
             hasError = true;

@@ -86,7 +86,7 @@ namespace Slangc {
             return std::nullopt;
         }
         auto name = consume(TokenType::Identifier).value;
-        if (isGlobal) name = moduleAST->name + "." + name;
+        if (isGlobal && !isExtern) name = moduleAST->name + "." + name;
         std::optional<ExprPtrVariant> value;
         if (match(TokenType::Assign)) {
             value = parseExpr();

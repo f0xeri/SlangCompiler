@@ -50,7 +50,7 @@ namespace Slangc {
                     llvm::cl::Positional, llvm::cl::desc("<input files>"), llvm::cl::OneOrMore,
                     llvm::cl::cat(options));
 
-            llvm::cl::opt<std::string> Define(
+            llvm::cl::list<std::string> Defines(
                     "D", llvm::cl::desc("Define macro"), llvm::cl::value_desc("macro"),
                     llvm::cl::Prefix, llvm::cl::cat(options));
 
@@ -67,6 +67,7 @@ namespace Slangc {
             debug_ = DebugInfo;
             gcEnabled_ = GCEnabled;
             libraries_ = Libraries;
+            defines_ = Defines;
             inputFiles_.reserve(InputFiles.size());
             for (auto &file : InputFiles) {
                 inputFiles_.emplace_back(std::move(file));
@@ -78,6 +79,7 @@ namespace Slangc {
         [[nodiscard]] auto isDebug() const -> bool { return debug_; }
         [[nodiscard]] auto getLinkLibraries() const -> const std::vector<std::string> & { return libraries_; }
         [[nodiscard]] auto getOptimizationLevel() const -> OptLevel { return optimizationLevel_; }
+        [[nodiscard]] auto getDefines() const -> const std::vector<std::string>& { return defines_; }
         [[nodiscard]] auto isGCEnabled() const -> bool { return gcEnabled_; }
 
     private:
@@ -85,6 +87,7 @@ namespace Slangc {
         bool debug_;
         bool gcEnabled_;
         std::vector<std::string> libraries_;
+        std::vector<std::string> defines_;
         std::vector<std::filesystem::path> inputFiles_;
         OptLevel optimizationLevel_;
     };

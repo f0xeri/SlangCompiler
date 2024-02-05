@@ -87,8 +87,12 @@ namespace Slangc {
             //LLVMInitializeX86TargetMC();
             //LLVMInitializeX86AsmParser();
             //LLVMInitializeX86AsmPrinter();
-
-            auto targetTriple = /*sys::getDefaultTargetTriple()*/"x86_64-w64-windows-gnu";
+            std::string targetTriple;
+#ifdef _WIN32
+            targetTriple = "x86_64-w64-windows-gnu";
+#else
+            targetTriple = sys::getDefaultTargetTriple();
+#endif
             std::string error;
             auto target = TargetRegistry::lookupTarget(targetTriple, error);
 

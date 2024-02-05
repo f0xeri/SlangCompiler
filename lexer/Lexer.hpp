@@ -13,7 +13,6 @@
 #include "TokenType.hpp"
 #include "common.hpp"
 #include "source/SourceBuffer.hpp"
-#include "source_location"
 
 namespace Slangc {
     class Lexer {

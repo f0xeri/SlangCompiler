@@ -37,7 +37,7 @@ namespace Slangc {
     }
 
     std::unique_ptr<Context> Driver::processUnit(std::filesystem::path &filepath, bool isMainModule) {
-        log() << std::format("Building '{}'...\n", filepath.string());
+        log() << "Building " << filepath.string() << "...\n";
         auto buffer = SourceBuffer::CreateFromFile(filepath.string());
         if (!buffer) {
             std::cout << toString(buffer.takeError()) << std::endl;

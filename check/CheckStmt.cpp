@@ -67,6 +67,8 @@ namespace Slangc::Check {
             result = false;
         }
         context.insert(stmt->name, stmt);
+        if (stmt->assignExpr.has_value())
+            result &= checkExpr(stmt->assignExpr.value(), context, errors);
         return result;
     }
 

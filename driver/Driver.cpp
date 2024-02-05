@@ -21,6 +21,7 @@ namespace Slangc {
         std::stringstream clangCallStream;
         clangCallStream << "clang ";
         std::ranges::copy(std::views::transform(options.getInputFilePaths(), [](const std::filesystem::path &p){ return p.string(); }), std::ostream_iterator<std::string>(clangCallStream, ".o "));
+        std::ranges::copy(std::views::transform(options.getLibDirs(), [](const std::string &p){ return "-L" + p; }), std::ostream_iterator<std::string>(clangCallStream, " "));
         std::ranges::copy(std::views::transform(options.getLinkLibraries(), [](const std::string &p){ return "-l" + p; }), std::ostream_iterator<std::string>(clangCallStream, " "));
         std::ranges::copy(std::views::transform(options.getDefines(), [](const std::string &p){ return "-D" + p; }), std::ostream_iterator<std::string>(clangCallStream, " "));
         std::string outputFilename;

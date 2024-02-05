@@ -54,6 +54,10 @@ namespace Slangc {
                     "D", llvm::cl::desc("Define macro"), llvm::cl::value_desc("macro"),
                     llvm::cl::Prefix, llvm::cl::cat(options));
 
+            llvm::cl::list<std::string> LibDirs(
+                    "L", llvm::cl::desc("Add directory to library search path"), llvm::cl::value_desc("dir"),
+                    llvm::cl::Prefix, llvm::cl::cat(options));
+
             cl::HideUnrelatedOptions(options);
             cl::SetVersionPrinter([](raw_ostream &OS) {
                 OS << "Slangc LLVM compiler version 2.0\n";
@@ -68,6 +72,7 @@ namespace Slangc {
             gcEnabled_ = GCEnabled;
             libraries_ = Libraries;
             defines_ = Defines;
+            libDirs_ = LibDirs;
             inputFiles_.reserve(InputFiles.size());
             for (auto &file : InputFiles) {
                 inputFiles_.emplace_back(std::move(file));
@@ -78,6 +83,7 @@ namespace Slangc {
         [[nodiscard]] auto getOutputFilePath() const -> const std::filesystem::path& { return outputFileName_; }
         [[nodiscard]] auto isDebug() const -> bool { return debug_; }
         [[nodiscard]] auto getLinkLibraries() const -> const std::vector<std::string> & { return libraries_; }
+        [[nodiscard]] auto getLibDirs() const -> const std::vector<std::string> & { return libDirs_; }
         [[nodiscard]] auto getOptimizationLevel() const -> OptLevel { return optimizationLevel_; }
         [[nodiscard]] auto getDefines() const -> const std::vector<std::string>& { return defines_; }
         [[nodiscard]] auto isGCEnabled() const -> bool { return gcEnabled_; }
@@ -88,6 +94,7 @@ namespace Slangc {
         bool gcEnabled_;
         std::vector<std::string> libraries_;
         std::vector<std::string> defines_;
+        std::vector<std::string> libDirs_;
         std::vector<std::filesystem::path> inputFiles_;
         OptLevel optimizationLevel_;
     };

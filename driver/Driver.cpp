@@ -29,7 +29,7 @@ namespace Slangc {
 #ifdef _WIN32
             outputFilename = "a.exe";
 #else
-            outputFilename = "a.out"
+            outputFilename = "a.out";
 #endif
         }
         clangCallStream << " -o " << (options.getOutputFilePath().empty() ? outputFilename : options.getOutputFilePath().string());

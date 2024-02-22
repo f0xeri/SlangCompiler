@@ -1,0 +1,15 @@
+A::foo called
+A::bar called
+0
+B::foo called
+A::bar called
+1
+B::foo called
+A::bar called
+2
+A::foo called
+A::bar called
+3
+A::foo called
+A::bar called
+4

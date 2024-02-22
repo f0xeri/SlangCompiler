@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.17)
-project(SlangcRefactored)
+project(slangc)
 
 #set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
 #set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
@@ -55,7 +55,7 @@ endforeach()
 #list(APPEND targets "X86CodeGen" "X86AsmParser" "X86Desc" "X86Info")
 llvm_map_components_to_libnames(llvm_libs support core irreader TransformUtils Analysis Passes ${targets} linker)
 
-add_executable(SlangcRefactored main.cpp common.hpp source/SourceBuffer.cpp source/SourceBuffer.hpp CompilerOptions.hpp lexer/Lexer.cpp parser/Parser.cpp parser/Parser.hpp parser/AST.hpp codegen/CodeGenContext.hpp codegen/CodeGen.cpp codegen/CodeGen.hpp parser/Scope.hpp parser/ParseExpr.cpp parser/ParseDecl.cpp parser/ParseStmt.cpp parser/AST.cpp check/Context.cpp check/Context.hpp parser/ASTFwdDecl.hpp
+add_executable(slangc main.cpp common.hpp source/SourceBuffer.cpp source/SourceBuffer.hpp CompilerOptions.hpp lexer/Lexer.cpp parser/Parser.cpp parser/Parser.hpp parser/AST.hpp codegen/CodeGenContext.hpp codegen/CodeGen.cpp codegen/CodeGen.hpp parser/Scope.hpp parser/ParseExpr.cpp parser/ParseDecl.cpp parser/ParseStmt.cpp parser/AST.cpp check/Context.cpp check/Context.hpp parser/ASTFwdDecl.hpp
         check/Check.cpp
         check/Check.hpp
         check/CheckStmt.cpp
@@ -71,13 +71,13 @@ add_executable(SlangcRefactored main.cpp common.hpp source/SourceBuffer.cpp sour
         codegen/DebugInfoBuilder.cpp
         codegen/DebugInfoBuilder.hpp
 )
-target_link_libraries(SlangcRefactored PRIVATE ${llvm_libs})
+target_link_libraries(slangc PRIVATE ${llvm_libs})
 
 #DEBUG
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
-    target_compile_definitions(SlangcRefactored PRIVATE DEBUG=0)
+    target_compile_definitions(slangc PRIVATE DEBUG=0)
 endif()
 #RELEASE
 if(CMAKE_BUILD_TYPE MATCHES "Release")
-    target_compile_definitions(SlangcRefactored PRIVATE DEBUG=0)
+    target_compile_definitions(slangc PRIVATE DEBUG=0)
 endif()

@@ -34,7 +34,7 @@ namespace Slangc {
 
     auto StringExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
-        return context.builder->CreateGlobalStringPtr(value);
+        return context.builder->CreateGlobalStringPtr(value, "", 0, context.module.get());
     }
 
     auto TypeExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
@@ -386,26 +386,26 @@ namespace Slangc {
         Value *formatStr;
         if (val->getType()->isFloatingPointTy()) {
             val = context.builder->CreateFPExt(val, Type::getDoubleTy(*context.llvmContext));
-            formatStr = context.builder->CreateGlobalStringPtr("%f\n");
+            formatStr = context.builder->CreateGlobalStringPtr("%f");
         }
         else if (val->getType()->isPointerTy() && charArray) {
-            formatStr = context.builder->CreateGlobalStringPtr("%s\n");
+            formatStr = context.builder->CreateGlobalStringPtr("%s");
         }
         else if (val->getType()->isPointerTy()) {
-            formatStr = context.builder->CreateGlobalStringPtr("%p\n");
+            formatStr = context.builder->CreateGlobalStringPtr("%p");
         }
         else if (val->getType()->isIntegerTy(8)) {
-            formatStr = context.builder->CreateGlobalStringPtr("%c\n");
+            formatStr = context.builder->CreateGlobalStringPtr("%c");
         }
         else if (val->getType()->isIntegerTy(1)) {
             val = context.builder->CreateIntCast(val, Type::getInt32Ty(*context.llvmContext), false);
-            formatStr = context.builder->CreateGlobalStringPtr("%d\n");
+            formatStr = context.builder->CreateGlobalStringPtr("%d");
         }
         else if (val->getType()->isIntegerTy()) {
-            formatStr = context.builder->CreateGlobalStringPtr("%d\n");
+            formatStr = context.builder->CreateGlobalStringPtr("%d");
         }
         else {
-            formatStr = context.builder->CreateGlobalStringPtr("%s\n");
+            formatStr = context.builder->CreateGlobalStringPtr("%s");
         }
         printArgs.push_back(formatStr);
         printArgs.push_back(val);

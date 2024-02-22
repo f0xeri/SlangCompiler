@@ -6,8 +6,8 @@
 /cmake-build-debug/build.ninja
 /cmake-build-debug/cmake_install.cmake
 /cmake-build-debug/CMakeCache.txt
-/cmake-build-debug/SlangcRefactored.ilk
-/cmake-build-debug/SlangcRefactored.pdb
+chan/cmake-build-debug/slangc.ilk
+/cmake-build-debug/slangc.pdb
 /.vs/
 *.o
 *.ll

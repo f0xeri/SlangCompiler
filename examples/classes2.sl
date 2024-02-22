@@ -15,11 +15,11 @@ module classes2
     public variable-integer globalInt := 15;
     private variable-integer globalPrivateInt := 15;
 
-    public procedure foo()()
+    public procedure foo()
         output "public foo 2\n";
     end foo;
 
-    private procedure foop()()
+    private procedure foop()
         output "private foop 2\n";
     end foop;
 start

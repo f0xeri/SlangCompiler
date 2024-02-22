@@ -107,6 +107,8 @@ start
 
     output "\n~~~~\n";
     variable-C c;
+    variable-A newA;
+    let c.aobj := newA;     // object-fields are not initialized
     variable-A a4 := c.aobj;
     output "a4.i = ";
     output a4.i;

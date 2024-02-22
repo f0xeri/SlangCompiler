@@ -1,0 +1,44 @@
+str = test str
+str = test str updated
+globalStr = global test string
+globalStr = globalStr updated
+~~~
+A class
+i2 = 1, f = 1.100000
+
+a.i = 1
+a.str = test
+a.str = test updated
+~~~
+B class
+i2 = 2, f = 2.200000
+
+b.i = 1
+b.ff = 2.220000
+b.str = str updated b test
+b.str2 = str2 updated b test2
+~~~
+A2 class
+a2.i = 1
+~~~
+public foo 2
+classes2.globalFloat = 15
+classes.globalFloat = 99.900002
+~~~~
+a4.i = 1
+a4.i = 444
+A class
+i2 = 3, f = 3.300000
+
+Hello, test111
+~~~~
+1
+~~~~
+1234
+5678
+9101112
+
+13141516
+17181920
+21222324
+

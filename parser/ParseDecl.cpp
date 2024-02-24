@@ -13,7 +13,7 @@ namespace Slangc {
         context.moduleName = moduleName;
         moduleAST = create<ModuleDeclNode>(loc, moduleName, create<BlockStmtNode>(loc, std::vector<StmtPtrVariant>()));
         advance();
-        while (token->type != TokenType::Start)
+        while (token->type != TokenType::Start && token->type != TokenType::EndOfFile)
         {
             if (token->type == TokenType::Function || token->type == TokenType::Procedure || (token->type == TokenType::Extern && ((token + 1)->type == TokenType::Procedure || (token + 1)->type == TokenType::Function))) {
                 auto funcDecl = parseFuncDecl();

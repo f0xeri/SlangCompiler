@@ -15,14 +15,14 @@ namespace Slangc {
     auto SourceBuffer::CreateFromFile(std::string_view path) -> llvm::Expected<SourceBuffer> {
         std::string filename = std::string(path);
         if (!filename.ends_with(".sl")) {
-            return llvm::make_error<llvm::StringError>(filename + " : slang source file extension must be .sl", llvm::inconvertibleErrorCode());
+            return llvm::make_error<llvm::StringError>(filename + ": slang source file extension must be .sl", llvm::inconvertibleErrorCode());
         }
         constexpr auto read_size = std::size_t{4096};
         auto stream = std::basic_ifstream<char32_t>{path.data()};
         stream.exceptions(std::ios_base::badbit);
 
         if (!stream) {
-            return llvm::make_error<llvm::StringError>(filename + " : file not found", llvm::inconvertibleErrorCode());
+            return llvm::make_error<llvm::StringError>(filename + ": file not found", llvm::inconvertibleErrorCode());
         }
 
         auto result = std::u32string{};
@@ -34,6 +34,7 @@ namespace Slangc {
         std::string str;
         std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
         str = converter.to_bytes(result);
+        if (str.empty()) return llvm::make_error<llvm::StringError>(filename + ": file is empty", llvm::inconvertibleErrorCode());
         return SourceBuffer{std::move(filename), std::move(str)};
     }
 

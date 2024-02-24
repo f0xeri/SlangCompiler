@@ -41,6 +41,7 @@ namespace Slangc {
         auto buffer = SourceBuffer::CreateFromFile(filepath.string());
         if (!buffer) {
             std::cout << toString(buffer.takeError()) << std::endl;
+            exit(1);
         }
         auto lexer = Lexer(std::move(buffer.get()), errors);
         lexer.tokenize();

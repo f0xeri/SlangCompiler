@@ -11,7 +11,7 @@
 namespace Slangc {
 
     class Logger {
-        llvm::raw_ostream &os;;
+        llvm::raw_ostream &os;
     public:
         ~Logger() = default;
         auto operator<<(const std::string &message) -> Logger & {

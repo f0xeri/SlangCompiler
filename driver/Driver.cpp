@@ -18,7 +18,9 @@ namespace Slangc {
         processUnit(mainModuleName, true);
         for (auto &error : errors)
             log() << error;
-        if (!errors.empty()) return;
+        if (std::ranges::any_of(errors, [](const ErrorMessage &err) {return !err.isWarning; }))
+            return;
+        log() << "Linking...\n";
         std::stringstream clangCallStream;
         clangCallStream << "clang ";
         std::ranges::copy(std::views::transform(options.getInputFilePaths(), [](const std::filesystem::path &p){ return p.string(); }), std::ostream_iterator<std::string>(clangCallStream, ".o "));

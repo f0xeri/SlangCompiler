@@ -212,7 +212,16 @@ namespace Slangc {
             return false;
         }
         auto stringColumn = currentColumn;
-        auto stringValueView = takeWhile(sourceText.substr(1), [=](char c) { return c != '"'; });
+        //auto stringValueView = takeWhile(sourceText.substr(1), [=](char c) { return c != '"'; });
+        auto endIt = sourceText.begin() + 1;
+        while (endIt != sourceText.end()) {
+            if (*endIt == '"')
+                if (*(endIt - 1) != '\\') {
+                    break;
+                }
+            ++endIt;
+        }
+        auto stringValueView = sourceText.substr(1, std::distance(sourceText.begin(), endIt - 1));
 
         if (!stringValueView.empty()) {
             if (stringValueView.back() == sourceText.back()) {
@@ -250,6 +259,9 @@ namespace Slangc {
                             stringValue[i] = '\\';
                             stringValue.erase(i + 1, 1);
                             break;
+                        case '"':
+                            stringValue[i] = '\"';
+                            stringValue.erase(i + 1, 1);
                         default:
                             break;
                     }

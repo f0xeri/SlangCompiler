@@ -365,7 +365,6 @@ namespace Slangc {
 
     auto OutputStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
-        // printf
         auto printfFunc = context.module->getOrInsertFunction("printf", FunctionType::get(Type::getInt32Ty(*context.llvmContext), PointerType::get(Type::getInt8Ty(*context.llvmContext), 0), true));
         auto temp = context.loadValue;
         context.loadValue = true;
@@ -413,7 +412,53 @@ namespace Slangc {
     }
 
     auto InputStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
-        return {};
+        if (context.debug) context.debugBuilder->emitLocation(loc);
+        auto scanfFunc = context.module->getOrInsertFunction("scanf", FunctionType::get(Type::getInt32Ty(*context.llvmContext), PointerType::get(Type::getInt8Ty(*context.llvmContext), 0), true));
+        auto temp = context.loadValue;
+        context.loadValue = false;
+        auto val = processNode(expr, context, errors);
+        context.loadValue = temp;
+        bool charArray = false;
+        auto exprType = getExprType(expr, context.context, errors).value();
+        if (auto arr = std::get_if<ArrayExprPtr>(&exprType)) {
+            if (auto type = std::get_if<TypeExprPtr>(&arr->get()->type)) {
+                if (type->get()->type == "character") {
+                    charArray = true;
+                    val = context.builder->CreateLoad(PointerType::get(*context.llvmContext, 0), val);
+                }
+            }
+        }
+        std::string type = "";
+        if (auto typeExpr = std::get_if<TypeExprPtr>(&exprType)) {
+            type = typeExpr->get()->type;
+        }
+
+        std::vector<Value*> printArgs;
+        Value *formatStr;
+        if (type == "real") {
+            formatStr = context.builder->CreateGlobalStringPtr("%lf");
+        }
+        else if (type == "float") {
+            formatStr = context.builder->CreateGlobalStringPtr("%f");
+        }
+        else if (charArray) {
+            formatStr = context.builder->CreateGlobalStringPtr(" %[^\n]s");
+        }
+        else if (type == "character") {
+            formatStr = context.builder->CreateGlobalStringPtr(" %c");
+        }
+        else if (type == "boolean") {
+            formatStr = context.builder->CreateGlobalStringPtr("%d");
+        }
+        else if (type == "integer") {
+            formatStr = context.builder->CreateGlobalStringPtr("%d");
+        }
+        else {
+            formatStr = context.builder->CreateGlobalStringPtr("%s");
+        }
+        printArgs.push_back(formatStr);
+        printArgs.push_back(val);
+        return context.builder->CreateCall(scanfFunc, printArgs);
     }
 
     auto VarDecStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {

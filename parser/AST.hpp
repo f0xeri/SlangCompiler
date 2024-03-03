@@ -133,6 +133,19 @@ namespace Slangc {
         }
     };
 
+    struct FormattedStringExprNode {
+        SourceLoc loc{0, 0};
+        bool isConst = false;
+        std::vector<ExprPtrVariant> values;
+        FormattedStringExprNode(SourceLoc loc, std::vector<ExprPtrVariant> values) : loc(loc), values(std::move(values)) {};
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> {
+            return std::make_unique<ArrayExprNode>(loc, std::nullopt,
+                                                   std::make_unique<TypeExprNode>("character"),
+                                                   std::make_unique<IntExprNode>(loc, 0));
+        }
+    };
+
     struct NilExprNode {
         SourceLoc loc{0, 0};
         std::optional<ExprPtrVariant> type;

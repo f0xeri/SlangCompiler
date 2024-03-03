@@ -153,6 +153,10 @@ namespace Slangc {
         if (identifierValue.empty()) {
             return false;
         }
+        // formatted string check
+        if (identifierValue == "f" && sourceText.at(identifierValue.size()) == '"') {
+            return false;
+        }
         auto identifierCol = currentColumn;
         currentColumn += identifierValue.size();
         sourceText.remove_prefix(identifierValue.size());
@@ -208,12 +212,16 @@ namespace Slangc {
     }
 
     bool Lexer::lexString(std::string_view &sourceText) {
+        bool isFormatted = false;
         if (sourceText.front() != '"') {
-            return false;
+            if (sourceText.starts_with("f\"")) {
+                isFormatted = true;
+            }
+            else return false;
         }
         auto stringColumn = currentColumn;
         //auto stringValueView = takeWhile(sourceText.substr(1), [=](char c) { return c != '"'; });
-        auto endIt = sourceText.begin() + 1;
+        auto endIt = sourceText.begin() + (isFormatted ? 2 : 1);
         while (endIt != sourceText.end()) {
             if (*endIt == '"')
                 if (*(endIt - 1) != '\\') {
@@ -221,7 +229,8 @@ namespace Slangc {
                 }
             ++endIt;
         }
-        auto stringValueView = sourceText.substr(1, std::distance(sourceText.begin(), endIt - 1));
+        // if isFormatted, take full string including f" and closing "
+        auto stringValueView = sourceText.substr(0, std::distance(sourceText.begin(), endIt + (isFormatted ? 1 : 1)));
 
         if (!stringValueView.empty()) {
             if (stringValueView.back() == sourceText.back()) {
@@ -230,8 +239,8 @@ namespace Slangc {
             }
         }
 
-        currentColumn += stringValueView.size() + 2;
-        sourceText.remove_prefix(stringValueView.size() + 2);
+        currentColumn += stringValueView.size();
+        sourceText.remove_prefix(stringValueView.size());
 
         auto stringValue = std::string(stringValueView);
 

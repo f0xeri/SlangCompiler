@@ -27,7 +27,7 @@ namespace Slangc {
         Driver &driver;
         std::filesystem::path filepath;
     public:
-        explicit Parser(std::filesystem::path &filepath, std::vector<Token> tokens, Driver &driver, Context &context, std::vector<ErrorMessage> &errors)
+        Parser(std::filesystem::path &filepath, std::vector<Token> tokens, Driver &driver, Context &context, std::vector<ErrorMessage> &errors)
                 : context(context), driver(driver), errors(errors), tokens(std::move(tokens)), filepath(filepath) {
             token = this->tokens.begin();
             filename = filepath.string();
@@ -77,6 +77,7 @@ namespace Slangc {
         auto parseMethodDecl(const std::string& typeName, size_t vtableIndex) -> std::optional<DeclPtrVariant>;
         auto parseClassDecl() -> std::optional<DeclPtrVariant>;
         auto parseVarDecl() -> std::optional<DeclPtrVariant>;
+        auto parseString() -> std::optional<ExprPtrVariant>;
 
     private:
         std::vector<Token> tokens;

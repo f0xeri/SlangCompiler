@@ -37,6 +37,98 @@ namespace Slangc {
         return context.builder->CreateGlobalStringPtr(value, "", 0, context.module.get());
     }
 
+    auto FormattedStringExprNode::codegen(Slangc::CodeGenContext &context, std::vector<ErrorMessage> &errors) -> llvm::Value * {
+        if (context.debug) context.debugBuilder->emitLocation(loc);
+        // llvm ir code do something like this:
+        /*
+                size_t needed = snprintf(NULL, 0, "%s: %s (%d)", msg, strerror(errno), errno) + 1;
+                char  *buffer = malloc(needed);
+                sprintf(buffer, "%s: %s (%d)", msg, strerror(errno), errno);
+                return buffer;
+         */
+        // int snprintf (char* s, size_t n, const char* format, ...);
+        auto snprintfFunc = context.module->getOrInsertFunction(
+                "snprintf",
+                FunctionType::get(
+                        Type::getInt32Ty(*context.llvmContext),{
+                            PointerType::get(Type::getInt8Ty(*context.llvmContext), 0),
+                            Type::getInt64Ty(*context.llvmContext),
+                            PointerType::get(Type::getInt8Ty(*context.llvmContext), 0)
+                        },
+                        true
+                   )
+                );
+
+        std::vector<Value*> args;
+        std::vector<Type*> argTypes;
+        Value* formatString = nullptr;
+        std::string fmtString;
+        // build format string and args
+        for (auto& arg: values) {
+            auto temp = context.loadValue;
+            context.loadValue = true;
+            auto val = processNode(arg, context, errors);
+            context.loadValue = temp;
+            auto exprType = getExprType(arg, context.context, errors).value();
+            bool charArray = false;
+            if (auto arr = std::get_if<ArrayExprPtr>(&exprType)) {
+                if (auto type = std::get_if<TypeExprPtr>(&arr->get()->type)) {
+                    if (type->get()->type == "character") {
+                        charArray = true;
+                    }
+                }
+            }
+            if (auto arr = std::get_if<StringExprPtr>(&arg)) charArray = true;
+
+            if (val->getType()->isFloatingPointTy()) {
+                val = context.builder->CreateFPExt(val, Type::getDoubleTy(*context.llvmContext));
+                fmtString +="%f";
+            }
+            else if (val->getType()->isPointerTy() && charArray) {
+                fmtString += "%s";
+            }
+            else if (val->getType()->isPointerTy()) {
+                fmtString += "%p";
+            }
+            else if (val->getType()->isIntegerTy(8)) {
+                fmtString += "%c";
+            }
+            else if (val->getType()->isIntegerTy(1)) {
+                val = context.builder->CreateIntCast(val, Type::getInt32Ty(*context.llvmContext), false);
+                fmtString += "%d";
+            }
+            else if (val->getType()->isIntegerTy()) {
+                fmtString += "%d";
+            }
+            else {
+                fmtString += "%s";
+            }
+
+            args.push_back(val);
+            argTypes.push_back(val->getType());
+        }
+        formatString = context.builder->CreateGlobalStringPtr(fmtString);
+        args.insert(args.begin(), formatString);
+        args.insert(args.begin(), ConstantInt::get(Type::getInt64Ty(*context.llvmContext), 0));
+        args.insert(args.begin(), ConstantPointerNull::get(PointerType::get(Type::getInt8Ty(*context.llvmContext), 0)));
+
+        auto needed = context.builder->CreateCall(snprintfFunc, args);
+        auto neededPlusOne = context.builder->CreateAdd(needed, ConstantInt::get(Type::getInt32Ty(*context.llvmContext), 1));
+        auto mallocFunc = context.module->getOrInsertFunction(
+                "malloc",
+                FunctionType::get(
+                        PointerType::get(Type::getInt8Ty(*context.llvmContext), 0),
+                        Type::getInt32Ty(*context.llvmContext),
+                        false
+                )
+        );
+        auto buffer = context.builder->CreateCall(mallocFunc, neededPlusOne);
+        args[0] = buffer;
+        args[1] = context.builder->CreateIntCast(neededPlusOne, Type::getInt64Ty(*context.llvmContext), false);
+        auto call = context.builder->CreateCall(snprintfFunc, args);
+        return buffer;
+    }
+
     auto TypeExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         return {};
     }

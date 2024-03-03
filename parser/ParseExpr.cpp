@@ -192,8 +192,7 @@ namespace Slangc {
         else if (tok.type == TokenType::Float) return createExpr<FloatExprNode>(loc, std::stof(tok.value));
         else if (tok.type == TokenType::Nil) return createExpr<NilExprNode>(loc);
         else if (tok.type == TokenType::String) {
-            if (tok.value.size() == 1) return createExpr<CharExprNode>(loc, tok.value[0]);
-            return createExpr<StringExprNode>(loc, tok.value);
+            return parseString();
         }
         else if (tok.type == TokenType::Identifier) {
             return parseVar();
@@ -250,6 +249,75 @@ namespace Slangc {
             }
         }
         return expr;
+    }
+
+    auto Parser::parseString() -> std::optional<ExprPtrVariant> {
+        auto tok = prevToken();
+        SourceLoc loc = tok.location;
+
+        if (tok.value.starts_with("f\"")) {
+            auto value = tok.value.substr(2, tok.value.size() - 3);
+            std::vector<ExprPtrVariant> values;
+            std::string currentValue;
+            bool closedFmt = true;
+            for (size_t i = 0; i < value.size(); ++i) {
+                auto ch = value[i];
+                // if {{ then push { to currentValue
+                if (ch == '{') {
+                    if (value.size() > i + 1 && value[i + 1] == '{') {
+                        currentValue += ch;
+                        i += 1;
+                    }
+                    else if (!currentValue.empty()) {
+                        values.push_back(createExpr<StringExprNode>(loc, currentValue));
+                        currentValue.clear();
+                        closedFmt = false;
+                    }
+                }
+                else if (ch == '}') {
+                    if (closedFmt && value.size() > i + 1 && value[i + 1] == '}') {
+                        currentValue += ch;
+                        i += 1;
+                    }
+                    else
+                    if (!currentValue.empty()) {
+                        auto buffer = SourceBuffer::CreateFromString(currentValue);
+                        Lexer lexer(std::move(buffer), errors);
+                        lexer.tokenize();
+                        Parser parser(filepath, lexer.tokens, driver, context, errors);
+                        auto expr = parser.parseExpr();
+                        if (expr.has_value() && parser.token == parser.tokens.end() - 1) {
+                            values.push_back(std::move(expr.value()));
+                        }
+                        else {
+                            errors.emplace_back(filename, "Failed to parse expression in formatted string literal.", loc);
+                            hasError = true;
+                        }
+                        currentValue.clear();
+                        closedFmt = true;
+                    }
+                }
+                else {
+                    currentValue += ch;
+                }
+            }
+            if (!currentValue.empty()) {
+                values.push_back(createExpr<StringExprNode>(loc, currentValue));
+            }
+            if (!closedFmt) {
+                errors.emplace_back(filename, "Failed to parse formatted string literal: missing closing '}'.", loc);
+                hasError = true;
+            }
+            return createExpr<FormattedStringExprNode>(loc, std::move(values));
+        }
+        else {
+            auto value = tok.value.substr(1, tok.value.size() - 2);
+            if (value.size() == 1)
+                return createExpr<CharExprNode>(loc, value[0]);
+            else
+                return createExpr<StringExprNode>(loc, value);
+        }
+        return std::nullopt;
     }
 
 } // Slangc

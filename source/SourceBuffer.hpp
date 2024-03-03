@@ -14,6 +14,7 @@ namespace Slangc {
     class SourceBuffer {
     public:
         static auto CreateFromFile(std::string_view path) -> llvm::Expected<SourceBuffer>;
+        static auto CreateFromString(std::string_view text) -> SourceBuffer;
         SourceBuffer() = delete;
         SourceBuffer(const SourceBuffer& arg) = default;
         SourceBuffer(SourceBuffer&& arg) noexcept;

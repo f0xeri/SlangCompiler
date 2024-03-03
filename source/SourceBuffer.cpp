@@ -41,4 +41,8 @@ namespace Slangc {
     SourceBuffer::SourceBuffer(std::string filename, std::string text) : filename(std::move(filename)), text(std::move(text)) {}
 
     SourceBuffer::SourceBuffer(SourceBuffer &&arg) noexcept : filename(std::move(arg.filename)), text(std::move(arg.text)) {}
+
+    auto SourceBuffer::CreateFromString(std::string_view text) -> SourceBuffer {
+        return SourceBuffer{"", std::string(text)};
+    }
 } // Slangc

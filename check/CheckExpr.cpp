@@ -98,6 +98,14 @@ namespace Slangc::Check {
         return true;
     }
 
+    bool checkExpr(const FormattedStringExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
+        bool result = true;
+        for (const auto &arg: expr->values) {
+            result &= checkExpr(arg, context, errors);
+        }
+        return result;
+    }
+
     bool checkExpr(const UnaryOperatorExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
         auto result = checkExpr(expr->expr, context, errors);
         if (!result) return false;

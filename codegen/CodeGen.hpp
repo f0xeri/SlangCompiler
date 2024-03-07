@@ -19,9 +19,9 @@ namespace Slangc {
     }
     class CodeGen {
     public:
-        CodeGen(Context& context, ModuleDeclPtr&& moduleAST, bool isMainModule) : context(context),
+        CodeGen(Context& context, ModuleDeclPtr&& moduleAST, bool isMainModule, bool debug, bool gcEnabled) : context(context),
             moduleAST(std::move(moduleAST)), isMainModule(isMainModule),
-            codeGenContext(context) {}
+            codeGenContext(context, debug, gcEnabled) {}
 
         void process(std::vector<ErrorMessage>& errors) {
 

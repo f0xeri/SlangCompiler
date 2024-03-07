@@ -36,7 +36,9 @@ namespace Slangc {
 #endif
         }
         clangCallStream << " -o " << (options.getOutputFilePath().empty() ? outputFilename : options.getOutputFilePath().string());
-        system(clangCallStream.str().c_str());
+        if (options.isGCEnabled())
+			clangCallStream << " -lgc";
+		system(clangCallStream.str().c_str());
     }
 
     std::unique_ptr<Context> Driver::processUnit(std::filesystem::path &filepath, bool isMainModule) {
@@ -53,7 +55,7 @@ namespace Slangc {
         parser.parse();
 
         Check::checkAST(parser.moduleAST, *context, errors);
-        auto codeGen = CodeGen(*context, std::move(parser.moduleAST), isMainModule);
+        auto codeGen = CodeGen(*context, std::move(parser.moduleAST), isMainModule, options.isDebug(), options.isGCEnabled());
         if (!containsErrors(errors))
             codeGen.process(errors);
         else

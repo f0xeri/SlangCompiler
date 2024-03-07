@@ -157,7 +157,7 @@ namespace Slangc {
         auto mallocCall = context.builder->CreateMalloc(intType, structType, ConstantInt::get(intType,
                                                                                               context.module->getDataLayout().getTypeAllocSize(
                                                                                                       structType)),
-                                                        nullptr);
+                                                        nullptr, context.mallocFunc);
         context.builder->CreateStore(mallocCall, var);
         return var;
     }
@@ -237,7 +237,7 @@ namespace Slangc {
                                                                                context.module->getDataLayout().getTypeAllocSize(
                                                                                        getIRType(array->type,
                                                                                                  context))));
-        auto mallocCall = context.builder->CreateMalloc(intType, arrayType, allocSize, nullptr);
+        auto mallocCall = context.builder->CreateMalloc(intType, arrayType, allocSize, nullptr, context.mallocFunc);
 
         auto arrLoad = context.builder->CreateLoad(loadArrType, var);
         Value *arrPtr = nullptr;
@@ -279,7 +279,7 @@ namespace Slangc {
         auto arraySize = processNode(array->size, context, errors);
         context.loadValue = temp;
         auto allocSize = context.builder->CreateMul(arraySize,ConstantInt::get(intType,context.module->getDataLayout().getTypeAllocSize(structType)));
-        auto mallocCall = context.builder->CreateMalloc(intType, structType, allocSize, nullptr);
+        auto mallocCall = context.builder->CreateMalloc(intType, structType, allocSize, nullptr, context.mallocFunc);
         auto indicesCount = array->getIndicesCount();
         context.builder->CreateStore(mallocCall, var);
         callArrayElementsConstructors(array, var, arraySize, context, errors);

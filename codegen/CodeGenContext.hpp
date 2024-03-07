@@ -73,8 +73,10 @@ namespace Slangc {
         bool loadValue = false;
         bool currentDeclImported = false;
         bool debug = true;
-
-        explicit CodeGenContext(Context &context) : context(context) {
+		bool gcEnabled = true;
+		Function* mallocFunc = nullptr;
+		Function* freeFunc = nullptr;
+        explicit CodeGenContext(Context &context, bool debug, bool gcEnabled) : context(context), debug(debug), gcEnabled(gcEnabled) {
             InitializeAllTargetInfos();
             InitializeAllTargets();
             InitializeAllTargetMCs();
@@ -109,12 +111,31 @@ namespace Slangc {
                 module->addModuleFlag(Module::Warning, "Debug Info Version", DEBUG_METADATA_VERSION);
             }
 
+			std::string mallocName = "malloc";
+			std::string freeName = "free";
+			if (gcEnabled) {
+				mallocName = "GC_malloc";
+				freeName = "GC_free";
+			}
+			mallocFunc = Function::Create(FunctionType::get(
+				PointerType::get(Type::getInt8Ty(*llvmContext), 0),
+				Type::getInt32Ty(*llvmContext),
+				false
+			), GlobalValue::ExternalLinkage, mallocName, module.get());
+			mallocFunc->setCallingConv(CallingConv::C);
+			freeFunc = Function::Create(FunctionType::get(
+				Type::getVoidTy(*llvmContext),
+				PointerType::get(Type::getInt8Ty(*llvmContext), 0),
+				false
+			), GlobalValue::ExternalLinkage, freeName, module.get());
+			freeFunc->setCallingConv(CallingConv::C);
+
         }
         ~CodeGenContext() = default;
 
         auto startMainFunc() -> llvm::Function* {
             auto mainFuncType = llvm::FunctionType::get(Type::getInt32Ty(*llvmContext), false);
-            auto mainFunc = llvm::Function::Create(mainFuncType, Function::ExternalLinkage, "main", module.get());
+            auto mainFunc = Function::Create(mainFuncType, Function::ExternalLinkage, "main", module.get());
             auto mainBlock = BasicBlock::Create(*llvmContext, "entry", mainFunc);
             builder->SetInsertPoint(mainBlock);
             pushBlock(mainBlock);
@@ -123,6 +144,11 @@ namespace Slangc {
                 mainFunc->setSubprogram(dbgFunc);
                 debugBuilder->lexicalBlocks.push_back(dbgFunc);
             }
+			if (gcEnabled) {
+				if (debug) debugBuilder->emitLocation();
+				auto gcInitFunc = module->getOrInsertFunction("GC_init", FunctionType::get(Type::getVoidTy(*llvmContext), false));
+				builder->CreateCall(gcInitFunc, {});
+			}
             return mainFunc;
         }
 

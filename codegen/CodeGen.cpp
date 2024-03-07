@@ -114,15 +114,7 @@ namespace Slangc {
 
         auto needed = context.builder->CreateCall(snprintfFunc, args);
         auto neededPlusOne = context.builder->CreateAdd(needed, ConstantInt::get(Type::getInt32Ty(*context.llvmContext), 1));
-        auto mallocFunc = context.module->getOrInsertFunction(
-                "malloc",
-                FunctionType::get(
-                        PointerType::get(Type::getInt8Ty(*context.llvmContext), 0),
-                        Type::getInt32Ty(*context.llvmContext),
-                        false
-                )
-        );
-        auto buffer = context.builder->CreateCall(mallocFunc, neededPlusOne);
+        auto buffer = context.builder->CreateMalloc(Type::getInt32Ty(*context.llvmContext), Type::getInt8Ty(*context.llvmContext), neededPlusOne, context.mallocFunc);
         args[0] = buffer;
         args[1] = context.builder->CreateIntCast(neededPlusOne, Type::getInt64Ty(*context.llvmContext), false);
         auto call = context.builder->CreateCall(snprintfFunc, args);
@@ -410,7 +402,10 @@ namespace Slangc {
         context.loadValue = true;    // TODO: not sure if it's correct
         auto var = processNode(expr, context, errors);
         context.loadValue = false;
-        return context.builder->CreateFree(var);
+		if (context.gcEnabled)
+			return context.builder->CreateCall(context.freeFunc, var);
+		else
+        	return context.builder->CreateFree(var);
     }
 
     auto BlockStmtNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {

@@ -402,10 +402,7 @@ namespace Slangc {
         context.loadValue = true;    // TODO: not sure if it's correct
         auto var = processNode(expr, context, errors);
         context.loadValue = false;
-		if (context.gcEnabled)
-			return context.builder->CreateCall(context.freeFunc, var);
-		else
-        	return context.builder->CreateFree(var);
+		return context.builder->CreateCall(context.freeFunc, var);
     }
 
     auto BlockStmtNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {

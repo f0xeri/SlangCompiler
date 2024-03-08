@@ -8,11 +8,11 @@
 #include <string>
 #include <filesystem>
 #include "llvm/Support/CommandLine.h"
+#include "common.hpp"
 
 using namespace llvm;
 
 namespace Slangc {
-
     enum OptLevel {
         O0, O1, O2, O3
     };
@@ -20,8 +20,7 @@ namespace Slangc {
     class CompilerOptions {
     public:
         CompilerOptions(int argc, char **argv) {
-            std::filesystem::path program_path(argv[0]);
-            std::filesystem::path current_directory = program_path.parent_path();
+            std::filesystem::path current_directory = getCurrentProcessDirectory();
             llvm::cl::OptionCategory options("Compiler options");
 
             llvm::cl::opt<std::string> OutputFileName(

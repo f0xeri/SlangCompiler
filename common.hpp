@@ -10,10 +10,46 @@
 #include <algorithm>
 #include <functional>
 #include <utility>
+#include <filesystem>
+
+#ifdef _WIN32
+#include <windows.h>
+#undef min
+#undef max
+namespace Slangc {
+    static std::filesystem::path getCurrentProcessDirectory() {
+        wchar_t buffer[MAX_PATH];
+        GetModuleFileName(NULL, buffer, sizeof(buffer));
+        return std::filesystem::path(buffer).parent_path();
+    }
+}
+#elif __linux__
+#include <linux/limits.h>
+namespace Slangc {
+    static std::filesystem::path getCurrentProcessDirectory() {
+        char result[PATH_MAX];
+        ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
+        return std::filesystem::path(std::string(result, (count > 0) ? count : 0)).parent_path();
+    }
+}
+#elif __APPLE__
+#include <mach-o/dyld.h>
+namespace Slangc {
+    static std::filesystem::path getCurrentProcessDirectory() {
+        char buffer[PATH_MAX];
+        uint32_t size = sizeof(buffer);
+        if (_NSGetExecutablePath(buffer, &size) == 0) {
+            return std::filesystem::path(buffer).parent_path();
+        }
+        return std::filesystem::path();
+    }
+}
+#endif
 
 namespace Slangc {
     struct SourceLoc {
         SourceLoc(std::uint64_t line, std::uint64_t column) : line(line), column(column) {}
+
         std::uint64_t line;
         std::uint64_t column;
 
@@ -30,8 +66,10 @@ namespace Slangc {
         bool isWarning = false;
         bool internal = false;
 
-        ErrorMessage(std::string sourceFile, std::string message, SourceLoc location, bool isWarning = false, bool internal = false)
-                : message(std::move(message)), sourceFile(std::move(sourceFile)), location(location), isWarning(isWarning), internal(internal) {}
+        ErrorMessage(std::string sourceFile, std::string message, SourceLoc location, bool isWarning = false,
+                     bool internal = false)
+                : message(std::move(message)), sourceFile(std::move(sourceFile)), location(location),
+                  isWarning(isWarning), internal(internal) {}
 
         void print(auto &stream) const {
             stream << sourceFile;
@@ -90,7 +128,7 @@ namespace Slangc {
     }
 
     static void printErrorMessages(std::vector<ErrorMessage> &errors, auto &stream, bool warnings = true) {
-        for (auto &error : errors) {
+        for (auto &error: errors) {
             if (error.isWarning && !warnings) continue;
             error.print(stream);
         }

@@ -29,6 +29,7 @@ namespace Slangc {
         void createLocalVar(std::string_view name, llvm::DIType* type, llvm::Value* value, SourceLoc loc);
         void createLocalFuncParam(std::string_view name, llvm::DIType* type, llvm::Value* value, SourceLoc loc, llvm::DISubprogram* dbgFunc, uint64_t argNo);
         llvm::DISubprogram *createDefaultConstructor(std::string_view name, llvm::DIType *type, SourceLoc loc);
+        llvm::DISubprogram *createDefaultDestructor(std::string_view name, llvm::DIType *type, SourceLoc loc);
         llvm::DIGlobalVariableExpression* createGlobalVar(std::string_view name, llvm::DIType* type, SourceLoc loc, bool isPrivate);
         llvm::DIType *getPointerType(llvm::DIType *type);
         llvm::DIType *getArrayType(ArrayExprPtr arrayExpr, Slangc::CodeGenContext &context);

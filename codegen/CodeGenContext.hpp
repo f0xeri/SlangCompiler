@@ -246,6 +246,7 @@ namespace Slangc {
     DIType* getDebugType(const ExprPtrVariant& expr, CodeGenContext& context, std::vector<ErrorMessage> &errors);
     Value* createMalloc(const std::string &type, Value* var, CodeGenContext &context);
     Function* createDefaultConstructor(TypeDecStatementNode* type, CodeGenContext &context, std::vector<ErrorMessage>& errors, bool isImported);
+    Function* createDefaultDestructor(TypeDecStatementNode* type, CodeGenContext &context, std::vector<ErrorMessage>& errors, bool isImported);
     Value* typeCast(Value* value, Type* type, CodeGenContext &context, std::vector<ErrorMessage> &errors, SourceLoc loc);
     Value* createArrayMalloc(ArrayExprPtr& array, Value* var, CodeGenContext &context, std::vector<ErrorMessage> &errors);
     void createArrayFree(ArrayExprPtr& array, Value* var, CodeGenContext &context, std::vector<ErrorMessage> &errors);

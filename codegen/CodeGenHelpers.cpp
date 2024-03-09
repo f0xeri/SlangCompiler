@@ -338,7 +338,6 @@ namespace Slangc {
         context.builder->SetInsertPoint(whileIter);
 
         // load 0 to next jvar
-        std::cout << i << " " << indicesCount << std::endl;
         if (i < indicesCount - 2)
             context.builder->CreateStore(ConstantInt::get(intType, 0), jvars[i + 1]);
 
@@ -450,6 +449,69 @@ namespace Slangc {
             constructor->setSubprogram(dbgCtor);
         }
         return constructor;
+    }
+
+    Function* createDefaultDestructor(TypeDecStatementNode* type, CodeGenContext &context, std::vector<ErrorMessage>& errors, bool isImported) {
+        auto structType = getIRType(type->name, context);
+        auto intType = Type::getInt32Ty(*context.llvmContext);
+        auto destructorType = FunctionType::get(Type::getVoidTy(*context.llvmContext), {structType->getPointerTo()}, false);
+        auto destructor = Function::Create(destructorType, Function::ExternalLinkage, type->name + "._destructor", context.module.get());
+        DISubprogram *dbgDtor = nullptr;
+        if (context.debug) {
+            dbgDtor = context.debugBuilder->createDefaultDestructor(
+                    type->name + "._destructor",
+                    getDebugType(type->name, context),
+                    type->loc);
+            context.debugBuilder->lexicalBlocks.push_back(dbgDtor);
+            context.debugBuilder->emitLocation(type->loc);
+        }
+        if (isImported) return destructor;
+        auto block = BasicBlock::Create(*context.llvmContext, "entry", destructor);
+        context.builder->SetInsertPoint(block);
+        context.pushBlock(block);
+        auto typeAlloc = context.builder->CreateAlloca(structType);
+        context.builder->CreateStore(destructor->getArg(0), typeAlloc);
+        auto loadThis = context.builder->CreateLoad(structType->getPointerTo(), typeAlloc);
+        context.currentTypeLoad = loadThis;
+        size_t index = 0;
+        for (; index < type->fields.size(); ++index) {
+            auto field = type->fields[index];
+            auto fieldType = getDeclType(field, context.context, errors);
+
+            if (auto arr = std::get_if<FieldArrayVarDecPtr>(&field)) {
+                auto gep = context.builder->CreateInBoundsGEP(context.allocatedClasses[type->name], loadThis,{ConstantInt::get(intType, 0), ConstantInt::get(intType, arr->get()->index)});
+                //auto fieldVal = context.builder->CreateLoad(getIRType(fieldType.value(), context),gep);
+                createArrayFree(arr->get()->expr, gep, context, errors);
+            }
+            else if (auto var = std::get_if<FieldVarDecPtr>(&field)) {
+                auto gep = context.builder->CreateInBoundsGEP(context.allocatedClasses[type->name], loadThis,{ConstantInt::get(intType, 0), ConstantInt::get(intType, var->get()->index)});
+                auto fieldVal = context.builder->CreateLoad(getIRType(fieldType.value(), context),gep);
+
+                auto varTypeDecl = var->get()->getType(context.context, errors).value();
+                if (auto varType = std::get_if<TypeExprPtr>(&varTypeDecl)) {
+                    if (!Context::isBuiltInType(varType->get()->type)) {
+                        auto fieldDtor = context.module->getFunction(varType->get()->type + "._destructor");
+                        if (fieldDtor) {
+                            context.builder->CreateCall(fieldDtor, {fieldVal});
+                        }
+                        context.builder->CreateCall(context.freeFunc, fieldVal);
+                    }
+                }
+            }
+        }
+        if (type->parentTypeName != "Object") {
+            // call parent dtor
+            auto parentDtor = context.module->getFunction(type->parentTypeName.value() + "._destructor");
+            context.builder->CreateCall(parentDtor, {loadThis});
+            index++;
+        }
+        context.builder->CreateRetVoid();
+        context.popBlock();
+        if (context.debug) {
+            context.debugBuilder->lexicalBlocks.pop_back();
+            destructor->setSubprogram(dbgDtor);
+        }
+        return destructor;
     }
 
     void createVTable(TypeDecStatementNode *type, CodeGenContext &context, std::vector<ErrorMessage> &errors) {

@@ -215,3 +215,18 @@ llvm::DISubprogram* Slangc::DebugInfoBuilder::createDefaultConstructor(std::stri
             llvm::DISubprogram::SPFlagDefinition);
     return debugFunc;
 }
+
+llvm::DISubprogram* Slangc::DebugInfoBuilder::createDefaultDestructor(std::string_view name, llvm::DIType *type, Slangc::SourceLoc loc) {
+    auto file = compileUnit->getFile();
+    auto debugFunc = debugBuilder->createFunction(
+            file,
+            name,
+            name,
+            file,
+            loc.line,
+            debugBuilder->createSubroutineType(debugBuilder->getOrCreateTypeArray({type})),
+            loc.line,
+            llvm::DINode::FlagPublic,
+            llvm::DISubprogram::SPFlagDefinition);
+    return debugFunc;
+}

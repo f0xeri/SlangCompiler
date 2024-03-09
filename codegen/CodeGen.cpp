@@ -900,6 +900,7 @@ namespace Slangc {
         if (vtableRequired) createVTable(this, context, errors);
         if (context.debug) context.debugBuilder->createType(this, context, errors);
         createDefaultConstructor(this, context, errors, context.currentDeclImported);
+        createDefaultDestructor(this, context, errors, context.currentDeclImported);
         context.context.exitScope();
         return nullptr;
     }

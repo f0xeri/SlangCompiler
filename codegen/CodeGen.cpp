@@ -51,13 +51,13 @@ namespace Slangc {
                 "snprintf",
                 FunctionType::get(
                         Type::getInt32Ty(*context.llvmContext),{
-                            PointerType::get(Type::getInt8Ty(*context.llvmContext), 0),
-                            Type::getInt64Ty(*context.llvmContext),
-                            PointerType::get(Type::getInt8Ty(*context.llvmContext), 0)
+                                PointerType::get(Type::getInt8Ty(*context.llvmContext), 0),
+                                Type::getInt64Ty(*context.llvmContext),
+                                PointerType::get(Type::getInt8Ty(*context.llvmContext), 0)
                         },
                         true
-                   )
-                );
+                )
+        );
 
         std::vector<Value*> args;
         std::vector<Type*> argTypes;
@@ -402,7 +402,7 @@ namespace Slangc {
         context.loadValue = true;    // TODO: not sure if it's correct
         auto var = processNode(expr, context, errors);
         context.loadValue = false;
-		return context.builder->CreateCall(context.freeFunc, var);
+        return context.builder->CreateCall(context.freeFunc, var);
     }
 
     auto BlockStmtNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
@@ -784,6 +784,9 @@ namespace Slangc {
             context.currentFuncSignature = std::nullopt;
         }
         context.currentReturnType = nullptr;
+
+        cleanupCurrentScope(context, errors);
+
         if (!isFunction) context.builder->CreateRetVoid();
         else {
             if (context.currentBlock()->empty()) {

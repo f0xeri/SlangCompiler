@@ -190,6 +190,14 @@ namespace Slangc {
             return value;
         }
 
+        Value* scopeLookup(const std::string &name) const {
+            Value *value = nullptr;
+            if (blocks.back()->locals.contains(name)) {
+                value = blocks.back()->locals[name];
+            }
+            return value;
+        }
+
         std::optional<DeclPtrVariant> localsDeclsLookup(const std::string &name) const {
             std::optional<DeclPtrVariant> value = std::nullopt;
             for (auto &b : blocks) {
@@ -197,6 +205,14 @@ namespace Slangc {
                     value = b->localsDecls[name];
                     break;
                 }
+            }
+            return value;
+        }
+
+        std::optional<DeclPtrVariant> scopeDeclsLookup(const std::string &name) const {
+            std::optional<DeclPtrVariant> value = std::nullopt;
+            if (blocks.back()->localsDecls.contains(name)) {
+                value = blocks.back()->localsDecls[name];
             }
             return value;
         }
@@ -232,6 +248,7 @@ namespace Slangc {
     Function* createDefaultConstructor(TypeDecStatementNode* type, CodeGenContext &context, std::vector<ErrorMessage>& errors, bool isImported);
     Value* typeCast(Value* value, Type* type, CodeGenContext &context, std::vector<ErrorMessage> &errors, SourceLoc loc);
     Value* createArrayMalloc(ArrayExprPtr& array, Value* var, CodeGenContext &context, std::vector<ErrorMessage> &errors);
+    void createArrayFree(ArrayExprPtr& array, Value* var, CodeGenContext &context, std::vector<ErrorMessage> &errors);
     void callArrayElementsConstructors(ArrayExprPtr& array, Value* var, Value* size, CodeGenContext &context, std::vector<ErrorMessage> &errors);
     void createMallocLoops(int i, ArrayExprPtr &array, int indicesCount, Value *var, std::vector<Value*> jvars, std::vector<Value*> sizes, CodeGenContext &context, std::vector<ErrorMessage> &errors);
     void createVTable(TypeDecStatementNode* type, CodeGenContext &context, std::vector<ErrorMessage>& errors);
@@ -239,6 +256,7 @@ namespace Slangc {
     std::string typeToMangledString(const ExprPtrVariant& type, ParameterType parameterType, bool newType);
     std::string getMangledFuncName(const FuncExprPtr& funcExpr);
     Function* getFuncFromExpr(const DeclPtrVariant& funcExpr, CodeGenContext &context);
+    void cleanupCurrentScope(CodeGenContext &context, std::vector<ErrorMessage> &errors);
 
 }
 

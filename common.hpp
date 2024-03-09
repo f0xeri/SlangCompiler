@@ -25,6 +25,8 @@ namespace Slangc {
 }
 #elif __linux__
 #include <linux/limits.h>
+#include <unistd.h>
+#include <cstdio>
 namespace Slangc {
     static std::filesystem::path getCurrentProcessDirectory() {
         char result[PATH_MAX];

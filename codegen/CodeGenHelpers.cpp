@@ -2,6 +2,7 @@
 // Created by user on 19.11.2023.
 //
 
+#include <iostream>
 #include "CodeGen.hpp"
 #include "CodeGenContext.hpp"
 #include "parser/AST.hpp"
@@ -305,6 +306,101 @@ namespace Slangc {
         return var;
     }
 
+    void createArrayFreeLoops(int i, ArrayExprPtr &array, int indicesCount, Value *var, std::vector<Value *> jvars,
+                              std::vector<Value*> sizes, CodeGenContext &context, std::vector<ErrorMessage> &errors) {
+        /*  Free the allocated memory
+            for (int i = 0; i < x_dim; i++) {
+                for (int j = 0; j < y_dim; j++) {
+                    free(arr[i][j]);
+                }
+                free(arr[i]);
+            }
+            free(arr);
+        */
+
+        if (i == indicesCount - 1) return;
+        auto intType = Type::getInt32Ty(*context.llvmContext);
+        auto func = context.builder->GetInsertBlock()->getParent();
+        auto whileCheck = BasicBlock::Create(*context.llvmContext, "whilecheck", func);
+        auto whileIter = BasicBlock::Create(*context.llvmContext, "whileiter", func);
+        auto whileEnd = BasicBlock::Create(*context.llvmContext, "whileend", func);
+
+        context.builder->CreateBr(whileCheck);
+        context.pushBlock(whileCheck);
+        context.builder->SetInsertPoint(whileCheck);
+        auto jvar = context.builder->CreateLoad(intType, jvars[i]);
+        auto arraySize = sizes[i];
+        auto cmp = context.builder->CreateICmpSLT(jvar, arraySize, "j_less_arrSz");
+
+        context.builder->CreateCondBr(cmp, whileIter, whileEnd);
+        context.popBlock();
+        context.pushBlock(whileIter);
+        context.builder->SetInsertPoint(whileIter);
+
+        // load 0 to next jvar
+        std::cout << i << " " << indicesCount << std::endl;
+        if (i < indicesCount - 2)
+            context.builder->CreateStore(ConstantInt::get(intType, 0), jvars[i + 1]);
+
+        // create next loop
+        if (i < indicesCount - 1) {
+            auto nextArray = std::get_if<ArrayExprPtr>(&array->type);
+            createArrayFreeLoops(i + 1, *nextArray, indicesCount, var, jvars, sizes, context, errors);
+        }
+        // call free
+        auto elementType = getIRType(array->type, context);
+        auto loadArrType = getIRType(array, context);
+        auto arrLoad = context.builder->CreateLoad(loadArrType, var);
+        Value *arrPtr = nullptr;
+        for (int k = 0; k <= i; ++k) {
+            jvar = context.builder->CreateLoad(intType, jvars[k]);
+            auto sext = context.builder->CreateSExt(jvar, Type::getInt64Ty(*context.llvmContext));
+            arrPtr = context.builder->CreateInBoundsGEP(loadArrType, arrLoad, sext);
+            arrLoad = context.builder->CreateLoad(loadArrType, arrPtr);
+        }
+        context.builder->CreateCall(context.freeFunc, arrLoad);
+        auto endJvar = context.builder->CreateLoad(intType, jvars[i]);
+        auto endAdd = context.builder->CreateAdd(endJvar, ConstantInt::get(intType, 1));
+        context.builder->CreateStore(endAdd, jvars[i]);
+
+        context.builder->CreateBr(whileCheck);
+        context.popBlock();
+        context.ret(whileEnd);
+        context.builder->SetInsertPoint(whileEnd);
+        if (i == 0) {
+            auto arrLoad = context.builder->CreateLoad(getIRType(array, context), var);
+            context.builder->CreateCall(context.freeFunc, arrLoad);
+        }
+    }
+
+    void createArrayFree(ArrayExprPtr& array, Value* var, CodeGenContext &context, std::vector<ErrorMessage> &errors) {
+        auto intType = Type::getInt32Ty(*context.llvmContext);
+        auto indicesCount = array->getIndicesCount();
+        if (indicesCount == 1) {
+            auto arrLoad = context.builder->CreateLoad(getIRType(array, context), var);
+            context.builder->CreateCall(context.freeFunc, arrLoad);
+            return;
+        }
+        std::vector<Value *> sizes;
+        sizes.reserve(indicesCount);
+        auto currArray = array->type;
+        context.loadValue = true;
+        sizes.push_back(processNode(array->size, context, errors));
+        while (auto arr = std::get_if<ArrayExprPtr>(&currArray)) {
+            sizes.push_back(processNode(arr->get()->size, context, errors));
+            currArray = arr->get()->type;
+        }
+        context.loadValue = false;
+        std::vector<Value *> jvars;
+        jvars.reserve(indicesCount);
+        for (int i = 0; i < indicesCount; ++i) {
+            jvars.push_back(context.builder->CreateAlloca(intType, nullptr, "j_free" + std::to_string(i)));
+            context.builder->CreateStore(ConstantInt::get(intType, 0), jvars[i]);
+        }
+        int i = 0;
+        createArrayFreeLoops(i, array, indicesCount, var, jvars, sizes, context, errors);
+    }
+
     Function* createDefaultConstructor(TypeDecStatementNode *type, CodeGenContext &context, std::vector<ErrorMessage> &errors,
                              bool isImported) {
         auto structType = getIRType(type->name, context);
@@ -460,5 +556,28 @@ namespace Slangc {
             return context.module->getFunction(method->get()->name + "." + getMangledFuncName(method->get()->expr));
         }
         return nullptr;
+    }
+
+    void cleanupCurrentScope(CodeGenContext &context, std::vector<ErrorMessage> &errors) {
+        auto block = context.blocks.back();
+        for (auto&& local : block->locals) {
+            auto localDecl = block->localsDecls[local.first];
+            if (auto varDecl = std::get_if<VarDecStmtPtr>(&localDecl)) {
+                auto typeDecl = varDecl->get()->getType(context.context, errors).value();
+                if (auto type = std::get_if<TypeExprPtr>(&typeDecl)) {
+                    if (!Context::isBuiltInType(type->get()->type)) {
+                        auto destructor = context.module->getFunction(type->get()->type + "._destructor");
+                        if (destructor) {
+                            auto load = context.builder->CreateLoad(getIRType(type->get()->type, context), local.second);
+                            context.builder->CreateCall(destructor, {load});
+                        }
+                        context.builder->CreateCall(context.freeFunc, local.second);
+                    }
+                }
+            }
+            if (auto arr = std::get_if<ArrayDecStatementPtr>(&localDecl)) {
+                createArrayFree(arr->get()->expr, local.second, context, errors);
+            }
+        }
     }
 }

@@ -494,7 +494,8 @@ namespace Slangc {
                         if (fieldDtor) {
                             context.builder->CreateCall(fieldDtor, {fieldVal});
                         }
-                        //context.builder->CreateCall(context.freeFunc, fieldVal);
+                        auto load = context.builder->CreateLoad(getIRType(fieldType.value(), context),gep);
+                        context.builder->CreateCall(context.freeFunc, load);
                     }
                 }
             }
@@ -633,7 +634,8 @@ namespace Slangc {
                             auto load = context.builder->CreateLoad(getIRType(type->get()->type, context), local.second);
                             context.builder->CreateCall(destructor, {load});
                         }
-                        //context.builder->CreateCall(context.freeFunc, local.second);
+                        auto load = context.builder->CreateLoad(getIRType(type->get()->type, context), local.second);
+                        context.builder->CreateCall(context.freeFunc, load);
                     }
                 }
             }

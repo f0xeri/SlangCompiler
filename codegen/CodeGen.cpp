@@ -815,7 +815,6 @@ namespace Slangc {
         auto elementPtr = context.builder->CreateStructGEP(context.allocatedClasses[typeName.type], context.currentTypeLoad, index, typeName.type + "." + name);
         if (!Context::isBuiltInType(typeExpr.type)) {
             auto malloc = createMalloc(typeExpr.type, elementPtr, context);
-            context.builder->CreateStore(malloc, elementPtr);
             // calling a constructor can cause an infinite recursion (A calls constr of B, B calls constr of A...)
             // TODO: make calling of constructor implicit, like variable-A a = new A;
             auto arg = context.builder->CreateLoad(type, elementPtr);

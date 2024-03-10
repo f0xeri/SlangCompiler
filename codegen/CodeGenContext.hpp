@@ -71,7 +71,7 @@ namespace Slangc {
         LoadInst* currentTypeLoad = nullptr;
         std::optional<FuncExprPtr> currentFuncSignature = std::nullopt;
         Type* currentReturnType = nullptr;
-        bool refferencing = false;
+        bool referencing = false;
         bool loadValue = false;
         bool currentDeclImported = false;
         bool debug = true;

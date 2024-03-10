@@ -73,9 +73,8 @@ namespace Slangc {
         // build format string and args
         for (auto& arg: values) {
             auto temp = context.loadValue;
-            context.loadValue = true;
-            auto val = processNode(arg, context, errors);
-            context.loadValue = temp;
+            Value* val = nullptr;
+
             auto exprType = getExprType(arg, context.context, errors).value();
             bool charArray = false;
             if (auto arr = std::get_if<ArrayExprPtr>(&exprType)) {
@@ -85,7 +84,16 @@ namespace Slangc {
                     }
                 }
             }
-            if (auto arr = std::get_if<StringExprPtr>(&arg)) charArray = true;
+            if (auto arr = std::get_if<StringExprPtr>(&arg)) {
+                // do not malloc string literals here, we will create new string anyway
+                val = context.builder->CreateGlobalStringPtr(arr->get()->value, "", 0, context.module.get());
+                charArray = true;
+            }
+            else {
+                context.loadValue = true;
+                val = processNode(arg, context, errors);
+                context.loadValue = temp;
+            }
 
             if (val->getType()->isFloatingPointTy()) {
                 val = context.builder->CreateFPExt(val, Type::getDoubleTy(*context.llvmContext));
@@ -121,7 +129,7 @@ namespace Slangc {
 
         auto needed = context.builder->CreateCall(snprintfFunc, args);
         auto neededPlusOne = context.builder->CreateAdd(needed, ConstantInt::get(Type::getInt32Ty(*context.llvmContext), 1));
-        auto buffer = context.builder->CreateMalloc(Type::getInt32Ty(*context.llvmContext), Type::getInt8Ty(*context.llvmContext), neededPlusOne, context.mallocFunc);
+        auto buffer = context.builder->CreateMalloc(Type::getInt32Ty(*context.llvmContext), Type::getInt8Ty(*context.llvmContext), neededPlusOne, nullptr, context.mallocFunc);
         args[0] = buffer;
         args[1] = context.builder->CreateIntCast(neededPlusOne, Type::getInt64Ty(*context.llvmContext), false);
         auto call = context.builder->CreateCall(snprintfFunc, args);
@@ -157,7 +165,7 @@ namespace Slangc {
         bool isFunc = false;
 
         if (auto localVar = context.localsDeclsLookup(name)) {
-            if (context.refferencing) {
+            if (context.referencing) {
                 context.setReferenced(name, true);
             }
             declType = getDeclType(localVar.value(), context.context, errors);
@@ -463,9 +471,9 @@ namespace Slangc {
             context.loadValue = false;
             context.currentFuncSignature = std::get<FuncExprPtr>(getExprType(left, context.context, errors).value());
         }
-        context.refferencing = true;
+        context.referencing = true;
         auto rightVal = processNode(right, context, errors);
-        context.refferencing = false;
+        context.referencing = false;
         // if right is new, clean up left
         /*if (auto newExpr = std::get_if<NewExprPtr>(&right)) {
             if (auto arr = std::get_if<ArrayExprPtr>(&newExpr->get()->type)) {
@@ -496,10 +504,10 @@ namespace Slangc {
         if (std::holds_alternative<TypeExprPtr>(expr) && std::get<TypeExprPtr>(expr)->type == "void")
             return context.builder->CreateRetVoid();
         context.loadValue = true;
-        context.refferencing = true;
+        context.referencing = true;
         auto type = getExprType(expr, context.context, errors).value();
         auto val = processNode(expr, context, errors);
-        context.refferencing = false;
+        context.referencing = false;
         context.loadValue = false;
         val = typeCast(val, context.currentReturnType, context, errors, getExprLoc(expr));
         // cleanupCurrentScope(context, errors);
@@ -510,9 +518,6 @@ namespace Slangc {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         auto printfFunc = context.module->getOrInsertFunction("printf", FunctionType::get(Type::getInt32Ty(*context.llvmContext), PointerType::get(Type::getInt8Ty(*context.llvmContext), 0), true));
         auto temp = context.loadValue;
-        context.loadValue = true;
-        auto val = processNode(expr, context, errors);
-        context.loadValue = temp;
         bool charArray = false;
         auto exprType = getExprType(expr, context.context, errors).value();
         if (auto arr = std::get_if<ArrayExprPtr>(&exprType)) {
@@ -521,6 +526,15 @@ namespace Slangc {
                     charArray = true;
                 }
             }
+        }
+        Value* val = nullptr;
+        // we don't want to malloc string in output statement
+        if (auto strLiteral = std::get_if<StringExprPtr>(&expr))
+            val = context.builder->CreateGlobalStringPtr(strLiteral->get()->value, "", 0, context.module.get());
+        else {
+            context.loadValue = true;
+            val = processNode(expr, context, errors);
+            context.loadValue = temp;
         }
         if (auto arr = std::get_if<StringExprPtr>(&expr)) charArray = true;
 
@@ -551,7 +565,14 @@ namespace Slangc {
         }
         printArgs.push_back(formatStr);
         printArgs.push_back(val);
-        return context.builder->CreateCall(printfFunc, printArgs);
+        auto printfCall = context.builder->CreateCall(printfFunc, printArgs);
+
+        // deallocate formatted string
+        if (auto fmtString = std::get_if<FormattedStringExprPtr>(&expr)) {
+            context.builder->CreateCall(context.freeFunc, val);
+        }
+
+        return printfCall;
     }
 
     auto InputStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
@@ -614,9 +635,9 @@ namespace Slangc {
             var = context.builder->CreateAlloca(type, nullptr, name);
             if (expr.has_value()) {
                 context.loadValue = true;
-                context.refferencing = true;
+                context.referencing = true;
                 rightVal = processNode(expr.value(), context, errors);
-                context.refferencing = false;
+                context.referencing = false;
                 context.loadValue = false;
                 // TODO: do type cast
                 if (rightVal->getType() != type) {
@@ -747,9 +768,9 @@ namespace Slangc {
             }
             if (assignExpr.has_value()) {
                 context.loadValue = true;
-                context.refferencing = true;
+                context.referencing = true;
                 auto assignVal = processNode(assignExpr.value(), context, errors);
-                context.refferencing = false;
+                context.referencing = false;
                 context.loadValue = false;
                 context.builder->CreateStore(assignVal, var);
                 //context.referenced()[name] = true;  // if string literal assigned, we should not try to clear this variable

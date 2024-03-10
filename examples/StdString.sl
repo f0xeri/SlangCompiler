@@ -133,6 +133,7 @@ module StdString
             end while;
             let newCharArray[j] := "\0";
             call result.init(newCharArray);
+            delete newCharArray;
             return result;
         end substr;
 

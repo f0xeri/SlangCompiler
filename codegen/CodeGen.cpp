@@ -35,13 +35,16 @@ namespace Slangc {
     auto StringExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         auto str = context.builder->CreateGlobalStringPtr(value, "", 0, context.module.get());
-        auto size = ConstantInt::get(Type::getInt32Ty(*context.llvmContext), value.size());
+        return str;
+        /* TODO: malloc strings is a good idea if we want to assign to array of chars, but bad in other scenarios like output
+           do we need malloc if we pass string to func? */
+        /*auto size = ConstantInt::get(Type::getInt32Ty(*context.llvmContext), value.size());
         auto charPtr = PointerType::get(Type::getInt8Ty(*context.llvmContext), 0);
         auto buffer = context.builder->CreateMalloc(Type::getInt32Ty(*context.llvmContext), charPtr, size, nullptr, context.mallocFunc);
         FunctionType *strcpyType = FunctionType::get(charPtr, {charPtr, charPtr}, false);
         auto strcpyFunc = context.module->getOrInsertFunction("strcpy", strcpyType);
         auto call = context.builder->CreateCall(strcpyFunc, {buffer, str});
-        return buffer;
+        return buffer;*/
     }
 
     auto FormattedStringExprNode::codegen(Slangc::CodeGenContext &context, std::vector<ErrorMessage> &errors) -> llvm::Value * {

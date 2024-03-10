@@ -77,7 +77,7 @@ module StdString
     end strstr;
 
     public class String inherits Object
-        private field-array[0] character arrayOfChars;
+        private field-array[12] character arrayOfChars;
         private field-integer length := 0;
 
         public method clear(String this)()
@@ -89,15 +89,10 @@ module StdString
 
         // TODO: does it leak?
         public method init(String this)(in array[] character str)
-            // delete clears not malloced pointer if we are passing element of array of objects
-            // TODO: fix array of objects initialization
             //delete this.arrayOfChars;
             variable-integer capacity := strlen(str);
-
-            variable-array[capacity + 1] character newCharArray;
-            let newCharArray := strcpy(newCharArray, str);
-
-            let this.arrayOfChars := newCharArray;
+            let this.arrayOfChars := new array[capacity + 1] character;
+            let this.arrayOfChars := strcpy(this.arrayOfChars, str);
             //let this.capacity := capacity;
             let this.length := capacity;
         end init;
@@ -110,8 +105,9 @@ module StdString
             let newCharArray := strcpy(newCharArray, this.arrayOfChars);
             let newCharArray := strcat(newCharArray, str);
 
-            delete this.arrayOfChars;
-            let this.arrayOfChars := newCharArray;
+            let this.arrayOfChars := new array[totalLength + 1] character;
+            let this.arrayOfChars := strcpy(this.arrayOfChars, newCharArray);
+
             //let this.capacity := totalLength;
             let this.length := totalLength;
         end concat;
@@ -225,8 +221,8 @@ module StdString
                 let j := j + 1;
             end while;
             let newCharArray[j] := "\0";
-            delete this.arrayOfChars;
-            let this.arrayOfChars := newCharArray;
+            let this.arrayOfChars := new array[newLength + 1] character;
+            let this.arrayOfChars := strcpy(this.arrayOfChars, newCharArray);
             let this.length := newLength;
             return this;
         end insert;
@@ -291,8 +287,8 @@ module StdString
                 let j := j + 1;
             end while;
             let newCharArray[j] := "\0";
-            delete this.arrayOfChars;
-            let this.arrayOfChars := newCharArray;
+            let this.arrayOfChars := new array[newLength + 2] character;
+            let this.arrayOfChars := strcpy(this.arrayOfChars, newCharArray);
             let this.length := newLength;
             return this;
         end replaceAll;

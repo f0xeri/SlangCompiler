@@ -37,16 +37,16 @@ class StringTest(unittest.TestCase):
                                       f"Building StdStringTests.sl...\n"
                                       f"Building StdString.sl...\n"
                                       f"Building StdMath.sl...\n"
-                                      f"StdString.sl(363,35): warning: Implicit conversion from 'character' to 'integer'.\n"
-                                      f"StdString.sl(363,12): warning: Implicit conversion from 'integer' to 'character'.\n"
-                                      f"StdString.sl(376,8): warning: Implicit conversion from 'real' to 'integer'.\n"
-                                      f"StdString.sl(377,37): warning: Implicit conversion from 'integer' to 'real'.\n"
-                                      f"StdString.sl(385,41): warning: Implicit conversion from 'integer' to 'real'.\n"
-                                      f"StdString.sl(396,41): warning: Implicit conversion from 'integer' to 'real'.\n"
-                                      f"StdString.sl(400,46): warning: Implicit conversion from 'integer' to 'real'.\n"
-                                      f"StdString.sl(400,51): warning: Implicit conversion from 'character' to 'real'.\n"
-                                      f"StdString.sl(400,20): warning: Implicit conversion from 'real' to 'character'.\n"
-                                      f"StdString.sl(404,45): warning: Implicit conversion from 'integer' to 'real'.\n",
+                                      f"StdString.sl(359,35): warning: Implicit conversion from 'character' to 'integer'.\n"
+                                      f"StdString.sl(359,12): warning: Implicit conversion from 'integer' to 'character'.\n"
+                                      f"StdString.sl(372,8): warning: Implicit conversion from 'real' to 'integer'.\n"
+                                      f"StdString.sl(373,37): warning: Implicit conversion from 'integer' to 'real'.\n"
+                                      f"StdString.sl(381,41): warning: Implicit conversion from 'integer' to 'real'.\n"
+                                      f"StdString.sl(392,41): warning: Implicit conversion from 'integer' to 'real'.\n"
+                                      f"StdString.sl(396,46): warning: Implicit conversion from 'integer' to 'real'.\n"
+                                      f"StdString.sl(396,51): warning: Implicit conversion from 'character' to 'real'.\n"
+                                      f"StdString.sl(396,20): warning: Implicit conversion from 'real' to 'character'.\n"
+                                      f"StdString.sl(400,45): warning: Implicit conversion from 'integer' to 'real'.\n",
                                       expected_program_output)
         test.compile_test()
         self.assertEqual(test.check_outs(), True)

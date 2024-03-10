@@ -197,6 +197,9 @@ namespace Slangc {
         else if (tok.type == TokenType::Identifier) {
             return parseVar();
         }
+        else if (tok.type == TokenType::New) {
+            return parseNew();
+        }
         else if (tok.type == TokenType::LParen) {
             auto expr = parseExpr().value();
             consume(TokenType::RParen);
@@ -318,6 +321,18 @@ namespace Slangc {
                 return createExpr<StringExprNode>(loc, value);
         }
         return std::nullopt;
+    }
+
+    auto Parser::parseNew() -> std::optional<ExprPtrVariant> {
+        auto tok = prevToken();
+        SourceLoc loc = tok.location;
+        auto type = parseType();
+        if (!type.has_value()) {
+            errors.emplace_back(filename, "Failed to parse type expression.", loc);
+            hasError = true;
+            return std::nullopt;
+        }
+        return createExpr<NewExprNode>(loc, std::move(type.value()));
     }
 
 } // Slangc

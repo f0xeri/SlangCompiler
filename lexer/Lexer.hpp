@@ -52,6 +52,8 @@ namespace Slangc {
 
         static const std::unordered_map<std::string_view, TokenType> tokensMap;
         static std::string_view getTokenName(TokenType type) {
+            if (type == TokenType::Identifier)
+                return "identifier";
             auto result = std::find_if(
                     tokensMap.begin(),
                     tokensMap.end(),

@@ -358,6 +358,7 @@ namespace Slangc {
             arrLoad = context.builder->CreateLoad(loadArrType, arrPtr);
         }
         context.builder->CreateCall(context.freeFunc, arrLoad);
+        context.builder->CreateStore(Constant::getNullValue(elementType), arrPtr);
         auto endJvar = context.builder->CreateLoad(intType, jvars[i]);
         auto endAdd = context.builder->CreateAdd(endJvar, ConstantInt::get(intType, 1));
         context.builder->CreateStore(endAdd, jvars[i]);
@@ -369,6 +370,7 @@ namespace Slangc {
         if (i == 0) {
             auto arrLoad = context.builder->CreateLoad(getIRType(array, context), var);
             context.builder->CreateCall(context.freeFunc, arrLoad);
+            context.builder->CreateStore(Constant::getNullValue(getIRType(array->type, context)), var);
         }
     }
 
@@ -378,6 +380,7 @@ namespace Slangc {
         if (indicesCount == 1) {
             auto arrLoad = context.builder->CreateLoad(getIRType(array, context), var);
             context.builder->CreateCall(context.freeFunc, arrLoad);
+            context.builder->CreateStore(Constant::getNullValue(getIRType(array->type, context)), var);
             return;
         }
         std::vector<Value *> sizes;
@@ -404,8 +407,9 @@ namespace Slangc {
                              bool isImported) {
         auto structType = getIRType(type->name, context);
         auto intType = Type::getInt32Ty(*context.llvmContext);
-        auto constructorType = FunctionType::get(Type::getVoidTy(*context.llvmContext), {structType->getPointerTo()},false);
-        auto constructor = Function::Create(constructorType, Function::ExternalLinkage,type->name + "._default_constructor", context.module.get());
+        auto constructorType = FunctionType::get(Type::getVoidTy(*context.llvmContext), PointerType::get(context.allocatedClasses[type->name], 0), false);
+        auto constructorCallee = context.module->getOrInsertFunction(type->name + "._default_constructor", constructorType);
+        auto constructor = cast<Function>(constructorCallee.getCallee());
         DISubprogram *dbgCtor = nullptr;
         if (context.debug) {
             dbgCtor = context.debugBuilder->createDefaultConstructor(
@@ -455,11 +459,12 @@ namespace Slangc {
         auto structType = getIRType(type->name, context);
         auto intType = Type::getInt32Ty(*context.llvmContext);
         auto destructorType = FunctionType::get(Type::getVoidTy(*context.llvmContext), {structType->getPointerTo()}, false);
-        auto destructor = Function::Create(destructorType, Function::ExternalLinkage, type->name + "._destructor", context.module.get());
+        auto destructorCallee = context.module->getOrInsertFunction(type->name + "._default_destructor", destructorType);
+        auto destructor = cast<Function>(destructorCallee.getCallee());
         DISubprogram *dbgDtor = nullptr;
         if (context.debug) {
             dbgDtor = context.debugBuilder->createDefaultDestructor(
-                    type->name + "._destructor",
+                    type->name + "._default_destructor",
                     getDebugType(type->name, context),
                     type->loc);
             context.debugBuilder->lexicalBlocks.push_back(dbgDtor);
@@ -490,19 +495,20 @@ namespace Slangc {
                 auto varTypeDecl = var->get()->getType(context.context, errors).value();
                 if (auto varType = std::get_if<TypeExprPtr>(&varTypeDecl)) {
                     if (!Context::isBuiltInType(varType->get()->type)) {
-                        auto fieldDtor = context.module->getFunction(varType->get()->type + "._destructor");
+                        auto fieldDtor = context.module->getFunction(varType->get()->type + "._default_destructor");
                         if (fieldDtor) {
                             context.builder->CreateCall(fieldDtor, {fieldVal});
                         }
                         auto load = context.builder->CreateLoad(getIRType(fieldType.value(), context),gep);
                         context.builder->CreateCall(context.freeFunc, load);
+                        context.builder->CreateStore(Constant::getNullValue(getIRType(fieldType.value(), context)),gep);
                     }
                 }
             }
         }
         if (type->parentTypeName != "Object") {
             // call parent dtor
-            auto parentDtor = context.module->getFunction(type->parentTypeName.value() + "._destructor");
+            auto parentDtor = context.module->getFunction(type->parentTypeName.value() + "._default_destructor");
             context.builder->CreateCall(parentDtor, {loadThis});
             index++;
         }
@@ -625,17 +631,21 @@ namespace Slangc {
         auto block = context.blocks.back();
         for (auto&& local : block->locals) {
             auto localDecl = block->localsDecls[local.first];
+            if (context.referenced()[local.first]) {
+                break;   // do not clean up if value is referenced in return stmt
+            }
             if (auto varDecl = std::get_if<VarDecStmtPtr>(&localDecl)) {
                 auto typeDecl = varDecl->get()->getType(context.context, errors).value();
                 if (auto type = std::get_if<TypeExprPtr>(&typeDecl)) {
                     if (!Context::isBuiltInType(type->get()->type)) {
-                        auto destructor = context.module->getFunction(type->get()->type + "._destructor");
+                        auto destructor = context.module->getFunction(type->get()->type + "._default_destructor");
                         if (destructor) {
                             auto load = context.builder->CreateLoad(getIRType(type->get()->type, context), local.second);
                             context.builder->CreateCall(destructor, {load});
                         }
                         auto load = context.builder->CreateLoad(getIRType(type->get()->type, context), local.second);
                         context.builder->CreateCall(context.freeFunc, load);
+                        context.builder->CreateStore(Constant::getNullValue(getIRType(type->get()->type, context)), local.second);
                     }
                 }
             }

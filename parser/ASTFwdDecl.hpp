@@ -34,6 +34,7 @@ namespace Slangc {
     struct CallExprNode;
     struct AccessExprNode;
     struct TypeExprNode;
+    struct NewExprNode;
 
     using ArrayExprPtr = std::shared_ptr<ArrayExprNode>;
     using BooleanExprPtr = std::shared_ptr<BooleanExprNode>;
@@ -52,11 +53,12 @@ namespace Slangc {
     using CallExprPtr = std::shared_ptr<CallExprNode>;
     using AccessExprPtr = std::shared_ptr<AccessExprNode>;
     using TypeExprPtr = std::shared_ptr<TypeExprNode>;
+    using NewExprPtr = std::shared_ptr<NewExprNode>;
 
     using ExprPtrVariant
             = std::variant<ArrayExprPtr, BooleanExprPtr, CharExprPtr, FloatExprPtr,
             FuncExprPtr, IntExprPtr, NilExprPtr, OperatorExprPtr, RealExprPtr, StringExprPtr, FormattedStringExprPtr,
-            UnaryOperatorExprPtr, VarExprPtr, IndexExprPtr, CallExprPtr, AccessExprPtr, TypeExprPtr>;
+            UnaryOperatorExprPtr, VarExprPtr, IndexExprPtr, CallExprPtr, AccessExprPtr, TypeExprPtr, NewExprPtr>;
 
     using VarExprPtrVariant = std::variant<VarExprPtr, IndexExprPtr>;
 

@@ -2,6 +2,7 @@
 // Created by user on 03.11.2023.
 //
 
+#include <iostream>
 #include "Check.hpp"
 
 namespace Slangc::Check {
@@ -300,6 +301,19 @@ namespace Slangc::Check {
                 if (auto nilExpr = std::get_if<NilExprPtr>(&expr->args[i])) {
                     nilExpr->get()->type = expr->funcType->get()->params[i]->type;
                 }
+            }
+        }
+        return result;
+    }
+
+    bool checkExpr(const NewExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
+        bool result = true;
+        result &= checkExpr(expr->type, context, errors);
+        if (auto type = std::get_if<TypeExprPtr>(&expr->type)) {
+            if (Context::isBuiltInType(type->get()->type)) {
+                auto typeStr = typeToString(expr->type);
+                errors.emplace_back(context.filename, "Cannot call new on type '" + typeStr + "'.", expr->loc, false, false);
+                result = false;
             }
         }
         return result;

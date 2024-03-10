@@ -284,6 +284,17 @@ namespace Slangc {
         }
     };
 
+    struct NewExprNode {
+        SourceLoc loc{0, 0};
+        ExprPtrVariant type;
+        bool isConst = false;
+        NewExprNode(SourceLoc loc, ExprPtrVariant type) : loc(loc), type(std::move(type)) {};
+        auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> {
+            return type;
+        }
+    };
+
     struct TypeDecStatementNode : std::enable_shared_from_this<TypeDecStatementNode> {
         SourceLoc loc{0, 0};
         std::string name;

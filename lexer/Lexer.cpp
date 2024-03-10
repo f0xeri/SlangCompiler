@@ -67,7 +67,8 @@ namespace Slangc {
             {"virtual",   TokenType::Virtual},
             {"nil",       TokenType::Nil},
             {"false",     TokenType::Boolean},
-            {"true",      TokenType::Boolean}
+            {"true",      TokenType::Boolean},
+            {"new",       TokenType::New},
     };
 
     void Lexer::tokenize() {

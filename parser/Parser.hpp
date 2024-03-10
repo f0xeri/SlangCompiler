@@ -55,6 +55,7 @@ namespace Slangc {
         auto parseCall() -> std::optional<ExprPtrVariant>;
         auto parsePrimary() -> std::optional<ExprPtrVariant>;
         auto parseVar() -> std::optional<ExprPtrVariant>;
+        auto parseNew() -> std::optional<ExprPtrVariant>;
 
         auto parseVarExpr() -> std::optional<ExprPtrVariant>;
         auto parseAccess() -> std::optional<ExprPtrVariant>;

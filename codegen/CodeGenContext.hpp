@@ -49,6 +49,7 @@ namespace Slangc {
         BasicBlock* block;
         std::map<std::string, Value*> locals;
         std::map<std::string, DeclPtrVariant> localsDecls;
+        std::map<std::string, bool> referenced;
         explicit CodeGenBlock(BasicBlock* block) : block(block) {}
     };
 
@@ -70,6 +71,7 @@ namespace Slangc {
         LoadInst* currentTypeLoad = nullptr;
         std::optional<FuncExprPtr> currentFuncSignature = std::nullopt;
         Type* currentReturnType = nullptr;
+        bool isReturning = false;
         bool loadValue = false;
         bool currentDeclImported = false;
         bool debug = true;
@@ -190,14 +192,6 @@ namespace Slangc {
             return value;
         }
 
-        Value* scopeLookup(const std::string &name) const {
-            Value *value = nullptr;
-            if (blocks.back()->locals.contains(name)) {
-                value = blocks.back()->locals[name];
-            }
-            return value;
-        }
-
         std::optional<DeclPtrVariant> localsDeclsLookup(const std::string &name) const {
             std::optional<DeclPtrVariant> value = std::nullopt;
             for (auto &b : blocks) {
@@ -209,12 +203,24 @@ namespace Slangc {
             return value;
         }
 
-        std::optional<DeclPtrVariant> scopeDeclsLookup(const std::string &name) const {
-            std::optional<DeclPtrVariant> value = std::nullopt;
-            if (blocks.back()->localsDecls.contains(name)) {
-                value = blocks.back()->localsDecls[name];
+        bool referencedLookup(const std::string &name) const {
+            bool value = false;
+            for (auto &b : blocks) {
+                if (b->referenced.contains(name)) {
+                    value = b->referenced[name];
+                    break;
+                }
             }
             return value;
+        }
+
+        void setReferenced(const std::string &name, bool value) {
+            for (auto &b : blocks) {
+                if (b->referenced.contains(name)) {
+                    b->referenced[name] = value;
+                    break;
+                }
+            }
         }
 
         std::map<std::string, Value*>& locals() {
@@ -223,6 +229,10 @@ namespace Slangc {
 
         std::map<std::string, DeclPtrVariant>& localsDecls() {
             return blocks.back()->localsDecls;
+        }
+
+        std::map<std::string, bool>& referenced() {
+            return blocks.back()->referenced;
         }
 
         std::map<std::string, llvm::Value*>& globals() {

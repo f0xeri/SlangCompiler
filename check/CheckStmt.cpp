@@ -32,6 +32,10 @@ namespace Slangc::Check {
         }
         context.insert(stmt->name, stmt);
         if (stmt->expr.has_value() && result) {
+            auto leftType = getDeclType(stmt, context, errors).value();
+            if (auto nilExpr = std::get_if<NilExprPtr>(&stmt->expr.value())) {
+                nilExpr->get()->type = leftType;
+            }
             if (!checkExpr(stmt->expr.value(), context, errors)) {
                 return false;
             }

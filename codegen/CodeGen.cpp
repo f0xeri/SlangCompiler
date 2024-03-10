@@ -148,7 +148,11 @@ namespace Slangc {
         bool isOut = false;
         bool isVar = false;
         bool isFunc = false;
+
         if (auto localVar = context.localsDeclsLookup(name)) {
+            if (context.isReturning) {
+                context.setReferenced(name, true);
+            }
             declType = getDeclType(localVar.value(), context.context, errors);
             if (auto funcParam = std::get_if<FuncParamDecStmtPtr>(&localVar.value())) {
                 if (funcParam->get()->parameterType == Out) {
@@ -371,6 +375,25 @@ namespace Slangc {
         return context.builder->CreateCall(getFuncType(funcType.value(), context), func, argsRef);
     }
 
+    auto NewExprNode::codegen(Slangc::CodeGenContext &context, std::vector<ErrorMessage> &errors) -> llvm::Value * {
+        if (context.debug) context.debugBuilder->emitLocation(loc);
+        auto irType = getIRType(type, context);
+        Value* val = context.builder->CreateAlloca(irType);
+        if (auto arr = std::get_if<ArrayExprPtr>(&type)) {
+            createArrayMalloc(*arr, val, context, errors);
+        }
+        else if (auto typeExpr = std::get_if<TypeExprPtr>(&type)) {
+            if (!Context::isBuiltInType(typeExpr->get()->type)) {
+                createMalloc(typeExpr->get()->type, val, context);
+                auto arg = context.builder->CreateLoad(irType, val);
+                auto constructor = context.module->getFunction(typeExpr->get()->type + "._default_constructor");
+                if (constructor) context.builder->CreateCall(constructor, arg);
+            }
+        }
+        val = context.builder->CreateLoad(irType, val);
+        return val;
+    }
+
     auto AccessExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         auto temp = context.loadValue;
@@ -402,7 +425,26 @@ namespace Slangc {
         context.loadValue = true;    // TODO: not sure if it's correct
         auto var = processNode(expr, context, errors);
         context.loadValue = false;
-        return context.builder->CreateCall(context.freeFunc, var);
+        // call destructor
+        auto type = getExprType(expr, context.context, errors).value();
+        if (auto typeExpr = std::get_if<TypeExprPtr>(&type)) {
+            if (!Context::isBuiltInType(typeExpr->get()->type)) {
+                auto arg = context.builder->CreateLoad(getIRType(typeExpr->get()->type, context), var);
+                auto destructor = context.module->getFunction(typeExpr->get()->type + "._default_destructor");
+                if (destructor) context.builder->CreateCall(destructor, arg);
+                context.builder->CreateCall(context.freeFunc, arg);
+                context.builder->CreateStore(Constant::getNullValue(getIRType(typeExpr->get()->type, context)), var);
+            }
+        }
+        else if (auto arr = std::get_if<ArrayExprPtr>(&type)) {
+            createArrayFree(*arr, var, context, errors);
+            return var;
+        }
+        else {
+            // TODO: check if it's correct and how we can set var to null
+            return context.builder->CreateCall(context.freeFunc, var);
+            //return context.builder->CreateStore(Constant::getNullValue(var->getType()), var);
+        }
     }
 
     auto BlockStmtNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
@@ -421,6 +463,21 @@ namespace Slangc {
             context.currentFuncSignature = std::get<FuncExprPtr>(getExprType(left, context.context, errors).value());
         }
         auto rightVal = processNode(right, context, errors);
+        // if right is new, clean up left
+        if (auto newExpr = std::get_if<NewExprPtr>(&right)) {
+            if (auto arr = std::get_if<ArrayExprPtr>(&newExpr->get()->type)) {
+                createArrayFree(*arr, leftVal, context, errors);
+            }
+            else if (auto typeExpr = std::get_if<TypeExprPtr>(&newExpr->get()->type)) {
+                if (!Context::isBuiltInType(typeExpr->get()->type)) {
+                    auto arg = context.builder->CreateLoad(rtype, leftVal);
+                    auto destructor = context.module->getFunction(typeExpr->get()->type + "._destructor");
+                    if (destructor) context.builder->CreateCall(destructor, arg);
+                    context.builder->CreateCall(context.freeFunc, arg);
+                    context.builder->CreateStore(Constant::getNullValue(rtype), leftVal);
+                }
+            }
+        }
         context.currentFuncSignature = tempSig;
         context.loadValue = false;
         if (ltype != rightVal->getType()) {
@@ -440,10 +497,13 @@ namespace Slangc {
     auto ReturnStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         context.loadValue = true;
+        context.isReturning = true;
         auto type = getExprType(expr, context.context, errors).value();
         auto val = processNode(expr, context, errors);
+        context.isReturning = false;
         context.loadValue = false;
         val = typeCast(val, context.currentReturnType, context, errors, getExprLoc(expr));
+        cleanupCurrentScope(context, errors);
         return context.builder->CreateRet(val);
     }
 
@@ -551,6 +611,7 @@ namespace Slangc {
         Value* var = nullptr;
         Value* rightVal = nullptr;
         if (!isGlobal) {
+            std::cout << name << std::endl;
             if (context.debug) context.debugBuilder->emitLocation(loc);
             var = context.builder->CreateAlloca(type, nullptr, name);
             if (expr.has_value()) {
@@ -572,6 +633,7 @@ namespace Slangc {
             }
             context.locals()[name] = var;
             context.localsDecls()[name] = shared_from_this();
+            context.referenced()[name] = false;
             if (context.debug) {
                 context.debugBuilder->createLocalVar(name, getDebugType(typeExpr.type, context), var, loc);
             }
@@ -641,6 +703,7 @@ namespace Slangc {
             var = context.builder->CreateAlloca(type, nullptr, name);
             context.locals()[name] = var;
             context.localsDecls()[name] = shared_from_this();
+            context.referenced()[name] = false;
             if (assignExpr.has_value())
                 context.builder->CreateStore(assignValue, var);
             if (context.debug) {
@@ -678,6 +741,7 @@ namespace Slangc {
             var = context.builder->CreateAlloca(type, nullptr, name);
             context.locals()[name] = var;
             context.localsDecls()[name] = shared_from_this();
+            context.referenced()[name] = false;
             if (context.debug) {
                 context.debugBuilder->createLocalVar(name, getDebugType(expr, context, errors), var, loc);
             }
@@ -760,6 +824,7 @@ namespace Slangc {
                     var = context.builder->CreateAlloca(getIRType(param->get()->type, context), nullptr, param->get()->name);
                 context.locals()[param->get()->name] = var;
                 context.localsDecls()[param->get()->name] = *param;
+                context.referenced()[param->get()->name] = false;
                 argsValues->setName(parameterTypeToString(param->get()->parameterType) + param->get()->name);
                 context.builder->CreateStore(argsValues, var);
 
@@ -775,18 +840,18 @@ namespace Slangc {
             context.currentReturnType = getIRType(expr->type, context);
             if (std::holds_alternative<FuncExprPtr>(expr->type))
                 context.currentFuncSignature = std::get<FuncExprPtr>(expr->type);
-
             auto val = processNode(stmt, context, errors);
             if (std::holds_alternative<ReturnStatementPtr>(stmt)) {
                 hasReturn = true;
                 break;
             }
+
             context.currentFuncSignature = std::nullopt;
         }
         context.currentReturnType = nullptr;
-
-        cleanupCurrentScope(context, errors);
-
+        if (!hasReturn) {
+            cleanupCurrentScope(context, errors);
+        }
         if (!isFunction) context.builder->CreateRetVoid();
         else {
             if (context.currentBlock()->empty()) {
@@ -889,8 +954,9 @@ namespace Slangc {
             types.push_back(getIRType(getDeclType(fields[index], context.context, errors).value(), context));
         }
         context.allocatedClasses[name]->setBody(types);
-        // create definition of default constructor
-        //createDefaultConstructor(this, context, errors, true);
+        // predefine default constructor and destructor
+        auto ctor = context.module->getOrInsertFunction(name + "._default_constructor", FunctionType::get(Type::getVoidTy(*context.llvmContext), PointerType::get(context.allocatedClasses[name], 0), false));
+        auto dtor = context.module->getOrInsertFunction(name + "._default_destructor", FunctionType::get(Type::getVoidTy(*context.llvmContext), PointerType::get(context.allocatedClasses[name], 0), false));
         context.context.enterScope(name);
         for (auto &method : methods) {
             method->codegen(context, errors);

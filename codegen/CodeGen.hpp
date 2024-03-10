@@ -37,6 +37,7 @@ namespace Slangc {
                 for (auto&stmt: moduleAST->block->statements) {
                     processNode(stmt, codeGenContext, errors);
                 }
+                cleanupCurrentScope(codeGenContext, errors);
                 codeGenContext.endMainFunc();
             }
             llvm::verifyModule(*codeGenContext.module, &llvm::errs());

@@ -368,8 +368,8 @@ namespace Slangc {
         context.ret(whileEnd);
         context.builder->SetInsertPoint(whileEnd);
         if (i == 0) {
-            auto arrLoad = context.builder->CreateLoad(getIRType(array, context), var);
-            context.builder->CreateCall(context.freeFunc, arrLoad);
+            auto arrLoadZero = context.builder->CreateLoad(getIRType(array, context), var);
+            context.builder->CreateCall(context.freeFunc, arrLoadZero);
             context.builder->CreateStore(Constant::getNullValue(getIRType(array->type, context)), var);
         }
     }
@@ -380,7 +380,7 @@ namespace Slangc {
         if (indicesCount == 1) {
             auto arrLoad = context.builder->CreateLoad(getIRType(array, context), var);
             context.builder->CreateCall(context.freeFunc, arrLoad);
-            context.builder->CreateStore(Constant::getNullValue(getIRType(array->type, context)), var);
+            context.builder->CreateStore(Constant::getNullValue(var->getType()), var);
             return;
         }
         std::vector<Value *> sizes;
@@ -647,6 +647,7 @@ namespace Slangc {
         return nullptr;
     }
 
+    // don't use this
     void cleanupCurrentScope(CodeGenContext &context, std::vector<ErrorMessage> &errors) {
         auto block = context.blocks.back();
         for (auto&& local : block->locals) {
@@ -670,7 +671,7 @@ namespace Slangc {
         if (!Context::isBuiltInType(type)) {
             auto arg = context.builder->CreateLoad(getIRType(type, context), var);
             // make sure arg is not null
-            auto cmp = context.builder->CreateICmpNE(arg, Constant::getNullValue(getIRType(type, context)));
+            /*auto cmp = context.builder->CreateICmpNE(arg, Constant::getNullValue(getIRType(type, context)));
             auto block = context.builder->GetInsertBlock();
             auto func = block->getParent();
             auto thenBlock = BasicBlock::Create(*context.llvmContext, "then", func);
@@ -678,14 +679,14 @@ namespace Slangc {
             auto endBlock = BasicBlock::Create(*context.llvmContext, "end", func);
             context.builder->CreateCondBr(cmp, thenBlock, elseBlock);
             context.pushBlock(thenBlock);
-            context.builder->SetInsertPoint(thenBlock);
+            context.builder->SetInsertPoint(thenBlock);*/
 
-            auto destructor = context.module->getFunction(type + "._default_destructor");
-            if (destructor) context.builder->CreateCall(destructor, arg);
+            // auto destructor = context.module->getFunction(type + "._default_destructor");
+            // if (destructor) context.builder->CreateCall(destructor, arg);
             context.builder->CreateCall(context.freeFunc, arg);
             context.builder->CreateStore(Constant::getNullValue(getIRType(type, context)), var);
 
-            context.builder->CreateBr(endBlock);
+            /*context.builder->CreateBr(endBlock);
             context.popBlock();
 
             context.pushBlock(elseBlock);
@@ -693,7 +694,7 @@ namespace Slangc {
             context.builder->CreateBr(endBlock);
             context.popBlock();
 
-            context.builder->SetInsertPoint(endBlock);
+            context.builder->SetInsertPoint(endBlock);*/
         }
     }
 }

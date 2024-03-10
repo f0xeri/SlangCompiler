@@ -226,7 +226,10 @@ namespace Slangc::Check {
     }
 
     bool checkStmt(const ReturnStatementPtr &stmt, Context &context, std::vector<ErrorMessage> &errors) {
-        auto result = checkExpr(stmt->expr, context, errors);
+        bool result = true;
+        if (!(std::holds_alternative<TypeExprPtr>(stmt->expr) && std::get<TypeExprPtr>(stmt->expr)->type == "void")) {
+            result = checkExpr(stmt->expr, context, errors);
+        }
         if (!result) return result;
         auto type = getExprType(stmt->expr, context, errors).value();
         context.currFuncReturnTypes.emplace_back(type, stmt->loc);

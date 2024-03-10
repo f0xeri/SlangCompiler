@@ -429,10 +429,10 @@ namespace Slangc {
 
     auto DeleteStmtNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
-        context.loadValue = true;    // TODO: not sure if it's correct
+        context.loadValue = false;    // TODO: not sure if it's correct
         auto var = processNode(expr, context, errors);
         context.loadValue = false;
-        // call destructor
+
         auto type = getExprType(expr, context.context, errors).value();
         if (auto typeExpr = std::get_if<TypeExprPtr>(&type)) {
             cleanupVar(typeExpr->get()->type, var, context, errors);
@@ -442,9 +442,9 @@ namespace Slangc {
             return var;
         }
         else {
-            // TODO: check if it's correct and how we can set var to null
-            return context.builder->CreateCall(context.freeFunc, var);
-            //return context.builder->CreateStore(Constant::getNullValue(var->getType()), var);
+            context.builder->CreateCall(context.freeFunc, var);
+            auto notLoadedVar = processNode(expr, context, errors);
+            return context.builder->CreateStore(Constant::getNullValue(notLoadedVar->getType()), notLoadedVar);
         }
     }
 
@@ -467,14 +467,14 @@ namespace Slangc {
         auto rightVal = processNode(right, context, errors);
         context.refferencing = false;
         // if right is new, clean up left
-        if (auto newExpr = std::get_if<NewExprPtr>(&right)) {
+        /*if (auto newExpr = std::get_if<NewExprPtr>(&right)) {
             if (auto arr = std::get_if<ArrayExprPtr>(&newExpr->get()->type)) {
                 createArrayFree(*arr, leftVal, context, errors);
             }
             else if (auto typeExpr = std::get_if<TypeExprPtr>(&newExpr->get()->type)) {
                 cleanupVar(typeExpr->get()->type, leftVal, context, errors);
             }
-        }
+        }*/
         context.currentFuncSignature = tempSig;
         context.loadValue = false;
         if (ltype != rightVal->getType()) {
@@ -493,6 +493,8 @@ namespace Slangc {
 
     auto ReturnStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
+        if (std::holds_alternative<TypeExprPtr>(expr) && std::get<TypeExprPtr>(expr)->type == "void")
+            return context.builder->CreateRetVoid();
         context.loadValue = true;
         context.refferencing = true;
         auto type = getExprType(expr, context.context, errors).value();
@@ -500,7 +502,7 @@ namespace Slangc {
         context.refferencing = false;
         context.loadValue = false;
         val = typeCast(val, context.currentReturnType, context, errors, getExprLoc(expr));
-        cleanupCurrentScope(context, errors);
+        // cleanupCurrentScope(context, errors);
         return context.builder->CreateRet(val);
     }
 
@@ -848,7 +850,7 @@ namespace Slangc {
         }
         context.currentReturnType = nullptr;
         if (!hasReturn) {
-            cleanupCurrentScope(context, errors);
+            // cleanupCurrentScope(context, errors);
         }
         if (!isFunction) context.builder->CreateRetVoid();
         else {

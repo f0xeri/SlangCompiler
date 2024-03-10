@@ -91,6 +91,7 @@ module StdString
         public method init(String this)(in array[] character str)
             //delete this.arrayOfChars;
             variable-integer capacity := strlen(str);
+            delete this.arrayOfChars;
             let this.arrayOfChars := new array[capacity + 1] character;
             let this.arrayOfChars := strcpy(this.arrayOfChars, str);
             //let this.capacity := capacity;
@@ -104,7 +105,7 @@ module StdString
             variable-array[totalLength + 1] character newCharArray;
             let newCharArray := strcpy(newCharArray, this.arrayOfChars);
             let newCharArray := strcat(newCharArray, str);
-
+            delete this.arrayOfChars;
             let this.arrayOfChars := new array[totalLength + 1] character;
             let this.arrayOfChars := strcpy(this.arrayOfChars, newCharArray);
 
@@ -221,6 +222,7 @@ module StdString
                 let j := j + 1;
             end while;
             let newCharArray[j] := "\0";
+            delete this.arrayOfChars;
             let this.arrayOfChars := new array[newLength + 1] character;
             let this.arrayOfChars := strcpy(this.arrayOfChars, newCharArray);
             let this.length := newLength;
@@ -287,6 +289,7 @@ module StdString
                 let j := j + 1;
             end while;
             let newCharArray[j] := "\0";
+            delete this.arrayOfChars;
             let this.arrayOfChars := new array[newLength + 2] character;
             let this.arrayOfChars := strcpy(this.arrayOfChars, newCharArray);
             let this.length := newLength;

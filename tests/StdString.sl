@@ -108,7 +108,7 @@ module StdString
             delete this.arrayOfChars;
             let this.arrayOfChars := new array[totalLength + 1] character;
             let this.arrayOfChars := strcpy(this.arrayOfChars, newCharArray);
-
+            delete newCharArray;
             //let this.capacity := totalLength;
             let this.length := totalLength;
         end concat;
@@ -225,6 +225,7 @@ module StdString
             delete this.arrayOfChars;
             let this.arrayOfChars := new array[newLength + 1] character;
             let this.arrayOfChars := strcpy(this.arrayOfChars, newCharArray);
+            delete newCharArray;
             let this.length := newLength;
             return this;
         end insert;
@@ -292,6 +293,7 @@ module StdString
             delete this.arrayOfChars;
             let this.arrayOfChars := new array[newLength + 2] character;
             let this.arrayOfChars := strcpy(this.arrayOfChars, newCharArray);
+            delete newCharArray;
             let this.length := newLength;
             return this;
         end replaceAll;
@@ -388,6 +390,7 @@ module StdString
         variable-integer finalSize := ipartSize + symbolsAfterPoint + 1;
         variable-array[finalSize] character str;
         let str := strcpy(str, intPartStr);
+        delete intPartStr;
         variable-integer i := 0;
         let tempFpart := fpart;
         if (symbolsAfterPoint > 0) then

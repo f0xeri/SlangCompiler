@@ -71,7 +71,7 @@ namespace Slangc {
         LoadInst* currentTypeLoad = nullptr;
         std::optional<FuncExprPtr> currentFuncSignature = std::nullopt;
         Type* currentReturnType = nullptr;
-        bool isReturning = false;
+        bool refferencing = false;
         bool loadValue = false;
         bool currentDeclImported = false;
         bool debug = true;
@@ -268,6 +268,7 @@ namespace Slangc {
     std::string getMangledFuncName(const FuncExprPtr& funcExpr);
     Function* getFuncFromExpr(const DeclPtrVariant& funcExpr, CodeGenContext &context);
     void cleanupCurrentScope(CodeGenContext &context, std::vector<ErrorMessage> &errors);
+    void cleanupVar(const std::string& type, Value* var, CodeGenContext &context, std::vector<ErrorMessage> &errors);
 
 }
 

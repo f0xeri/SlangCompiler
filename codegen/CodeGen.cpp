@@ -34,7 +34,14 @@ namespace Slangc {
 
     auto StringExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
-        return context.builder->CreateGlobalStringPtr(value, "", 0, context.module.get());
+        auto str = context.builder->CreateGlobalStringPtr(value, "", 0, context.module.get());
+        auto size = ConstantInt::get(Type::getInt32Ty(*context.llvmContext), value.size());
+        auto charPtr = PointerType::get(Type::getInt8Ty(*context.llvmContext), 0);
+        auto buffer = context.builder->CreateMalloc(Type::getInt32Ty(*context.llvmContext), charPtr, size, nullptr, context.mallocFunc);
+        FunctionType *strcpyType = FunctionType::get(charPtr, {charPtr, charPtr}, false);
+        auto strcpyFunc = context.module->getOrInsertFunction("strcpy", strcpyType);
+        auto call = context.builder->CreateCall(strcpyFunc, {buffer, str});
+        return buffer;
     }
 
     auto FormattedStringExprNode::codegen(Slangc::CodeGenContext &context, std::vector<ErrorMessage> &errors) -> llvm::Value * {
@@ -107,7 +114,7 @@ namespace Slangc {
             args.push_back(val);
             argTypes.push_back(val->getType());
         }
-        formatString = context.builder->CreateGlobalStringPtr(fmtString);
+        formatString = context.builder->CreateGlobalStringPtr(fmtString, "", 0, context.module.get());
         args.insert(args.begin(), formatString);
         args.insert(args.begin(), ConstantInt::get(Type::getInt64Ty(*context.llvmContext), 0));
         args.insert(args.begin(), ConstantPointerNull::get(PointerType::get(Type::getInt8Ty(*context.llvmContext), 0)));
@@ -150,7 +157,7 @@ namespace Slangc {
         bool isFunc = false;
 
         if (auto localVar = context.localsDeclsLookup(name)) {
-            if (context.isReturning) {
+            if (context.refferencing) {
                 context.setReferenced(name, true);
             }
             declType = getDeclType(localVar.value(), context.context, errors);
@@ -428,13 +435,7 @@ namespace Slangc {
         // call destructor
         auto type = getExprType(expr, context.context, errors).value();
         if (auto typeExpr = std::get_if<TypeExprPtr>(&type)) {
-            if (!Context::isBuiltInType(typeExpr->get()->type)) {
-                auto arg = context.builder->CreateLoad(getIRType(typeExpr->get()->type, context), var);
-                auto destructor = context.module->getFunction(typeExpr->get()->type + "._default_destructor");
-                if (destructor) context.builder->CreateCall(destructor, arg);
-                context.builder->CreateCall(context.freeFunc, arg);
-                context.builder->CreateStore(Constant::getNullValue(getIRType(typeExpr->get()->type, context)), var);
-            }
+            cleanupVar(typeExpr->get()->type, var, context, errors);
         }
         else if (auto arr = std::get_if<ArrayExprPtr>(&type)) {
             createArrayFree(*arr, var, context, errors);
@@ -462,20 +463,16 @@ namespace Slangc {
             context.loadValue = false;
             context.currentFuncSignature = std::get<FuncExprPtr>(getExprType(left, context.context, errors).value());
         }
+        context.refferencing = true;
         auto rightVal = processNode(right, context, errors);
+        context.refferencing = false;
         // if right is new, clean up left
         if (auto newExpr = std::get_if<NewExprPtr>(&right)) {
             if (auto arr = std::get_if<ArrayExprPtr>(&newExpr->get()->type)) {
                 createArrayFree(*arr, leftVal, context, errors);
             }
             else if (auto typeExpr = std::get_if<TypeExprPtr>(&newExpr->get()->type)) {
-                if (!Context::isBuiltInType(typeExpr->get()->type)) {
-                    auto arg = context.builder->CreateLoad(rtype, leftVal);
-                    auto destructor = context.module->getFunction(typeExpr->get()->type + "._destructor");
-                    if (destructor) context.builder->CreateCall(destructor, arg);
-                    context.builder->CreateCall(context.freeFunc, arg);
-                    context.builder->CreateStore(Constant::getNullValue(rtype), leftVal);
-                }
+                cleanupVar(typeExpr->get()->type, leftVal, context, errors);
             }
         }
         context.currentFuncSignature = tempSig;
@@ -497,10 +494,10 @@ namespace Slangc {
     auto ReturnStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         context.loadValue = true;
-        context.isReturning = true;
+        context.refferencing = true;
         auto type = getExprType(expr, context.context, errors).value();
         auto val = processNode(expr, context, errors);
-        context.isReturning = false;
+        context.refferencing = false;
         context.loadValue = false;
         val = typeCast(val, context.currentReturnType, context, errors, getExprLoc(expr));
         cleanupCurrentScope(context, errors);
@@ -611,12 +608,13 @@ namespace Slangc {
         Value* var = nullptr;
         Value* rightVal = nullptr;
         if (!isGlobal) {
-            std::cout << name << std::endl;
             if (context.debug) context.debugBuilder->emitLocation(loc);
             var = context.builder->CreateAlloca(type, nullptr, name);
             if (expr.has_value()) {
                 context.loadValue = true;
+                context.refferencing = true;
                 rightVal = processNode(expr.value(), context, errors);
+                context.refferencing = false;
                 context.loadValue = false;
                 // TODO: do type cast
                 if (rightVal->getType() != type) {
@@ -747,9 +745,12 @@ namespace Slangc {
             }
             if (assignExpr.has_value()) {
                 context.loadValue = true;
+                context.refferencing = true;
                 auto assignVal = processNode(assignExpr.value(), context, errors);
+                context.refferencing = false;
                 context.loadValue = false;
                 context.builder->CreateStore(assignVal, var);
+                //context.referenced()[name] = true;  // if string literal assigned, we should not try to clear this variable
             }
             else createArrayMalloc(expr, var, context, errors);
         }
@@ -760,29 +761,26 @@ namespace Slangc {
             global->setDSOLocal(true);
             if (isExtern) global->setLinkage(GlobalValue::ExternalLinkage);
             if (!isExtern) {
+                global->setInitializer(Constant::getNullValue(type));
+                auto globalCtorFuncCallee = context.module->getOrInsertFunction(name + "._global_constructor", FunctionType::get(Type::getVoidTy(*context.llvmContext), false));
+                auto globalCtorFunc = context.module->getFunction(name + "._global_constructor");
+                auto block = BasicBlock::Create(*context.llvmContext, "entry", globalCtorFunc);
+                context.pushBlock(block);
+                context.builder->SetInsertPoint(block);
+                getOrCreateSanitizerCtorAndInitFunctions(
+                        *context.module, context.context.moduleName + "__GLOBAL__" + name,
+                        name + "._global_constructor", {}, {},
+                        [&](Function *Ctor, FunctionCallee) { appendToGlobalCtors(*context.module, Ctor, 65535); });
+
                 if (assignExpr.has_value()) {
                     context.loadValue = true;
                     auto assignVal = processNode(assignExpr.value(), context, errors);
                     context.loadValue = false;
-                    global->setInitializer(dyn_cast<Constant>(assignVal));
+                    context.builder->CreateStore(assignVal, global);
                 }
-                else {
-                    global->setInitializer(Constant::getNullValue(type));
-
-                    auto globalCtorFuncCallee = context.module->getOrInsertFunction(name + "._global_constructor", FunctionType::get(Type::getVoidTy(*context.llvmContext), false));
-                    auto globalCtorFunc = context.module->getFunction(name + "._global_constructor");
-                    auto block = BasicBlock::Create(*context.llvmContext, "entry", globalCtorFunc);
-                    context.pushBlock(block);
-                    context.builder->SetInsertPoint(block);
-                    getOrCreateSanitizerCtorAndInitFunctions(
-                            *context.module, context.context.moduleName + "__GLOBAL__" + name,
-                            name + "._global_constructor", {}, {},
-                            [&](Function *Ctor, FunctionCallee) { appendToGlobalCtors(*context.module, Ctor, 65535); });
-
-                    createArrayMalloc(expr, global, context, errors);
-                    context.builder->CreateRetVoid();
-                    context.popBlock();
-                }
+                else createArrayMalloc(expr, global, context, errors);
+                context.builder->CreateRetVoid();
+                context.popBlock();
             }
             context.globals()[name] = global;
             context.globalsDecls()[name] = shared_from_this();
@@ -878,7 +876,7 @@ namespace Slangc {
         auto type = getIRType(typeExpr.type, context);
         Value* rightVal = nullptr;
         auto elementPtr = context.builder->CreateStructGEP(context.allocatedClasses[typeName.type], context.currentTypeLoad, index, typeName.type + "." + name);
-        if (!Context::isBuiltInType(typeExpr.type)) {
+        if (!Context::isBuiltInType(typeExpr.type) && !(expr.has_value() && std::holds_alternative<NilExprPtr>(expr.value()))) {
             auto malloc = createMalloc(typeExpr.type, elementPtr, context);
             // calling a constructor can cause an infinite recursion (A calls constr of B, B calls constr of A...)
             // TODO: make calling of constructor implicit, like variable-A a = new A;

@@ -2,6 +2,7 @@
 // Created by user on 05.11.2023.
 //
 
+#include <iostream>
 #include "Check.hpp"
 
 namespace Slangc::Check {
@@ -58,7 +59,9 @@ namespace Slangc::Check {
             if (!checkExpr(decl->expr.value(), context, errors)) {
                 return false;
             }
-            auto exprType = std::get<TypeExprPtr>(getExprType(decl->expr.value(), context, errors).value())->type;
+            // TODO: check why result is not TypeExprPtr
+            // auto exprType = std::get<TypeExprPtr>(getExprType(decl->expr.value(), context, errors).value())->type;
+            auto exprType = typeToString(getExprType(decl->expr.value(), context, errors).value());
             if (exprType != decl->typeExpr.type) {
                 if (!Context::isCastable(exprType, decl->typeExpr.type, context)) {
                     errors.emplace_back(context.filename, "Type mismatch: cannot assign '" + exprType + "' to '" + decl->typeExpr.type + "'.", decl->loc, false, false);

@@ -73,6 +73,26 @@ namespace Slangc::Check {
         context.insert(stmt->name, stmt);
         if (stmt->assignExpr.has_value())
             result &= checkExpr(stmt->assignExpr.value(), context, errors);
+
+        if (stmt->assignExpr.has_value() && result) {
+            auto leftType = getDeclType(stmt, context, errors).value();
+            if (auto nilExpr = std::get_if<NilExprPtr>(&stmt->assignExpr.value())) {
+                nilExpr->get()->type = leftType;
+            }
+            if (!checkExpr(stmt->assignExpr.value(), context, errors)) {
+                return false;
+            }
+            auto exprType = typeToString(getExprType(stmt->assignExpr.value(), context, errors).value());
+            auto arrType = typeToString(stmt->getType(context, errors).value());
+            if (exprType != arrType) {
+                errors.emplace_back(context.filename, "Type mismatch: cannot assign '" + exprType + "' to '" + arrType + "'.", stmt->loc, false, false);
+                result = false;
+            }
+            if (!isConstExpr(stmt->assignExpr.value()) && stmt->isGlobal) {
+                errors.emplace_back(context.filename, "Global variable '" + stmt->name + "' can be initialized only with constant expression.", stmt->loc, false, false);
+                result = false;
+            }
+        }
         return result;
     }
 
@@ -88,7 +108,13 @@ namespace Slangc::Check {
             result &= checkExpr(stmt->assignExpr.value(), context, errors);
             if (result) {
                 auto leftType = stmt->expr;
+
+                if (auto nilExpr = std::get_if<NilExprPtr>(&stmt->assignExpr.value())) {
+                    nilExpr->get()->type = leftType;
+                    return result;
+                }
                 auto rightType = getExprType(stmt->assignExpr.value(), context, errors).value();
+
                 // searching for overloaded function
                 if (auto varExpr = std::get_if<VarExprPtr>(&stmt->assignExpr.value())) {
                     if (auto func = context.symbolTable.lookupFunc(varExpr->get()->name, stmt->expr, context)) {

@@ -27,6 +27,26 @@ namespace Slangc::Check {
             }
         }
         context.insert(decl->name, decl);
+
+        if (decl->assignExpr.has_value())
+            result &= checkExpr(decl->assignExpr.value(), context, errors);
+
+        if (decl->assignExpr.has_value() && result) {
+            auto leftType = getDeclType(decl, context, errors).value();
+            if (auto nilExpr = std::get_if<NilExprPtr>(&decl->assignExpr.value())) {
+                nilExpr->get()->type = leftType;
+            }
+            if (!checkExpr(decl->assignExpr.value(), context, errors)) {
+                return false;
+            }
+            auto exprType = typeToString(getExprType(decl->assignExpr.value(), context, errors).value());
+            auto arrType = typeToString(decl->getType(context, errors).value());
+            if (exprType != arrType) {
+                errors.emplace_back(context.filename, "Type mismatch: cannot assign '" + exprType + "' to '" + arrType + "'.", decl->loc, false, false);
+                result = false;
+            }
+        }
+
         return result;
     }
 
@@ -90,7 +110,13 @@ namespace Slangc::Check {
             result &= checkExpr(decl->assignExpr.value(), context, errors);
             if (result) {
                 auto leftType = decl->expr;
+
+                if (auto nilExpr = std::get_if<NilExprPtr>(&decl->assignExpr.value())) {
+                    nilExpr->get()->type = leftType;
+                    return result;
+                }
                 auto rightType = getExprType(decl->assignExpr.value(), context, errors).value();
+
                 // searching for overloaded function
                 if (auto varExpr = std::get_if<VarExprPtr>(&decl->assignExpr.value())) {
                     if (auto func = context.symbolTable.lookupFunc(varExpr->get()->name, decl->expr, context)) {

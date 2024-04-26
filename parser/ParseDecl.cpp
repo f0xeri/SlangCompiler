@@ -371,7 +371,7 @@ namespace Slangc {
         }
         bool vtableRequired = false;
         size_t vtableIndex = 0;
-        while (token->type != TokenType::End) {
+        while (token->type != TokenType::End && token->type != TokenType::EndOfFile) {
             consume(TokenType::VisibilityType);
             if (token->type == TokenType::Field) {
                 auto field = parseFieldDecl(mangledName, fieldIndex);

@@ -155,7 +155,7 @@ namespace Slangc {
         }
 
         static auto oneOfDefaultTypes(std::string_view name) -> bool {
-            return (name == "integer" || name == "float" || name == "real" || name == "boolean" || name == "character");
+            return (name == "int" || name == "float" || name == "real" || name == "bool" || name == "char");
         }
     };
 

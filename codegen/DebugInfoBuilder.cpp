@@ -13,7 +13,7 @@ llvm::DIType *Slangc::DebugInfoBuilder::createType(Slangc::TypeDecStatementNode 
     uint64_t index = 0;
     if (type->vtableRequired && type->parentTypeName == "Object") {
         // vtable type
-        auto vtableType = debugBuilder->createSubroutineType(debugBuilder->getOrCreateTypeArray({typeCache["integer"]}));
+        auto vtableType = debugBuilder->createSubroutineType(debugBuilder->getOrCreateTypeArray({typeCache["int"]}));
         members.push_back(debugBuilder->createMemberType(
                 compileUnit,
                 "vptr_" + type->name,
@@ -109,11 +109,11 @@ Slangc::DebugInfoBuilder::DebugInfoBuilder(const llvm::DataLayout &dataLayout, s
             "",
             0);
 
-    typeCache["integer"] = debugBuilder->createBasicType("integer", 32, llvm::dwarf::DW_ATE_signed);
+    typeCache["int"] = debugBuilder->createBasicType("int", 32, llvm::dwarf::DW_ATE_signed);
     typeCache["float"] = debugBuilder->createBasicType("float", 32, llvm::dwarf::DW_ATE_float);
     typeCache["real"] = debugBuilder->createBasicType("real", 64, llvm::dwarf::DW_ATE_float);
-    typeCache["boolean"] = debugBuilder->createBasicType("boolean", 1, llvm::dwarf::DW_ATE_boolean);
-    typeCache["character"] = debugBuilder->createBasicType("character", 8, llvm::dwarf::DW_ATE_signed_char);
+    typeCache["bool"] = debugBuilder->createBasicType("bool", 1, llvm::dwarf::DW_ATE_boolean);
+    typeCache["char"] = debugBuilder->createBasicType("char", 8, llvm::dwarf::DW_ATE_signed_char);
     typeCache["void"] = debugBuilder->createBasicType("void", 0, llvm::dwarf::DW_ATE_signed);
 }
 
@@ -150,7 +150,7 @@ llvm::DISubprogram *Slangc::DebugInfoBuilder::createMainFunction(Slangc::CodeGen
             "main",
             file,
             0,
-            debugBuilder->createSubroutineType(debugBuilder->getOrCreateTypeArray({typeCache["integer"]})),
+            debugBuilder->createSubroutineType(debugBuilder->getOrCreateTypeArray({typeCache["int"]})),
             0,
             llvm::DINode::FlagPublic,
             llvm::DISubprogram::SPFlagDefinition);

@@ -42,15 +42,15 @@ namespace Slangc {
     }
 
     Type *getIRType(const std::string &type, CodeGenContext &context) {
-        if (type == "integer")
+        if (type == "int")
             return Type::getInt32Ty(*context.llvmContext);
         if (type == "real")
             return Type::getDoubleTy(*context.llvmContext);
         if (type == "float")
             return Type::getFloatTy(*context.llvmContext);
-        if (type == "boolean")
+        if (type == "bool")
             return Type::getInt1Ty(*context.llvmContext);
-        if (type == "character")
+        if (type == "char")
             return Type::getInt8Ty(*context.llvmContext);
         if (type == "void" || type == "")
             return Type::getVoidTy(*context.llvmContext);
@@ -60,15 +60,15 @@ namespace Slangc {
     }
 
     Type *getIRPtrType(const std::string &type, CodeGenContext &context) {
-        if (type == "integer")
+        if (type == "int")
             return Type::getInt32Ty(*context.llvmContext)->getPointerTo();
         if (type == "real")
             return Type::getDoubleTy(*context.llvmContext)->getPointerTo();
         if (type == "float")
             return Type::getFloatTy(*context.llvmContext)->getPointerTo();
-        if (type == "boolean")
+        if (type == "bool")
             return Type::getInt1Ty(*context.llvmContext)->getPointerTo();
-        if (type == "character")
+        if (type == "char")
             return Type::getInt8Ty(*context.llvmContext)->getPointerTo();
         if (type == "void" || type == "")
             return context.builder->getPtrTy();
@@ -78,15 +78,15 @@ namespace Slangc {
     }
 
     Type *getIRTypeForSize(const std::string &type, CodeGenContext &context) {
-        if (type == "integer")
+        if (type == "int")
             return Type::getInt32Ty(*context.llvmContext);
         if (type == "real")
             return Type::getDoubleTy(*context.llvmContext);
         if (type == "float")
             return Type::getFloatTy(*context.llvmContext);
-        if (type == "boolean")
+        if (type == "bool")
             return Type::getInt1Ty(*context.llvmContext);
-        if (type == "character")
+        if (type == "char")
             return Type::getInt8Ty(*context.llvmContext);
         if (type == "void" || type == "")
             return Type::getVoidTy(*context.llvmContext);

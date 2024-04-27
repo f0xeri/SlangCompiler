@@ -49,6 +49,24 @@ namespace Slangc {
 #endif
 
 namespace Slangc {
+    enum class BuiltInType : uint8_t {
+        Void = 0,
+        Int,
+        Float,
+        Real,
+        Char,
+        Bool,
+    };
+
+    static const std::unordered_map<std::string_view, BuiltInType> builtInTypes = {
+            {"int",                 BuiltInType::Int},
+            {"real",                BuiltInType::Real},
+            {"float",               BuiltInType::Float},
+            {"bool",                BuiltInType::Bool},
+            {"char",                BuiltInType::Char},
+            {"void",                BuiltInType::Void}
+    };
+
     struct SourceLoc {
         SourceLoc(std::uint64_t line, std::uint64_t column) : line(line), column(column) {}
 

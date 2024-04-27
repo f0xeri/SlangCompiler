@@ -39,19 +39,22 @@ namespace Slangc {
             }
             else if (token->type == TokenType::End) {
                 advance();
-                expect({TokenType::Identifier, TokenType::While, TokenType::If});
+                expect(TokenType::Identifier);
                 auto endName = token->value;
-                if ((name == "while" && token->type == TokenType::While) ||
-                    ((name == "if" || name == "else" || name == "elseif") && token->type == TokenType::If) || name == endName) {
-                    advance();
-                }
-                else {
-                    errors.emplace_back(filename, std::string("Expected end of block " + name + ", got " + endName + "."), token->location, false, false);
+                if (token->value != moduleAST->name) {
+                    errors.emplace_back(filename,
+                                        std::string("Expected end of module " + name + ", got " + endName + "."),
+                                        token->location, false, false);
                     hasError = true;
                 }
-                //context.exitScope();
+                advance();
                 return block;
-            } else if (token->type == TokenType::EndOfFile) {
+            }
+            else if (token->type == TokenType::RBrace) {
+                advance();
+                return block;
+            }
+            else if (token->type == TokenType::EndOfFile) {
                 errors.emplace_back(filename, "Unexpected end of file.", token->location, false, false);
                 hasError = true;
                 //context.exitScope();
@@ -79,7 +82,7 @@ namespace Slangc {
         SourceLoc loc = token->location;
         std::optional<StmtPtrVariant> result = std::nullopt;
         consume(TokenType::Variable);
-        consume(TokenType::Minus);
+
         auto type = parseType();
         if (!type.has_value()) {
             errors.emplace_back(filename, "Expected typeExpr.", token->location, false, false);
@@ -125,7 +128,7 @@ namespace Slangc {
             hasError = true;
             return {};
         }
-        expect(TokenType::Then);
+        expect(TokenType::LBrace);
         std::optional<BlockStmtPtr> trueBlock = std::nullopt;
         std::optional<BlockStmtPtr> falseBlock = std::nullopt;
         auto elseIfNodes = std::vector<ElseIfStatementPtr>();
@@ -141,11 +144,13 @@ namespace Slangc {
                 hasError = true;
                 return {};
             }
-            expect(TokenType::Then);
+            expect(TokenType::LBrace);
             auto elseIfBlock = parseBlockStmt("if");
             elseIfNodes.emplace_back(create<ElseIfStatementNode>(loc, std::move(elseIfCondition.value()), std::move(elseIfBlock.value())));
         }
         if (token->type == TokenType::Else) {
+            advance();
+            expect(TokenType::LBrace);
             falseBlock = parseBlockStmt("else");
         }
         consume(TokenType::Semicolon);
@@ -156,7 +161,7 @@ namespace Slangc {
         auto loc = token->location;
         consume(TokenType::While);
         auto condition = parseExpr();
-        expect(TokenType::Repeat);
+        expect(TokenType::LBrace);
         auto block = parseBlockStmt("while");
         consume(TokenType::Semicolon);
         if (condition.has_value() && block.has_value()) {

@@ -39,8 +39,7 @@ namespace Slangc {
             else
                 importStr = currModuleDir / importStr;
             advance();
-            expect(TokenType::Semicolon);
-            advance();
+            consume(TokenType::Semicolon);
 
             if (!globalImports.contains(importStr)) {
                 globalImports.insert({importStr, nullptr});
@@ -78,55 +77,13 @@ namespace Slangc {
     auto Parser::parseType() -> std::optional<ExprPtrVariant> {
         ExprPtrVariant result;
         SourceLoc loc = token->location;
-        if (!expect({TokenType::Identifier, TokenType::Function, TokenType::Procedure})) {
+        if (!expect({TokenType::Identifier, TokenType::Function})) {
             return std::nullopt;
         }
         auto type = token->value;
         advance();
         std::optional<ExprPtrVariant> value;
-        if (type == "array") {
-            auto indicesCount = 1;
-            consume(TokenType::LBracket);
-            ExprPtrVariant size;
-            if (token->type != TokenType::RBracket) {
-                auto sizeExpr = parseExpr();
-                if (sizeExpr.has_value()) {
-                    size = sizeExpr.value();
-                }
-            }
-            else {
-                size = create<IntExprNode>(loc, 0);
-            }
-            consume(TokenType::RBracket);
-            auto arrayType = parseType();
-            if (!arrayType.has_value()) {
-                errors.emplace_back(filename, "Failed to parse array typeExpr.", token->location, false, false);
-                hasError = true;
-                return std::nullopt;
-            }
-            auto arrExpr = create<ArrayExprNode>(loc, std::nullopt, arrayType.value(), size);
-            /*while (arrayType == "array") {
-                advance();
-                indicesCount++;
-                consume(TokenType::LBracket);
-                if (token->typeExpr != TokenType::RBracket) {
-                    auto sizeExpr = parseExpr();
-                    if (sizeExpr.has_value()) {
-                        size = sizeExpr.assignExpr();
-                    }
-                }
-                else {
-                    size = create<IntExprNode>(loc, 0);
-                }
-                consume(TokenType::RBracket);
-
-                if (token->typeExpr == TokenType::Identifier && token->assignExpr != "array") {
-                    arrayType = parseTypeName().assignExpr();
-                }
-                arrExpr->values.emplace_back(createExpr<ArrayExprNode>(loc, std::vector<ExprPtrVariant>(), arrayType, size));
-            }*/
-            result = arrExpr;
-        } else if (type == "function" || type == "procedure") {
+        if (type == "function" || type == "procedure") {
             bool isFunction = type == "function";
             auto args = parseFuncParams(false);
             if (!args.has_value()) {
@@ -158,6 +115,27 @@ namespace Slangc {
                 advance();
             }
             result = createExpr<TypeExprNode>(loc, type);
+
+            std::vector<ExprPtrVariant> sizes;
+            while (token->type == TokenType::LBracket) {
+                advance();
+                ExprPtrVariant size;
+                if (token->type != TokenType::RBracket) {
+                    auto sizeExpr = parseExpr();
+                    if (sizeExpr.has_value()) {
+                        size = sizeExpr.value();
+                    }
+                }
+                consume(TokenType::RBracket);
+                sizes.push_back(std::move(size));
+            }
+            if (!sizes.empty()) {
+                ExprPtrVariant arrExpr;
+                for (auto it = sizes.rbegin(); it != sizes.rend(); ++it) {
+                    arrExpr = create<ArrayExprNode>(loc, std::nullopt, result, *it);
+                    result = arrExpr;
+                }
+            }
         }
         return result;
     }

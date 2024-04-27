@@ -6,7 +6,7 @@
 
 namespace Slangc {
     bool Context::isBuiltInType(std::string_view name) {
-        return name == "integer" || name == "float" || name == "real" || name == "boolean" || name == "character" || name == "void";
+        return builtInTypes.contains(name);
     }
 
     bool Context::isCastToLeft(const std::string& left, const std::string& right, const Context& context) {
@@ -18,9 +18,9 @@ namespace Slangc {
         static std::map<std::string, int> typeStrengthMap = {
                 {"real", 6},
                 {"float", 5},
-                {"integer", 4},
-                {"character", 3},
-                {"boolean", 2},
+                {"int", 4},
+                {"char", 3},
+                {"bool", 2},
                 {"void", 1},
                 {"nil", 1}
         };
@@ -42,8 +42,8 @@ namespace Slangc {
             }
             else return false;
         }
-        if ((from == "integer" || from == "float" || from == "real" || from == "character" || from == "boolean") &&
-            (  to == "integer" ||   to == "float" ||   to == "real" ||   to == "character" ||   to == "boolean"))
+        if ((from == "int" || from == "float" || from == "real" || from == "char" || from == "bool") &&
+            (  to == "int" ||   to == "float" ||   to == "real" ||   to == "char" ||   to == "bool"))
             return true;
         return false;
     }

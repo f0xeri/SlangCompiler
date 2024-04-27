@@ -135,8 +135,8 @@ namespace Slangc::Check {
         result &= checkExpr(stmt->condition, context, errors);
         if (result) {
             auto condType = typeToString(getExprType(stmt->condition, context, errors).value());
-            if (condType != "boolean") {
-                if (!Context::isCastable(condType, "boolean", context)) {
+            if (condType != "bool") {
+                if (!Context::isCastable(condType, "bool", context)) {
                     errors.emplace_back(context.filename, "Type mismatch: cannot use '" + condType + "' as condition.", stmt->loc, false, false);
                     result = false;
                 }
@@ -164,8 +164,8 @@ namespace Slangc::Check {
         result &= checkExpr(stmt->condition, context, errors);
         if (result) {
             auto condType = typeToString(getExprType(stmt->condition, context, errors).value());
-            if (condType != "boolean") {
-                if (!Context::isCastable(condType, "boolean", context)) {
+            if (condType != "bool") {
+                if (!Context::isCastable(condType, "bool", context)) {
                     errors.emplace_back(context.filename, "Type mismatch: cannot use '" + condType + "' as condition.", stmt->loc, false, false);
                     result = false;
                 }
@@ -185,8 +185,8 @@ namespace Slangc::Check {
         result &= checkExpr(stmt->condition, context, errors);
         if (result) {
             auto condType = typeToString(getExprType(stmt->condition, context, errors).value());
-            if (condType != "boolean") {
-                if (!Context::isCastable(condType, "boolean", context)) {
+            if (condType != "bool") {
+                if (!Context::isCastable(condType, "bool", context)) {
                     errors.emplace_back(context.filename, "Type mismatch: cannot use '" + condType + "' as condition.", stmt->loc, false, false);
                     result = false;
                 }

@@ -15,7 +15,7 @@ namespace Slangc::Check {
             auto size = std::get<ArrayExprPtr>(type)->size;
             if (checkExpr(size, context, errors)) {
                 auto sizeType = typeToString(getExprType(size, context, errors).value());
-                if (sizeType != "integer") {
+                if (sizeType != "int") {
                     errors.emplace_back(context.filename, "Array size must be of type 'integer', not '" + sizeType + "'.", expr->loc, false, false);
                     result = false;
                 }
@@ -112,13 +112,13 @@ namespace Slangc::Check {
         if (!result) return false;
         auto type = typeToString(getExprType(expr->expr, context, errors).value());
         if (expr->op == TokenType::Minus) {
-            if (type != "integer" && type != "character" && type != "float" && type != "boolean" && type != "real") {
+            if (type != "int" && type != "char" && type != "float" && type != "bool" && type != "real") {
                 errors.emplace_back(context.filename, "Cannot apply operator '-' to '" + type + "'.", expr->loc, false, false);
                 result = false;
             }
         }
         else if (expr->op == TokenType::Neg) {
-            if (type != "boolean") {
+            if (type != "bool") {
                 errors.emplace_back(context.filename, "Cannot apply operator '!' to '" + type + "'.", expr->loc, false, false);
                 result = false;
             }
@@ -173,7 +173,7 @@ namespace Slangc::Check {
         }
         if (indexType.has_value()) {
             auto typeStr = typeToString(indexType.value());
-            if (typeStr != "integer") {
+            if (typeStr != "int") {
                 errors.emplace_back(context.filename, "Index must be of type 'integer, not '" + typeStr + "'.", expr->loc, false, false);
                 result = false;
             }

@@ -82,7 +82,7 @@ namespace Slangc {
             bool charArray = false;
             if (auto arr = std::get_if<ArrayExprPtr>(&exprType)) {
                 if (auto type = std::get_if<TypeExprPtr>(&arr->get()->type)) {
-                    if (type->get()->type == "character") {
+                    if (type->get()->type == "char") {
                         charArray = true;
                     }
                 }
@@ -525,7 +525,7 @@ namespace Slangc {
         auto exprType = getExprType(expr, context.context, errors).value();
         if (auto arr = std::get_if<ArrayExprPtr>(&exprType)) {
             if (auto type = std::get_if<TypeExprPtr>(&arr->get()->type)) {
-                if (type->get()->type == "character") {
+                if (type->get()->type == "char") {
                     charArray = true;
                 }
             }
@@ -589,7 +589,7 @@ namespace Slangc {
         auto exprType = getExprType(expr, context.context, errors).value();
         if (auto arr = std::get_if<ArrayExprPtr>(&exprType)) {
             if (auto type = std::get_if<TypeExprPtr>(&arr->get()->type)) {
-                if (type->get()->type == "character") {
+                if (type->get()->type == "char") {
                     charArray = true;
                     val = context.builder->CreateLoad(PointerType::get(*context.llvmContext, 0), val);
                 }
@@ -611,13 +611,13 @@ namespace Slangc {
         else if (charArray) {
             formatStr = context.builder->CreateGlobalStringPtr(" %[^\n]s");
         }
-        else if (type == "character") {
+        else if (type == "char") {
             formatStr = context.builder->CreateGlobalStringPtr(" %c");
         }
-        else if (type == "boolean") {
+        else if (type == "bool") {
             formatStr = context.builder->CreateGlobalStringPtr("%d");
         }
-        else if (type == "integer") {
+        else if (type == "int") {
             formatStr = context.builder->CreateGlobalStringPtr("%d");
         }
         else {

@@ -8,14 +8,13 @@ namespace Slangc {
     auto Parser::parseModuleDecl() -> std::optional<ModuleDeclPtr> {
         SourceLoc loc = token->location;
         consume(TokenType::Module);
-        expect(TokenType::Identifier);
-        auto moduleName = token->value;
+        auto moduleName = consume(TokenType::Identifier).value;
         context.moduleName = moduleName;
         moduleAST = create<ModuleDeclNode>(loc, moduleName, create<BlockStmtNode>(loc, std::vector<StmtPtrVariant>()));
         advance();
-        while (token->type != TokenType::Start && token->type != TokenType::EndOfFile)
+        while (prevToken().type != TokenType::Start && prevToken().type != TokenType::EndOfFile)
         {
-            if (token->type == TokenType::Function || token->type == TokenType::Procedure || (token->type == TokenType::Extern && ((token + 1)->type == TokenType::Procedure || (token + 1)->type == TokenType::Function))) {
+            if (token->type == TokenType::Function || (token->type == TokenType::Extern && (token + 1)->type == TokenType::Function)) {
                 auto funcDecl = parseFuncDecl();
                 if (!funcDecl.has_value()) {
                     errors.emplace_back(filename, "Failed to parse function declaration.", token->location, false, false);
@@ -39,8 +38,14 @@ namespace Slangc {
                     return std::nullopt;
                 }
             }
+            else {
+                errors.emplace_back(filename, "Unexpected token. Failed to parse module declaration.", token->location, false, false);
+                hasError = true;
+                return std::nullopt;
+            }
             advance();
         }
+        --token;
         auto block = parseBlockStmt(moduleName);
         if (!block.has_value()) {
             errors.emplace_back(filename, "Failed to parse module block.", token->location, false, true);
@@ -78,7 +83,7 @@ namespace Slangc {
         }
         std::optional<DeclPtrVariant> result = std::nullopt;
         consume(TokenType::Variable);
-        consume(TokenType::Minus);
+
         auto type = parseType();
         if (!type.has_value()) {
             errors.emplace_back(filename, "Expected typeExpr.", token->location, false, false);
@@ -91,7 +96,7 @@ namespace Slangc {
         if (match(TokenType::Assign)) {
             value = parseExpr();
         }
-        expect(TokenType::Semicolon);
+        consume(TokenType::Semicolon);
 
         if (std::holds_alternative<ArrayExprPtr>(type.value())) {
             auto arrExpr = std::get<ArrayExprPtr>(type.value());
@@ -163,12 +168,7 @@ namespace Slangc {
             isExtern = true;
             advance();
         }
-        if (match(TokenType::Function)) {
-            isFunction = true;
-        }
-        else {
-            consume(TokenType::Procedure);
-        }
+        consume(TokenType::Function);
 
         std::string name = consume(TokenType::Identifier).value;
         auto params = parseFuncParams();
@@ -179,16 +179,16 @@ namespace Slangc {
         }
 
         advance();
-        ExprPtrVariant returnType;
-        if (isFunction) {
-            consume(TokenType::Colon);
-            auto returnTypeOpt = parseType();
-            if (!returnTypeOpt.has_value()) {
+        std::optional<ExprPtrVariant> returnType;
+        if (token->type == TokenType::Colon) {
+            advance();
+            returnType = parseType();
+            isFunction = true;
+            if (!returnType.has_value()) {
                 errors.emplace_back(filename, "Failed to parse function return typeExpr.", token->location, false, false);
                 hasError = true;
                 return std::nullopt;
             }
-            returnType = std::move(returnTypeOpt.value());
         }
         else {
             returnType = createExpr<TypeExprNode>(loc, "void");
@@ -200,11 +200,11 @@ namespace Slangc {
             mangledName = moduleAST->name + "." + name;
         }
 
-        auto funcExpr = create<FuncExprNode>(loc, returnType, params.value(), isFunction);
+        auto funcExpr = create<FuncExprNode>(loc, returnType.value(), params.value(), isFunction);
         funcDecl = createDecl<FuncDecStatementNode>(loc, mangledName, funcExpr, std::nullopt, isPrivate, isFunction, isExtern);
         context.symbolTable.insert(mangledName, moduleAST->name, funcDecl, isPrivate, false);
 
-        --token;
+        expect(TokenType::LBrace);
         auto block = parseBlockStmt(name, &params.value());
         if (!block.has_value()) {
             errors.emplace_back(filename, "Failed to parse function block.", token->location, false, false);
@@ -215,11 +215,8 @@ namespace Slangc {
             auto func = std::get<FuncDecStatementPtr>(funcDecl);
             func->block = std::move(block.value());
         //}
-        if (token->type != TokenType::Semicolon) {
-            errors.emplace_back(filename, "Expected semicolon after function declaration.", token->location, false, false);
-            hasError = true;
-            return std::nullopt;
-        }
+        consume(TokenType::Semicolon);
+
         return funcDecl;
     }
 
@@ -228,8 +225,8 @@ namespace Slangc {
         std::optional<DeclPtrVariant> result = std::nullopt;
         SourceLoc loc = token->location;
         bool isPrivate = consume(TokenType::VisibilityType).value == "private";
-        consume(TokenType::Field);
-        consume(TokenType::Minus);
+        consume(TokenType::Variable);
+
         auto type = parseType();
         if (!type.has_value()) {
             errors.emplace_back(filename, "Failed to parse field typeExpr.", token->location, false, false);
@@ -323,7 +320,8 @@ namespace Slangc {
         auto funcExpr = create<FuncExprNode>(loc, returnType.value(), args.value(), isFunction);
         auto funcDecl = create<MethodDecNode>(loc, name, funcExpr, thisName, block, isPrivate, isFunction, isVirtual, vtableIndex);
         //context.insert(name, funcDecl);
-        --token;
+
+        expect(TokenType::LBrace);
         auto parsedBlock = parseBlockStmt(basicName);
         if (parsedBlock.has_value()) {
             block = std::move(parsedBlock.value());
@@ -354,15 +352,20 @@ namespace Slangc {
         if (!isExtern) {
             mangledName = moduleAST->name + "." + name;
         }
-        consume(TokenType::Inherits);
-        auto parentTypeName = parseTypeName().value();
+        std::string parentTypeName = "Object";
+        if (token->type == TokenType::Colon) {
+            advance();
+            parentTypeName = parseTypeName().value();
+            advance();
+        }
         auto classNode = createDecl<TypeDecStatementNode>(loc, mangledName, std::vector<DeclPtrVariant>{}, std::vector<MethodDecPtr>{}, parentTypeName, isPrivate, isExtern);
         //context.insert(name, classNode);
         //context.types.emplace_back(std::get<TypeDecStmtPtr>(classNode));
         uint32_t fieldIndex = 0;
         std::vector<DeclPtrVariant> fields;
         std::vector<MethodDecPtr> methods;
-        advance();
+
+        consume(TokenType::LBrace);
         // if current type is inherited from another type, add invisible parent field at 0 index
         if (parentTypeName != "Object") {
             auto parentField = createDecl<FieldVarDecNode>(loc, "", mangledName, true, fieldIndex, parentTypeName, std::nullopt);
@@ -371,9 +374,9 @@ namespace Slangc {
         }
         bool vtableRequired = false;
         size_t vtableIndex = 0;
-        while (token->type != TokenType::End && token->type != TokenType::EndOfFile) {
+        while (token->type != TokenType::RBrace && token->type != TokenType::EndOfFile) {
             consume(TokenType::VisibilityType);
-            if (token->type == TokenType::Field) {
+            if (token->type == TokenType::Variable) {
                 auto field = parseFieldDecl(mangledName, fieldIndex);
                 ++fieldIndex;
                 if (!field.has_value()) {
@@ -397,19 +400,15 @@ namespace Slangc {
             }
         }
         advance();
+        consume(TokenType::Semicolon);
         //context.exitScope();
-        if (token->type == TokenType::Identifier && token->value == name) {
-            std::get<TypeDecStmtPtr>(classNode)->fields = std::move(fields);
-            std::get<TypeDecStmtPtr>(classNode)->methods = std::move(methods);
-        }
-        else {
-            errors.emplace_back(filename, std::string("Expected end of " + name + ", got " + token->value + "."), token->location, false, false);
-            hasError = true;
-            return std::nullopt;
-        }
+
+        std::get<TypeDecStmtPtr>(classNode)->fields = std::move(fields);
+        std::get<TypeDecStmtPtr>(classNode)->methods = std::move(methods);
+
         std::get<TypeDecStmtPtr>(classNode)->vtableRequired = vtableRequired;
         //context.types[mangledName] = std::get<TypeDecStmtPtr>(classNode);
         context.symbolTable.insert(mangledName, moduleAST->name, classNode, isPrivate, false);
         return classNode;
     }
-} // Slangc
+}

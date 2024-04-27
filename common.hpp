@@ -59,13 +59,28 @@ namespace Slangc {
     };
 
     static const std::unordered_map<std::string_view, BuiltInType> builtInTypes = {
-            {"int",                 BuiltInType::Int},
-            {"real",                BuiltInType::Real},
-            {"float",               BuiltInType::Float},
-            {"bool",                BuiltInType::Bool},
-            {"char",                BuiltInType::Char},
-            {"void",                BuiltInType::Void}
+            {"int",         BuiltInType::Int},
+            {"real",        BuiltInType::Real},
+            {"float",       BuiltInType::Float},
+            {"bool",        BuiltInType::Bool},
+            {"char",        BuiltInType::Char},
+            {"void",        BuiltInType::Void}
     };
+
+    static constexpr std::string getBuiltInTypeName(BuiltInType type) {
+        switch (type) {
+            case BuiltInType::Int:      return "int";
+            case BuiltInType::Real:     return "real";
+            case BuiltInType::Float:    return "float";
+            case BuiltInType::Bool:     return "bool";
+            case BuiltInType::Char:     return "char";
+            case BuiltInType::Void:     return "void";
+        }
+    }
+
+    static bool isBuiltInNonVoid(std::string_view type) {
+        return builtInTypes.contains(type) && builtInTypes.at(type) != BuiltInType::Void;
+    }
 
     struct SourceLoc {
         SourceLoc(std::uint64_t line, std::uint64_t column) : line(line), column(column) {}

@@ -63,7 +63,7 @@ namespace Slangc {
 
         IntExprNode(SourceLoc loc, int value) : loc(loc), value(value) {};
         auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
-        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant>  { return std::make_unique<TypeExprNode>("int"); }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant>  { return std::make_unique<TypeExprNode>(getBuiltInTypeName(BuiltInType::Int)); }
     };
 
     struct FloatExprNode {
@@ -73,7 +73,7 @@ namespace Slangc {
 
         FloatExprNode(SourceLoc loc, float value) : loc(loc), value(value) {};
         auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
-        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>("float"); }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>(getBuiltInTypeName(BuiltInType::Float)); }
     };
 
     struct RealExprNode {
@@ -83,7 +83,7 @@ namespace Slangc {
 
         RealExprNode(SourceLoc loc, double value) : loc(loc), value(value) {};
         auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
-        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>("real"); }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>(getBuiltInTypeName(BuiltInType::Real)); }
     };
 
     struct CharExprNode {
@@ -93,7 +93,7 @@ namespace Slangc {
 
         CharExprNode(SourceLoc loc, char value) : loc(loc), value(value) {};
         auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
-        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>("char"); }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>(getBuiltInTypeName(BuiltInType::Char)); }
     };
 
     struct ArrayExprNode {
@@ -128,7 +128,7 @@ namespace Slangc {
         auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> {
             return std::make_unique<ArrayExprNode>(loc, std::nullopt,
-                                                   std::make_unique<TypeExprNode>("char"),
+                                                   std::make_unique<TypeExprNode>(getBuiltInTypeName(BuiltInType::Char)),
                                                    std::make_unique<IntExprNode>(loc, value.size()));
         }
     };
@@ -141,7 +141,7 @@ namespace Slangc {
         auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> {
             return std::make_unique<ArrayExprNode>(loc, std::nullopt,
-                                                   std::make_unique<TypeExprNode>("char"),
+                                                   std::make_unique<TypeExprNode>(getBuiltInTypeName(BuiltInType::Char)),
                                                    std::make_unique<IntExprNode>(loc, 0));
         }
     };
@@ -164,7 +164,7 @@ namespace Slangc {
         BooleanExprNode(SourceLoc loc, bool value) : loc(loc), value(value) {};
         auto codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> llvm::Value*;
 
-        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>("bool"); }
+        auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> { return std::make_unique<TypeExprNode>(getBuiltInTypeName(BuiltInType::Bool)); }
     };
 
     struct VarExprNode {
@@ -235,7 +235,7 @@ namespace Slangc {
         auto getType(const Context& analysis, std::vector<ErrorMessage>& errors) -> std::optional<ExprPtrVariant> {
             if (op == TokenType::Less || op == TokenType::LessOrEqual || op == TokenType::Greater || op == TokenType::GreaterOrEqual ||
                 op == TokenType::Equal || op == TokenType::NotEqual || op == TokenType::And || op == TokenType::Or) {
-                return std::make_unique<TypeExprNode>("bool");
+                return std::make_unique<TypeExprNode>(getBuiltInTypeName(BuiltInType::Bool));
             }
             auto leftType = typeToString(getExprType(left, analysis, errors).value());
             auto rightType = typeToString(getExprType(right, analysis, errors).value());

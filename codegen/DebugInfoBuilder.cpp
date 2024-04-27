@@ -13,7 +13,7 @@ llvm::DIType *Slangc::DebugInfoBuilder::createType(Slangc::TypeDecStatementNode 
     uint64_t index = 0;
     if (type->vtableRequired && type->parentTypeName == "Object") {
         // vtable type
-        auto vtableType = debugBuilder->createSubroutineType(debugBuilder->getOrCreateTypeArray({typeCache["int"]}));
+        auto vtableType = debugBuilder->createSubroutineType(debugBuilder->getOrCreateTypeArray({typeCache[getBuiltInTypeName(BuiltInType::Int)]}));
         members.push_back(debugBuilder->createMemberType(
                 compileUnit,
                 "vptr_" + type->name,
@@ -109,12 +109,18 @@ Slangc::DebugInfoBuilder::DebugInfoBuilder(const llvm::DataLayout &dataLayout, s
             "",
             0);
 
-    typeCache["int"] = debugBuilder->createBasicType("int", 32, llvm::dwarf::DW_ATE_signed);
-    typeCache["float"] = debugBuilder->createBasicType("float", 32, llvm::dwarf::DW_ATE_float);
-    typeCache["real"] = debugBuilder->createBasicType("real", 64, llvm::dwarf::DW_ATE_float);
-    typeCache["bool"] = debugBuilder->createBasicType("bool", 1, llvm::dwarf::DW_ATE_boolean);
-    typeCache["char"] = debugBuilder->createBasicType("char", 8, llvm::dwarf::DW_ATE_signed_char);
-    typeCache["void"] = debugBuilder->createBasicType("void", 0, llvm::dwarf::DW_ATE_signed);
+    typeCache[getBuiltInTypeName(BuiltInType::Int)] = debugBuilder->createBasicType(
+            getBuiltInTypeName(BuiltInType::Int), 32, llvm::dwarf::DW_ATE_signed);
+    typeCache[getBuiltInTypeName(BuiltInType::Float)] = debugBuilder->createBasicType(
+            getBuiltInTypeName(BuiltInType::Float), 32, llvm::dwarf::DW_ATE_float);
+    typeCache[getBuiltInTypeName(BuiltInType::Real)] = debugBuilder->createBasicType(
+            getBuiltInTypeName(BuiltInType::Real), 64, llvm::dwarf::DW_ATE_float);
+    typeCache[getBuiltInTypeName(BuiltInType::Bool)] = debugBuilder->createBasicType(
+            getBuiltInTypeName(BuiltInType::Bool), 1, llvm::dwarf::DW_ATE_boolean);
+    typeCache[getBuiltInTypeName(BuiltInType::Char)] = debugBuilder->createBasicType(
+            getBuiltInTypeName(BuiltInType::Char), 8, llvm::dwarf::DW_ATE_signed_char);
+    typeCache[getBuiltInTypeName(BuiltInType::Void)] = debugBuilder->createBasicType(
+            getBuiltInTypeName(BuiltInType::Void), 0, llvm::dwarf::DW_ATE_signed);
 }
 
 void Slangc::DebugInfoBuilder::emitLocation() {
@@ -150,7 +156,7 @@ llvm::DISubprogram *Slangc::DebugInfoBuilder::createMainFunction(Slangc::CodeGen
             "main",
             file,
             0,
-            debugBuilder->createSubroutineType(debugBuilder->getOrCreateTypeArray({typeCache["int"]})),
+            debugBuilder->createSubroutineType(debugBuilder->getOrCreateTypeArray({typeCache[getBuiltInTypeName(BuiltInType::Int)]})),
             0,
             llvm::DINode::FlagPublic,
             llvm::DISubprogram::SPFlagDefinition);

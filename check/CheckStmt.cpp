@@ -135,8 +135,8 @@ namespace Slangc::Check {
         result &= checkExpr(stmt->condition, context, errors);
         if (result) {
             auto condType = typeToString(getExprType(stmt->condition, context, errors).value());
-            if (condType != "bool") {
-                if (!Context::isCastable(condType, "bool", context)) {
+            if (condType != getBuiltInTypeName(BuiltInType::Bool)) {
+                if (!Context::isCastable(condType, getBuiltInTypeName(BuiltInType::Bool), context)) {
                     errors.emplace_back(context.filename, "Type mismatch: cannot use '" + condType + "' as condition.", stmt->loc, false, false);
                     result = false;
                 }
@@ -164,8 +164,8 @@ namespace Slangc::Check {
         result &= checkExpr(stmt->condition, context, errors);
         if (result) {
             auto condType = typeToString(getExprType(stmt->condition, context, errors).value());
-            if (condType != "bool") {
-                if (!Context::isCastable(condType, "bool", context)) {
+            if (condType != getBuiltInTypeName(BuiltInType::Bool)) {
+                if (!Context::isCastable(condType, getBuiltInTypeName(BuiltInType::Bool), context)) {
                     errors.emplace_back(context.filename, "Type mismatch: cannot use '" + condType + "' as condition.", stmt->loc, false, false);
                     result = false;
                 }
@@ -185,8 +185,8 @@ namespace Slangc::Check {
         result &= checkExpr(stmt->condition, context, errors);
         if (result) {
             auto condType = typeToString(getExprType(stmt->condition, context, errors).value());
-            if (condType != "bool") {
-                if (!Context::isCastable(condType, "bool", context)) {
+            if (condType != getBuiltInTypeName(BuiltInType::Bool)) {
+                if (!Context::isCastable(condType, getBuiltInTypeName(BuiltInType::Bool), context)) {
                     errors.emplace_back(context.filename, "Type mismatch: cannot use '" + condType + "' as condition.", stmt->loc, false, false);
                     result = false;
                 }
@@ -253,7 +253,7 @@ namespace Slangc::Check {
 
     bool checkStmt(const ReturnStatementPtr &stmt, Context &context, std::vector<ErrorMessage> &errors) {
         bool result = true;
-        if (!(std::holds_alternative<TypeExprPtr>(stmt->expr) && std::get<TypeExprPtr>(stmt->expr)->type == "void")) {
+        if (!(std::holds_alternative<TypeExprPtr>(stmt->expr) && std::get<TypeExprPtr>(stmt->expr)->type == getBuiltInTypeName(BuiltInType::Void))) {
             result = checkExpr(stmt->expr, context, errors);
         }
         if (!result) return result;

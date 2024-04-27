@@ -153,10 +153,6 @@ namespace Slangc {
             advance();
             return tok;
         }
-
-        static auto oneOfDefaultTypes(std::string_view name) -> bool {
-            return (name == "int" || name == "float" || name == "real" || name == "bool" || name == "char");
-        }
     };
 
 } // Slangc

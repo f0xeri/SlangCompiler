@@ -82,7 +82,7 @@ namespace Slangc {
             bool charArray = false;
             if (auto arr = std::get_if<ArrayExprPtr>(&exprType)) {
                 if (auto type = std::get_if<TypeExprPtr>(&arr->get()->type)) {
-                    if (type->get()->type == "char") {
+                    if (type->get()->type == getBuiltInTypeName(BuiltInType::Char)) {
                         charArray = true;
                     }
                 }
@@ -366,7 +366,7 @@ namespace Slangc {
             }
             auto exprType = getExprType(currCallArg, context.context, errors).value();
             auto isOutVar = currExpectedArg->parameterType == Out || currExpectedArg->parameterType == Var;
-            bool isVoid = std::holds_alternative<TypeExprPtr>(currExpectedArg->type) && std::get<TypeExprPtr>(currExpectedArg->type)->type == "void";
+            bool isVoid = std::holds_alternative<TypeExprPtr>(currExpectedArg->type) && std::get<TypeExprPtr>(currExpectedArg->type)->type == getBuiltInTypeName(BuiltInType::Void);
 
             bool isArgCustomType = std::holds_alternative<TypeExprPtr>(exprType) && context.allocatedClassesDecls.contains(std::get<TypeExprPtr>(exprType)->type);
             context.loadValue = !isOutVar;
@@ -504,7 +504,7 @@ namespace Slangc {
 
     auto ReturnStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
-        if (std::holds_alternative<TypeExprPtr>(expr) && std::get<TypeExprPtr>(expr)->type == "void")
+        if (std::holds_alternative<TypeExprPtr>(expr) && std::get<TypeExprPtr>(expr)->type == getBuiltInTypeName(BuiltInType::Void))
             return context.builder->CreateRetVoid();
         context.loadValue = true;
         context.referencing = true;
@@ -525,7 +525,7 @@ namespace Slangc {
         auto exprType = getExprType(expr, context.context, errors).value();
         if (auto arr = std::get_if<ArrayExprPtr>(&exprType)) {
             if (auto type = std::get_if<TypeExprPtr>(&arr->get()->type)) {
-                if (type->get()->type == "char") {
+                if (type->get()->type == getBuiltInTypeName(BuiltInType::Char)) {
                     charArray = true;
                 }
             }
@@ -589,7 +589,7 @@ namespace Slangc {
         auto exprType = getExprType(expr, context.context, errors).value();
         if (auto arr = std::get_if<ArrayExprPtr>(&exprType)) {
             if (auto type = std::get_if<TypeExprPtr>(&arr->get()->type)) {
-                if (type->get()->type == "char") {
+                if (type->get()->type == getBuiltInTypeName(BuiltInType::Char)) {
                     charArray = true;
                     val = context.builder->CreateLoad(PointerType::get(*context.llvmContext, 0), val);
                 }
@@ -602,22 +602,22 @@ namespace Slangc {
 
         std::vector<Value*> printArgs;
         Value *formatStr;
-        if (type == "real") {
+        if (type == getBuiltInTypeName(BuiltInType::Real)) {
             formatStr = context.builder->CreateGlobalStringPtr("%lf");
         }
-        else if (type == "float") {
+        else if (type == getBuiltInTypeName(BuiltInType::Float)) {
             formatStr = context.builder->CreateGlobalStringPtr("%f");
         }
         else if (charArray) {
             formatStr = context.builder->CreateGlobalStringPtr(" %[^\n]s");
         }
-        else if (type == "char") {
+        else if (type == getBuiltInTypeName(BuiltInType::Char)) {
             formatStr = context.builder->CreateGlobalStringPtr(" %c");
         }
-        else if (type == "bool") {
+        else if (type == getBuiltInTypeName(BuiltInType::Bool)) {
             formatStr = context.builder->CreateGlobalStringPtr("%d");
         }
-        else if (type == "int") {
+        else if (type == getBuiltInTypeName(BuiltInType::Int)) {
             formatStr = context.builder->CreateGlobalStringPtr("%d");
         }
         else {
@@ -630,7 +630,7 @@ namespace Slangc {
 
     auto VarDecStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
         auto type = getIRType(typeExpr.type, context);
-        type = (Context::isBuiltInType(typeExpr.type) && typeExpr.type != "void") ? type : getIRPtrType(typeExpr.type, context);
+        type = (Context::isBuiltInType(typeExpr.type) && typeExpr.type != getBuiltInTypeName(BuiltInType::Void)) ? type : getIRPtrType(typeExpr.type, context);
         Value* var = nullptr;
         Value* rightVal = nullptr;
         if (!isGlobal) {

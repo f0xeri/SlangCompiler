@@ -15,7 +15,7 @@ namespace Slangc::Check {
             auto size = std::get<ArrayExprPtr>(type)->size;
             if (checkExpr(size, context, errors)) {
                 auto sizeType = typeToString(getExprType(size, context, errors).value());
-                if (sizeType != "int") {
+                if (sizeType != getBuiltInTypeName(BuiltInType::Int)) {
                     errors.emplace_back(context.filename, "Array size must be of type 'integer', not '" + sizeType + "'.", expr->loc, false, false);
                     result = false;
                 }
@@ -112,13 +112,13 @@ namespace Slangc::Check {
         if (!result) return false;
         auto type = typeToString(getExprType(expr->expr, context, errors).value());
         if (expr->op == TokenType::Minus) {
-            if (type != "int" && type != "char" && type != "float" && type != "bool" && type != "real") {
+            if (!isBuiltInNonVoid(type)) {
                 errors.emplace_back(context.filename, "Cannot apply operator '-' to '" + type + "'.", expr->loc, false, false);
                 result = false;
             }
         }
         else if (expr->op == TokenType::Neg) {
-            if (type != "bool") {
+            if (type != getBuiltInTypeName(BuiltInType::Bool)) {
                 errors.emplace_back(context.filename, "Cannot apply operator '!' to '" + type + "'.", expr->loc, false, false);
                 result = false;
             }
@@ -173,7 +173,7 @@ namespace Slangc::Check {
         }
         if (indexType.has_value()) {
             auto typeStr = typeToString(indexType.value());
-            if (typeStr != "int") {
+            if (typeStr != getBuiltInTypeName(BuiltInType::Int)) {
                 errors.emplace_back(context.filename, "Index must be of type 'integer, not '" + typeStr + "'.", expr->loc, false, false);
                 result = false;
             }
@@ -200,7 +200,7 @@ namespace Slangc::Check {
         for (const auto &arg: expr->args) {
             params.push_back(create<FuncParamDecStatementNode>(zeroLoc, "", None, getExprType(arg, context, errors).value()));
         }
-        auto funcExpr = create<FuncExprNode>(zeroLoc, create<TypeExprNode>(zeroLoc, "void"), params);
+        auto funcExpr = create<FuncExprNode>(zeroLoc, create<TypeExprNode>(zeroLoc, getBuiltInTypeName(BuiltInType::Void)), params);
 
         auto type = getExprType(expr->expr, context, errors);
         // check is callable

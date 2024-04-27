@@ -15,16 +15,16 @@ namespace Slangc {
                 return true;
             else return false;
         }
-        static std::map<std::string, int> typeStrengthMap = {
-                {"real", 6},
-                {"float", 5},
-                {"int", 4},
-                {"char", 3},
-                {"bool", 2},
-                {"void", 1},
-                {"nil", 1}
+        static std::map<BuiltInType, int> typeStrengthMap = {
+                {BuiltInType::Real, 6},
+                {BuiltInType::Float, 5},
+                {BuiltInType::Int, 4},
+                {BuiltInType::Char, 3},
+                {BuiltInType::Bool, 2},
+                {BuiltInType::Void, 1}
         };
-        if (typeStrengthMap[left] > typeStrengthMap[right]) {
+        auto getTypeStrength = [](std::string_view type) { return type == "nil" ? 1 : typeStrengthMap[builtInTypes.at(type)]; };
+        if (getTypeStrength(left) > getTypeStrength(right)) {
             return true;
         }
         return false;
@@ -33,7 +33,7 @@ namespace Slangc {
     bool Context::isCastable(const std::string& from, const std::string& to, const Context& context) {
         if (from == "nil" || to == "nil")
             return true;
-        if (from == "void" || to == "void")
+        if (from == getBuiltInTypeName(BuiltInType::Void) || to == getBuiltInTypeName(BuiltInType::Void))
             return true;
         if (!Context::isBuiltInType(from) || !Context::isBuiltInType(to)) {
             if (isParentType(to, from, context) ||
@@ -42,8 +42,7 @@ namespace Slangc {
             }
             else return false;
         }
-        if ((from == "int" || from == "float" || from == "real" || from == "char" || from == "bool") &&
-            (  to == "int" ||   to == "float" ||   to == "real" ||   to == "char" ||   to == "bool"))
+        if (isBuiltInNonVoid(from) && isBuiltInNonVoid(to))
             return true;
         return false;
     }

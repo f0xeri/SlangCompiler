@@ -218,7 +218,7 @@ namespace Slangc {
         consume(TokenType::Return);
         if (token->type == TokenType::Semicolon) {
             advance();
-            return createStmt<ReturnStatementNode>(loc, create<TypeExprNode>(loc, "void"));
+            return createStmt<ReturnStatementNode>(loc, create<TypeExprNode>(loc, getBuiltInTypeName(BuiltInType::Void)));
         }
         auto expr = parseExpr();
         consume(TokenType::Semicolon);

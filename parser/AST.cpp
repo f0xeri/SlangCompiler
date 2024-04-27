@@ -19,7 +19,7 @@ namespace Slangc {
                 if (checkCast) {
                     // we can cast anything to void* (out void)
                     if (std::holds_alternative<TypeExprPtr>(func1->params[i]->type)) {
-                        if (std::get<TypeExprPtr>(func1->params[i]->type)->type == "void" && func1->params[i]->parameterType == Out) {
+                        if (std::get<TypeExprPtr>(func1->params[i]->type)->type == getBuiltInTypeName(BuiltInType::Void) && func1->params[i]->parameterType == Out) {
                             return true;
                         }
                     }

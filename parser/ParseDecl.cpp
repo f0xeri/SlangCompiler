@@ -191,7 +191,7 @@ namespace Slangc {
             }
         }
         else {
-            returnType = createExpr<TypeExprNode>(loc, "void");
+            returnType = createExpr<TypeExprNode>(loc, getBuiltInTypeName(BuiltInType::Void));
         }
 
         DeclPtrVariant funcDecl;
@@ -312,7 +312,7 @@ namespace Slangc {
             }
         }
         else {
-            returnType = createExpr<TypeExprNode>(loc, "void");
+            returnType = createExpr<TypeExprNode>(loc, getBuiltInTypeName(BuiltInType::Void));
         }
         loc = token->location;
         std::vector<StmtPtrVariant> statements;

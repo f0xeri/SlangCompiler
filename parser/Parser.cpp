@@ -104,7 +104,7 @@ namespace Slangc {
                     return std::nullopt;
                 }
             } else {
-                returnType = createExpr<TypeExprNode>(loc, "void");
+                returnType = createExpr<TypeExprNode>(loc, getBuiltInTypeName(BuiltInType::Void));
             }
             result = createExpr<FuncExprNode>(loc, std::move(returnType), std::move(args.value()), isFunction);
         } else {

@@ -42,17 +42,17 @@ namespace Slangc {
     }
 
     Type *getIRType(const std::string &type, CodeGenContext &context) {
-        if (type == "int")
+        if (type == getBuiltInTypeName(BuiltInType::Int))
             return Type::getInt32Ty(*context.llvmContext);
-        if (type == "real")
+        if (type == getBuiltInTypeName(BuiltInType::Real))
             return Type::getDoubleTy(*context.llvmContext);
-        if (type == "float")
+        if (type == getBuiltInTypeName(BuiltInType::Float))
             return Type::getFloatTy(*context.llvmContext);
-        if (type == "bool")
+        if (type == getBuiltInTypeName(BuiltInType::Bool))
             return Type::getInt1Ty(*context.llvmContext);
-        if (type == "char")
+        if (type == getBuiltInTypeName(BuiltInType::Char))
             return Type::getInt8Ty(*context.llvmContext);
-        if (type == "void" || type == "")
+        if (type == getBuiltInTypeName(BuiltInType::Void) || type == "")
             return Type::getVoidTy(*context.llvmContext);
         if (context.allocatedClasses.contains(type))
             return context.allocatedClasses[type]->getPointerTo();
@@ -60,17 +60,17 @@ namespace Slangc {
     }
 
     Type *getIRPtrType(const std::string &type, CodeGenContext &context) {
-        if (type == "int")
+        if (type == getBuiltInTypeName(BuiltInType::Int))
             return Type::getInt32Ty(*context.llvmContext)->getPointerTo();
-        if (type == "real")
+        if (type == getBuiltInTypeName(BuiltInType::Real))
             return Type::getDoubleTy(*context.llvmContext)->getPointerTo();
-        if (type == "float")
+        if (type == getBuiltInTypeName(BuiltInType::Float))
             return Type::getFloatTy(*context.llvmContext)->getPointerTo();
-        if (type == "bool")
+        if (type == getBuiltInTypeName(BuiltInType::Bool))
             return Type::getInt1Ty(*context.llvmContext)->getPointerTo();
-        if (type == "char")
+        if (type == getBuiltInTypeName(BuiltInType::Char))
             return Type::getInt8Ty(*context.llvmContext)->getPointerTo();
-        if (type == "void" || type == "")
+        if (type == getBuiltInTypeName(BuiltInType::Void) || type == "")
             return context.builder->getPtrTy();
         if (context.allocatedClasses.contains(type))
             return context.allocatedClasses[type]->getPointerTo();
@@ -78,17 +78,17 @@ namespace Slangc {
     }
 
     Type *getIRTypeForSize(const std::string &type, CodeGenContext &context) {
-        if (type == "int")
+        if (type == getBuiltInTypeName(BuiltInType::Int))
             return Type::getInt32Ty(*context.llvmContext);
-        if (type == "real")
+        if (type == getBuiltInTypeName(BuiltInType::Real))
             return Type::getDoubleTy(*context.llvmContext);
-        if (type == "float")
+        if (type == getBuiltInTypeName(BuiltInType::Float))
             return Type::getFloatTy(*context.llvmContext);
-        if (type == "bool")
+        if (type == getBuiltInTypeName(BuiltInType::Bool))
             return Type::getInt1Ty(*context.llvmContext);
-        if (type == "char")
+        if (type == getBuiltInTypeName(BuiltInType::Char))
             return Type::getInt8Ty(*context.llvmContext);
-        if (type == "void" || type == "")
+        if (type == getBuiltInTypeName(BuiltInType::Void) || type == "")
             return Type::getVoidTy(*context.llvmContext);
         if (context.allocatedClasses.contains(type))
             return context.allocatedClasses[type];

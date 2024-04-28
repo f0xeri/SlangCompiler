@@ -5,16 +5,16 @@
 #include "Check.hpp"
 
 namespace Slangc::Check {
-    auto checkAST(const ModuleDeclPtr& moduleAST, Context &context, std::vector<ErrorMessage> &errors) -> bool {
+    auto checkAST(const ModuleDeclPtr& moduleAST, Context &context) -> bool {
         // TODO: check imports
         // TODO: we should check all symbols, not funcs and types separately
         for (auto &decl: context.symbolTable.symbols) {
             if (decl.isImported)
                 context.insert(decl.name, decl.declaration);
             else
-                checkDecl(decl.declaration, context, errors);
+                checkDecl(decl.declaration, context);
         }
-        checkBlockStmt(moduleAST->block, context, errors);
+        checkBlockStmt(moduleAST->block, context);
         return true;
     }
 };

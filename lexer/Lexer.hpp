@@ -16,7 +16,7 @@
 
 namespace Slangc {
     class Lexer {
-        std::vector<ErrorMessage> &errors;
+
         std::unique_ptr<SourceBuffer> sourceBuffer;
 
         uint64_t currentLine = 1;
@@ -40,14 +40,10 @@ namespace Slangc {
             tokens.emplace_back(Token{type, "", SourceLoc{currentLine, column}});
         }
 
-        auto getErrors() -> std::vector<ErrorMessage> {
-            return errors;
-        }
-
     public:
        std::vector<Token> tokens;
 
-        explicit Lexer(SourceBuffer &&sourceBuffer, std::vector<ErrorMessage> &errors) : errors(errors), sourceBuffer(std::make_unique<SourceBuffer>(sourceBuffer)) {}
+        explicit Lexer(SourceBuffer &&sourceBuffer) : sourceBuffer(std::make_unique<SourceBuffer>(sourceBuffer)) {}
         void tokenize();
 
         static const std::unordered_map<std::string_view, TokenType> tokensMap;

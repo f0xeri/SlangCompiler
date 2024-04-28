@@ -21,7 +21,7 @@ namespace Slangc {
             moduleAST = std::move(moduleNode.value());
         }
         else {
-            errors.emplace_back(filename, "Failed to parse module declaration.", token->location, false, false);
+            SLANGC_LOG(filename, "Failed to parse module declaration.", token->location, LogLevel::Error, false);
             return false;
         }
         context.symbolTable.insert("Object", "", obj, false, false);
@@ -58,7 +58,7 @@ namespace Slangc {
 
     auto Parser::parseTypeName() -> std::optional<std::string> {
         if (token->type != TokenType::Identifier) {
-            errors.emplace_back(filename, "Expected typeExpr name.", token->location, false, false);
+            SLANGC_LOG(filename, "Expected typeExpr name.", token->location, LogLevel::Error, false);
             hasError = true;
             return std::nullopt;
         }
@@ -87,7 +87,7 @@ namespace Slangc {
             bool isFunction = type == "function";
             auto args = parseFuncParams(false);
             if (!args.has_value()) {
-                errors.emplace_back(filename, "Expected function parameters.", token->location, false, false);
+                SLANGC_LOG(filename, "Expected function parameters.", token->location, LogLevel::Error, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -99,7 +99,7 @@ namespace Slangc {
                 if (returnTypeOpt.has_value()) {
                     returnType = std::move(returnTypeOpt.value());
                 } else {
-                    errors.emplace_back(filename, "Expected typeExpr after ':'.", token->location, false, false);
+                    SLANGC_LOG(filename, "Expected typeExpr after ':'.", token->location, LogLevel::Error, false);
                     hasError = true;
                     return std::nullopt;
                 }

@@ -27,14 +27,14 @@ namespace Slangc {
         Driver &driver;
         std::filesystem::path filepath;
     public:
-        Parser(std::filesystem::path &filepath, std::vector<Token> tokens, Driver &driver, Context &context, std::vector<ErrorMessage> &errors)
-                : context(context), driver(driver), errors(errors), tokens(std::move(tokens)), filepath(filepath) {
+        Parser(std::filesystem::path &filepath, std::vector<Token> tokens, Driver &driver, Context &context)
+                : context(context), driver(driver), tokens(std::move(tokens)), filepath(filepath) {
             token = this->tokens.begin();
             filename = filepath.string();
         }
 
         //const CompilerOptions &options;
-        std::vector<ErrorMessage> &errors;
+
         ModuleDeclPtr moduleAST;
         std::string filename;
         bool hasError = false;
@@ -86,7 +86,7 @@ namespace Slangc {
 
         auto advance() -> Token {
             if (token->type == TokenType::EndOfFile) {
-                errors.emplace_back(filename, "Unexpected EOF token.", token->location);
+                SLANGC_LOG(filename, "Unexpected EOF token.", token->location, LogLevel::Error);
                 hasError = true;
                 return *token;
             }
@@ -95,13 +95,13 @@ namespace Slangc {
         }
 
         void error() {
-            errors.emplace_back(filename, "Unexpected token " + std::string(Lexer::getTokenName(*token)) + ".", token->location);
+            SLANGC_LOG(filename, "Unexpected token " + std::string(Lexer::getTokenName(*token)) + ".", token->location);
             hasError = true;
         }
 
         bool expect(TokenType tokenType) {
             if (token->type != tokenType) {
-                errors.emplace_back(filename, std::string("Unexpected token ") + std::string(Lexer::getTokenName(*token)) + std::string(", expected ") + std::string(Lexer::getTokenName(tokenType)) + ".", token->location);
+                SLANGC_LOG(filename, std::string("Unexpected token ") + std::string(Lexer::getTokenName(*token)) + std::string(", expected ") + std::string(Lexer::getTokenName(tokenType)) + ".", token->location, LogLevel::Error);
                 hasError = true;
                 return false;
             }
@@ -120,7 +120,7 @@ namespace Slangc {
                     }
                 }
                 err += ".";
-                errors.emplace_back(filename, err, token->location);
+                SLANGC_LOG(filename, err, token->location, LogLevel::Error);
                 hasError = true;
                 return false;
             }

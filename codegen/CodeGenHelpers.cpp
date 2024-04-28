@@ -9,7 +9,7 @@
 
 namespace Slangc {
     Value *
-    typeCast(Value *value, Type *type, CodeGenContext &context, std::vector<ErrorMessage> &errors, SourceLoc loc) {
+    typeCast(Value *value, Type *type, CodeGenContext &context, SourceLoc loc) {
         if (value->getType() == type) return value;
         if (value->getType()->isIntegerTy() && type->isIntegerTy()) {
             return context.builder->CreateIntCast(value, type, true);
@@ -37,7 +37,7 @@ namespace Slangc {
         value->getType()->print(rso);
         rso << " to ";
         type->print(rso);
-        errors.emplace_back(context.context.filename, "Cannot cast from " + type_str + " .", loc, false, true);
+        SLANGC_LOG(context.context.filename, "Cannot cast from " + type_str + " .", loc, LogLevel::Error, true);
         return value;
     }
 
@@ -139,15 +139,15 @@ namespace Slangc {
         return context.allocatedClasses.contains(type) ? context.debugBuilder->getPointerType(dbgType) : dbgType;
     }
 
-    DIType *getDebugType(const ExprPtrVariant &expr, CodeGenContext &context, std::vector<ErrorMessage> &errors) {
+    DIType *getDebugType(const ExprPtrVariant &expr, CodeGenContext &context) {
         if (auto type = std::get_if<TypeExprPtr>(&expr)) {
             return getDebugType(type->get()->type, context);
         }
         if (auto arr = std::get_if<ArrayExprPtr>(&expr)) {
-            return context.debugBuilder->getPointerType(getDebugType(arr->get()->type, context, errors));
+            return context.debugBuilder->getPointerType(getDebugType(arr->get()->type, context));
         }
         if (auto func = std::get_if<FuncExprPtr>(&expr)) {
-            return context.debugBuilder->getPointerType(context.debugBuilder->getFunctionType(*func, context, errors));
+            return context.debugBuilder->getPointerType(context.debugBuilder->getFunctionType(*func, context));
         }
         return nullptr;
     }
@@ -163,8 +163,7 @@ namespace Slangc {
         return var;
     }
 
-    void callArrayElementsConstructors(ArrayExprPtr &array, Value *var, Value *size, CodeGenContext &context,
-                                       std::vector<ErrorMessage> &errors) {
+    void callArrayElementsConstructors(ArrayExprPtr &array, Value *var, Value *size, CodeGenContext &context) {
         auto int32Type = Type::getInt32Ty(*context.llvmContext);
         auto int64Type = Type::getInt64Ty(*context.llvmContext);
         auto jvar = context.builder->CreateAlloca(int32Type, nullptr, "j");
@@ -212,7 +211,7 @@ namespace Slangc {
     }
 
     void createMallocLoops(int i, ArrayExprPtr &array, int indicesCount, Value *var, std::vector<Value *> jvars,
-                           std::vector<Value *> sizes, CodeGenContext &context, std::vector<ErrorMessage> &errors) {
+                           std::vector<Value *> sizes, CodeGenContext &context) {
         if (i == indicesCount) return;
         auto intType = Type::getInt32Ty(*context.llvmContext);
         auto func = context.builder->GetInsertBlock()->getParent();
@@ -254,11 +253,11 @@ namespace Slangc {
             jvar = context.builder->CreateLoad(intType, jvars[i]);
             auto add = context.builder->CreateAdd(jvar, ConstantInt::get(intType, 1));
             context.builder->CreateStore(add, jvars[i]);
-            callArrayElementsConstructors(array, arrPtr, sizes[i], context, errors);
+            callArrayElementsConstructors(array, arrPtr, sizes[i], context);
         } else context.builder->CreateStore(ConstantInt::get(intType, 0), jvars[i + 1]);
 
         auto nextArray = std::get_if<ArrayExprPtr>(&array->type);
-        createMallocLoops(i + 1, *nextArray, indicesCount, var, jvars, sizes, context, errors);
+        createMallocLoops(i + 1, *nextArray, indicesCount, var, jvars, sizes, context);
 
         context.builder->CreateBr(whileCheck);
         context.popBlock();
@@ -272,18 +271,18 @@ namespace Slangc {
         }
     }
 
-    Value* createArrayMalloc(ArrayExprPtr &array, Value *var, CodeGenContext &context, std::vector<ErrorMessage> &errors) {
+    Value* createArrayMalloc(ArrayExprPtr &array, Value *var, CodeGenContext &context) {
         auto intType = Type::getInt32Ty(*context.llvmContext);
         auto structType = getIRType(array->type, context);
         auto temp = context.loadValue;
         context.loadValue = true;
-        auto arraySize = processNode(array->size, context, errors);
+        auto arraySize = processNode(array->size, context);
         context.loadValue = temp;
         auto allocSize = context.builder->CreateMul(arraySize,ConstantInt::get(intType,context.module->getDataLayout().getTypeAllocSize(structType)));
         auto mallocCall = context.builder->CreateMalloc(intType, structType, allocSize, nullptr, context.mallocFunc);
         auto indicesCount = array->getIndicesCount();
         context.builder->CreateStore(mallocCall, var);
-        callArrayElementsConstructors(array, var, arraySize, context, errors);
+        callArrayElementsConstructors(array, var, arraySize, context);
         if (indicesCount == 1) return var;
         std::vector<Value *> sizes;
         sizes.reserve(indicesCount);
@@ -291,7 +290,7 @@ namespace Slangc {
         auto currArray = array->type;
         context.loadValue = true;
         while (auto arr = std::get_if<ArrayExprPtr>(&currArray)) {
-            sizes.push_back(processNode(arr->get()->size, context, errors));
+            sizes.push_back(processNode(arr->get()->size, context));
             currArray = arr->get()->type;
         }
         context.loadValue = temp;
@@ -302,12 +301,12 @@ namespace Slangc {
             context.builder->CreateStore(ConstantInt::get(intType, 0), jvars[i]);
         }
         int i = 1;
-        createMallocLoops(i, std::get<ArrayExprPtr>(array->type), indicesCount, var, jvars, sizes, context, errors);
+        createMallocLoops(i, std::get<ArrayExprPtr>(array->type), indicesCount, var, jvars, sizes, context);
         return var;
     }
 
     void createArrayFreeLoops(int i, ArrayExprPtr &array, int indicesCount, Value *var, std::vector<Value *> jvars,
-                              std::vector<Value*> sizes, CodeGenContext &context, std::vector<ErrorMessage> &errors) {
+                              std::vector<Value*> sizes, CodeGenContext &context) {
         /*  Free the allocated memory
             for (int i = 0; i < x_dim; i++) {
                 for (int j = 0; j < y_dim; j++) {
@@ -344,7 +343,7 @@ namespace Slangc {
         // create next loop
         if (i < indicesCount - 1) {
             auto nextArray = std::get_if<ArrayExprPtr>(&array->type);
-            createArrayFreeLoops(i + 1, *nextArray, indicesCount, var, jvars, sizes, context, errors);
+            createArrayFreeLoops(i + 1, *nextArray, indicesCount, var, jvars, sizes, context);
         }
         // call free
         auto elementType = getIRType(array->type, context);
@@ -374,7 +373,7 @@ namespace Slangc {
         }
     }
 
-    void createArrayFree(ArrayExprPtr& array, Value* var, CodeGenContext &context, std::vector<ErrorMessage> &errors) {
+    void createArrayFree(ArrayExprPtr& array, Value* var, CodeGenContext &context) {
         auto intType = Type::getInt32Ty(*context.llvmContext);
         auto indicesCount = array->getIndicesCount();
         if (indicesCount == 1) {
@@ -387,9 +386,9 @@ namespace Slangc {
         sizes.reserve(indicesCount);
         auto currArray = array->type;
         context.loadValue = true;
-        sizes.push_back(processNode(array->size, context, errors));
+        sizes.push_back(processNode(array->size, context));
         while (auto arr = std::get_if<ArrayExprPtr>(&currArray)) {
-            sizes.push_back(processNode(arr->get()->size, context, errors));
+            sizes.push_back(processNode(arr->get()->size, context));
             currArray = arr->get()->type;
         }
         context.loadValue = false;
@@ -400,10 +399,10 @@ namespace Slangc {
             context.builder->CreateStore(ConstantInt::get(intType, 0), jvars[i]);
         }
         int i = 0;
-        createArrayFreeLoops(i, array, indicesCount, var, jvars, sizes, context, errors);
+        createArrayFreeLoops(i, array, indicesCount, var, jvars, sizes, context);
     }
 
-    Function* createDefaultConstructor(TypeDecStatementNode *type, CodeGenContext &context, std::vector<ErrorMessage> &errors,
+    Function* createDefaultConstructor(TypeDecStatementNode *type, CodeGenContext &context,
                              bool isImported) {
         auto structType = getIRType(type->name, context);
         auto intType = Type::getInt32Ty(*context.llvmContext);
@@ -444,7 +443,7 @@ namespace Slangc {
                                                                              ConstantInt::get(intType, 1)}), loadThis);
         }
         for (; index < type->fields.size(); ++index) {
-            processNode(type->fields[index], context, errors);
+            processNode(type->fields[index], context);
         }
         context.builder->CreateRetVoid();
         context.popBlock();
@@ -455,7 +454,7 @@ namespace Slangc {
         return constructor;
     }
 
-    Function* createDefaultDestructor(TypeDecStatementNode* type, CodeGenContext &context, std::vector<ErrorMessage>& errors, bool isImported) {
+    Function* createDefaultDestructor(TypeDecStatementNode* type, CodeGenContext &context, bool isImported) {
         auto structType = getIRType(type->name, context);
         auto intType = Type::getInt32Ty(*context.llvmContext);
         auto destructorType = FunctionType::get(Type::getVoidTy(*context.llvmContext), {structType->getPointerTo()}, false);
@@ -482,15 +481,15 @@ namespace Slangc {
         int endIndex = type->parentTypeName == "Object" ? 0 : 1;
         for (; index >= endIndex; index--) {
             auto field = type->fields[index];
-            auto fieldType = getDeclType(field, context.context, errors);
+            auto fieldType = getDeclType(field, context.context);
 
             if (auto arr = std::get_if<FieldArrayVarDecPtr>(&field)) {
                 auto gep = context.builder->CreateInBoundsGEP(context.allocatedClasses[type->name], loadThis,{ConstantInt::get(intType, 0), ConstantInt::get(intType, arr->get()->index)});
                 //auto fieldVal = context.builder->CreateLoad(getIRType(fieldType.value(), context),gep);
-                createArrayFree(arr->get()->expr, gep, context, errors);
+                createArrayFree(arr->get()->expr, gep, context);
             }
             else if (auto var = std::get_if<FieldVarDecPtr>(&field)) {
-                auto varTypeDecl = var->get()->getType(context.context, errors).value();
+                auto varTypeDecl = var->get()->getType(context.context).value();
                 if (auto varType = std::get_if<TypeExprPtr>(&varTypeDecl)) {
                     if (!Context::isBuiltInType(varType->get()->type)) {
                         auto gep = context.builder->CreateInBoundsGEP(context.allocatedClasses[type->name], loadThis,{ConstantInt::get(intType, 0), ConstantInt::get(intType, var->get()->index)});
@@ -541,7 +540,7 @@ namespace Slangc {
         return destructor;
     }
 
-    void createVTable(TypeDecStatementNode *type, CodeGenContext &context, std::vector<ErrorMessage> &errors) {
+    void createVTable(TypeDecStatementNode *type, CodeGenContext &context) {
         auto vtableName = "vtable_" + type->name;
         auto vtableMethods = std::vector<Constant *>();
         auto vtableMethodsDecls = std::vector<MethodDecPtr>();
@@ -648,7 +647,7 @@ namespace Slangc {
     }
 
     // don't use this
-    void cleanupCurrentScope(CodeGenContext &context, std::vector<ErrorMessage> &errors) {
+    void cleanupCurrentScope(CodeGenContext &context) {
         auto block = context.blocks.back();
         for (auto&& local : block->locals) {
             auto localDecl = block->localsDecls[local.first];
@@ -656,18 +655,18 @@ namespace Slangc {
                 break;   // do not clean up if value is referenced in return stmt
             }
             if (auto varDecl = std::get_if<VarDecStmtPtr>(&localDecl)) {
-                auto typeDecl = varDecl->get()->getType(context.context, errors).value();
+                auto typeDecl = varDecl->get()->getType(context.context).value();
                 if (auto type = std::get_if<TypeExprPtr>(&typeDecl)) {
-                    cleanupVar(type->get()->type, local.second, context, errors);
+                    cleanupVar(type->get()->type, local.second, context);
                 }
             }
             if (auto arr = std::get_if<ArrayDecStatementPtr>(&localDecl)) {
-                createArrayFree(arr->get()->expr, local.second, context, errors);
+                createArrayFree(arr->get()->expr, local.second, context);
             }
         }
     }
 
-    void cleanupVar(const std::string& type, Value* var, CodeGenContext &context, std::vector<ErrorMessage> &errors) {
+    void cleanupVar(const std::string& type, Value* var, CodeGenContext &context) {
         if (!Context::isBuiltInType(type)) {
             auto arg = context.builder->CreateLoad(getIRType(type, context), var);
             // make sure arg is not null

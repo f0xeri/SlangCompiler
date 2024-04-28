@@ -11,9 +11,11 @@
 #include <functional>
 #include <utility>
 #include <filesystem>
+#include <llvm/Support/raw_ostream.h>
 
 #ifdef _WIN32
 #include <windows.h>
+
 #undef min
 #undef max
 namespace Slangc {
@@ -49,6 +51,10 @@ namespace Slangc {
 #endif
 
 namespace Slangc {
+
+#define SLANGC_LOG(...) Slangc::log() << LogMessage{__VA_ARGS__}
+#define ERRORS_FOUND Slangc::log().errorsPrinted
+
     enum class BuiltInType : uint8_t {
         Void = 0,
         Int,
@@ -93,23 +99,28 @@ namespace Slangc {
         }
     };
 
-    class ErrorMessage {
+    enum class LogLevel {
+        Info,
+        Error,
+        Warn,
+        Debug
+    };
+
+    class LogMessage {
     public:
         std::string message;
         std::string sourceFile;
         SourceLoc location;
-        bool isWarning = false;
         bool internal = false;
-
-        ErrorMessage(std::string sourceFile, std::string message, SourceLoc location, bool isWarning = false,
-                     bool internal = false)
-                : message(std::move(message)), sourceFile(std::move(sourceFile)), location(location),
-                  isWarning(isWarning), internal(internal) {}
+        LogLevel logLevel = LogLevel::Info;
+        LogMessage(std::string sourceFile, std::string message, SourceLoc location, LogLevel logLevel = LogLevel::Info,
+                   bool internal = false)
+                : message(std::move(message)), sourceFile(std::move(sourceFile)), location(location), logLevel(logLevel), internal(internal) {}
 
         void print(auto &stream) const {
             stream << sourceFile;
             stream << "(" << location.line << "," << location.column << "): ";
-            if (isWarning) {
+            if (logLevel == LogLevel::Warn) {
                 stream << "warning";
             } else {
                 stream << "error";
@@ -122,51 +133,45 @@ namespace Slangc {
         }
     };
 
-    inline bool containsErrors(const std::vector<ErrorMessage> &errors) {
-        return std::ranges::any_of(errors.begin(), errors.end(), [](auto &error) { return !error.isWarning; });
-    }
-
-    // https://www.foonathan.net/2022/05/recursive-variant-box/
-    /*template <typename T>
-    class Box
-    {
-        // Wrapper over unique_ptr.
-        std::unique_ptr<T> _impl;
-
+    class Logger {
+        llvm::raw_ostream &os;
+        inline static bool hasErrors;
     public:
-        // Automatic construction from a `T`, not a `T*`.
-        Box(T &&obj) : _impl(new T(std::move(obj))) {}
-        Box(const T &obj) : _impl(new T(obj)) {}
-
-        // Copy constructor copies `T`.
-        Box(const Box &other) : Box(*other._impl) {}
-        Box &operator=(const Box &other)
-        {
-            *_impl = *other._impl;
+        ~Logger() = default;
+        auto operator<<(const std::string &message) -> Logger & {
+            os << message;
             return *this;
         }
 
-        // unique_ptr destroys `T` for us.
-        ~Box() = default;
+        auto operator<<(const LogMessage &message) -> Logger & {
+            if (message.logLevel == LogLevel::Error) hasErrors = true;
+            message.print(os);
+            return *this;
+        }
 
-        // Access propagates constness.
-        T &operator*() { return *_impl; }
-        const T &operator*() const { return *_impl; }
+        explicit Logger(llvm::raw_ostream &os) : os(os) {}
 
-        T *operator->() { return _impl.get(); }
-        const T *operator->() const { return _impl.get(); }
-    };*/
+        static bool errorsPrinted() {
+            return hasErrors;
+        }
+    };
+
+    static Logger& log() {
+        static Logger logger(llvm::outs());
+        return logger;
+    }
+
+    /*void SLANGC_LOG(auto&&... args) {
+        Slangc::log() << LogMessage{args...};
+    }*/
+
+    /*bool ERRORS_FOUND() {
+        return Slangc::Logger::errorsPrinted();
+    }*/
 
     [[nodiscard]] static std::string_view takeWhile(std::string_view str, std::function<bool(char)> pred) {
         auto endIt = std::find_if_not(str.begin(), str.end(), std::move(pred));
         return str.substr(0, std::distance(str.begin(), endIt));
-    }
-
-    static void printErrorMessages(std::vector<ErrorMessage> &errors, auto &stream, bool warnings = true) {
-        for (auto &error: errors) {
-            if (error.isWarning && !warnings) continue;
-            error.print(stream);
-        }
     }
 }
 

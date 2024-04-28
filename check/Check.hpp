@@ -11,11 +11,11 @@
 #include <ranges>
 
 namespace Slangc::Check {
-    bool checkAST(const ModuleDeclPtr& moduleAST, Context &context, std::vector<ErrorMessage> &errors);
-    bool checkBlockStmt(const BlockStmtPtr &stmt, Context &context, std::vector<ErrorMessage> &errors);
-    bool checkExpr(const ExprPtrVariant &stmt, Context &context, std::vector<ErrorMessage> &errors);
-    bool checkStmt(const StmtPtrVariant &stmt, Context &context, std::vector<ErrorMessage> &errors);
-    bool checkDecl(const DeclPtrVariant &decl, Context &context, std::vector<ErrorMessage> &errors);
+    bool checkAST(const ModuleDeclPtr& moduleAST, Context &context);
+    bool checkBlockStmt(const BlockStmtPtr &stmt, Context &context);
+    bool checkExpr(const ExprPtrVariant &stmt, Context &context);
+    bool checkStmt(const StmtPtrVariant &stmt, Context &context);
+    bool checkDecl(const DeclPtrVariant &decl, Context &context);
 };
 
 

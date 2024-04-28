@@ -253,22 +253,22 @@ namespace Slangc {
     Type* getIRTypeForSize(const std::string& type, CodeGenContext& context);
     Type* getIRTypeForSize(const ExprPtrVariant& expr, CodeGenContext& context);
     DIType* getDebugType(const std::string& type, CodeGenContext& context);
-    DIType* getDebugType(const ExprPtrVariant& expr, CodeGenContext& context, std::vector<ErrorMessage> &errors);
+    DIType* getDebugType(const ExprPtrVariant& expr, CodeGenContext& context);
     Value* createMalloc(const std::string &type, Value* var, CodeGenContext &context);
-    Function* createDefaultConstructor(TypeDecStatementNode* type, CodeGenContext &context, std::vector<ErrorMessage>& errors, bool isImported);
-    Function* createDefaultDestructor(TypeDecStatementNode* type, CodeGenContext &context, std::vector<ErrorMessage>& errors, bool isImported);
-    Value* typeCast(Value* value, Type* type, CodeGenContext &context, std::vector<ErrorMessage> &errors, SourceLoc loc);
-    Value* createArrayMalloc(ArrayExprPtr& array, Value* var, CodeGenContext &context, std::vector<ErrorMessage> &errors);
-    void createArrayFree(ArrayExprPtr& array, Value* var, CodeGenContext &context, std::vector<ErrorMessage> &errors);
-    void callArrayElementsConstructors(ArrayExprPtr& array, Value* var, Value* size, CodeGenContext &context, std::vector<ErrorMessage> &errors);
-    void createMallocLoops(int i, ArrayExprPtr &array, int indicesCount, Value *var, std::vector<Value*> jvars, std::vector<Value*> sizes, CodeGenContext &context, std::vector<ErrorMessage> &errors);
-    void createVTable(TypeDecStatementNode* type, CodeGenContext &context, std::vector<ErrorMessage>& errors);
+    Function* createDefaultConstructor(TypeDecStatementNode* type, CodeGenContext &context, bool isImported);
+    Function* createDefaultDestructor(TypeDecStatementNode* type, CodeGenContext &context, bool isImported);
+    Value* typeCast(Value* value, Type* type, CodeGenContext &context, SourceLoc loc);
+    Value* createArrayMalloc(ArrayExprPtr& array, Value* var, CodeGenContext &context);
+    void createArrayFree(ArrayExprPtr& array, Value* var, CodeGenContext &context);
+    void callArrayElementsConstructors(ArrayExprPtr& array, Value* var, Value* size, CodeGenContext &context);
+    void createMallocLoops(int i, ArrayExprPtr &array, int indicesCount, Value *var, std::vector<Value*> jvars, std::vector<Value*> sizes, CodeGenContext &context);
+    void createVTable(TypeDecStatementNode* type, CodeGenContext &context);
     FunctionType* getFuncType(const FuncExprPtr& funcExpr, CodeGenContext &context);
     std::string typeToMangledString(const ExprPtrVariant& type, ParameterType parameterType, bool newType);
     std::string getMangledFuncName(const FuncExprPtr& funcExpr);
     Function* getFuncFromExpr(const DeclPtrVariant& funcExpr, CodeGenContext &context);
-    void cleanupCurrentScope(CodeGenContext &context, std::vector<ErrorMessage> &errors);
-    void cleanupVar(const std::string& type, Value* var, CodeGenContext &context, std::vector<ErrorMessage> &errors);
+    void cleanupCurrentScope(CodeGenContext &context);
+    void cleanupVar(const std::string& type, Value* var, CodeGenContext &context);
 
 }
 

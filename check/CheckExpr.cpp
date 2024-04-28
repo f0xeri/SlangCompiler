@@ -6,147 +6,147 @@
 #include "Check.hpp"
 
 namespace Slangc::Check {
-    bool checkExpr(const ExprPtrVariant &expr, Context &context, std::vector<ErrorMessage> &errors);
+    bool checkExpr(const ExprPtrVariant &expr, Context &context);
 
-    bool checkExpr(const ArrayExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkExpr(const ArrayExprPtr &expr, Context &context) {
         bool result = true;
         auto type = expr->type;
         while (std::holds_alternative<ArrayExprPtr>(type)) {
             auto size = std::get<ArrayExprPtr>(type)->size;
-            if (checkExpr(size, context, errors)) {
-                auto sizeType = typeToString(getExprType(size, context, errors).value());
+            if (checkExpr(size, context)) {
+                auto sizeType = typeToString(getExprType(size, context).value());
                 if (sizeType != getBuiltInTypeName(BuiltInType::Int)) {
-                    errors.emplace_back(context.filename, "Array size must be of type 'integer', not '" + sizeType + "'.", expr->loc, false, false);
+                    SLANGC_LOG(context.filename, "Array size must be of type 'integer', not '" + sizeType + "'.", expr->loc, LogLevel::Error, false);
                     result = false;
                 }
             }
             else result = false;
             type = std::get<ArrayExprPtr>(type)->type;
         }
-        return checkExpr(type, context, errors);
+        return checkExpr(type, context);
     }
 
-    bool checkExpr(const BooleanExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkExpr(const BooleanExprPtr &expr, Context &context) {
         return true;
     }
 
-    bool checkExpr(const CharExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkExpr(const CharExprPtr &expr, Context &context) {
         return true;
     }
 
-    bool checkExpr(const FloatExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkExpr(const FloatExprPtr &expr, Context &context) {
         return true;
     }
 
-    bool checkExpr(const FuncExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkExpr(const FuncExprPtr &expr, Context &context) {
         bool result = true;
-        result = checkExpr(expr->type, context, errors);
+        result = checkExpr(expr->type, context);
         for (const auto &param: expr->params) {
-            result &= checkStmt(param, context, errors);
+            result &= checkStmt(param, context);
         }
         return result;
     }
 
-    bool checkExpr(const IntExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkExpr(const IntExprPtr &expr, Context &context) {
         return true;
     }
 
-    bool checkExpr(const NilExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkExpr(const NilExprPtr &expr, Context &context) {
         return true;
     }
 
-    bool checkExpr(const OperatorExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
-        bool result = checkExpr(expr->left, context, errors);
-        result &= checkExpr(expr->right, context, errors);
+    bool checkExpr(const OperatorExprPtr &expr, Context &context) {
+        bool result = checkExpr(expr->left, context);
+        result &= checkExpr(expr->right, context);
         if (result) {
-            auto leftType = typeToString(getExprType(expr->left, context, errors).value());
-            auto rightType = typeToString(getExprType(expr->right, context, errors).value());
+            auto leftType = typeToString(getExprType(expr->left, context).value());
+            auto rightType = typeToString(getExprType(expr->right, context).value());
             if (auto nilExpr = std::get_if<NilExprPtr>(&expr->left)) {
-                nilExpr->get()->type = getExprType(expr->right, context, errors).value();
-                leftType = typeToString(getExprType(expr->left, context, errors).value());
+                nilExpr->get()->type = getExprType(expr->right, context).value();
+                leftType = typeToString(getExprType(expr->left, context).value());
             }
             if (auto nilExpr = std::get_if<NilExprPtr>(&expr->right)) {
-                nilExpr->get()->type = getExprType(expr->left, context, errors).value();
-                rightType = typeToString(getExprType(expr->right, context, errors).value());
+                nilExpr->get()->type = getExprType(expr->left, context).value();
+                rightType = typeToString(getExprType(expr->right, context).value());
             }
             if (leftType != rightType) {
                 if (!Context::isCastable(rightType, leftType, context)) {
-                    errors.emplace_back(context.filename, std::string("Cannot apply operator '") + Context::operatorToString(expr->op) + "' to '" + leftType + "' and '" + rightType + "'.", expr->loc, false, false);
+                    SLANGC_LOG(context.filename, std::string("Cannot apply operator '") + Context::operatorToString(expr->op) + "' to '" + leftType + "' and '" + rightType + "'.", expr->loc, LogLevel::Error, false);
                     result = false;
                 }
                 else {
                     if (Context::isCastToLeft(leftType, rightType, context)) {
-                        errors.emplace_back(context.filename, "Implicit conversion from '" + rightType + "' to '" + leftType + "'.", getExprLoc(expr->right), true, false);
+                        SLANGC_LOG(context.filename, "Implicit conversion from '" + rightType + "' to '" + leftType + "'.", getExprLoc(expr->right), LogLevel::Warn, false);
                     }
                     else {
-                        errors.emplace_back(context.filename, "Implicit conversion from '" + leftType + "' to '" + rightType + "'.", getExprLoc(expr->left), true, false);
+                        SLANGC_LOG(context.filename, "Implicit conversion from '" + leftType + "' to '" + rightType + "'.", getExprLoc(expr->left), LogLevel::Warn, false);
                     }
                 }
             }
             if (result && (!Context::isBuiltInType(leftType) || !Context::isBuiltInType(rightType)) && !(expr->op == TokenType::Equal || expr->op == TokenType::NotEqual)) {
-                errors.emplace_back(context.filename, std::string("Cannot apply operator '") + Context::operatorToString(expr->op) + "' to '" + leftType + "' and '" + rightType + "'.", expr->loc, false, false);
+                SLANGC_LOG(context.filename, std::string("Cannot apply operator '") + Context::operatorToString(expr->op) + "' to '" + leftType + "' and '" + rightType + "'.", expr->loc, LogLevel::Error, false);
                 result = false;
             }
         }
         return result;
     }
 
-    bool checkExpr(const RealExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkExpr(const RealExprPtr &expr, Context &context) {
         return true;
     }
 
-    bool checkExpr(const StringExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkExpr(const StringExprPtr &expr, Context &context) {
         return true;
     }
 
-    bool checkExpr(const FormattedStringExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkExpr(const FormattedStringExprPtr &expr, Context &context) {
         bool result = true;
         for (const auto &arg: expr->values) {
-            result &= checkExpr(arg, context, errors);
+            result &= checkExpr(arg, context);
         }
         return result;
     }
 
-    bool checkExpr(const UnaryOperatorExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
-        auto result = checkExpr(expr->expr, context, errors);
+    bool checkExpr(const UnaryOperatorExprPtr &expr, Context &context) {
+        auto result = checkExpr(expr->expr, context);
         if (!result) return false;
-        auto type = typeToString(getExprType(expr->expr, context, errors).value());
+        auto type = typeToString(getExprType(expr->expr, context).value());
         if (expr->op == TokenType::Minus) {
             if (!isBuiltInNonVoid(type)) {
-                errors.emplace_back(context.filename, "Cannot apply operator '-' to '" + type + "'.", expr->loc, false, false);
+                SLANGC_LOG(context.filename, "Cannot apply operator '-' to '" + type + "'.", expr->loc, LogLevel::Error, false);
                 result = false;
             }
         }
         else if (expr->op == TokenType::Neg) {
             if (type != getBuiltInTypeName(BuiltInType::Bool)) {
-                errors.emplace_back(context.filename, "Cannot apply operator '!' to '" + type + "'.", expr->loc, false, false);
+                SLANGC_LOG(context.filename, "Cannot apply operator '!' to '" + type + "'.", expr->loc, LogLevel::Error, false);
                 result = false;
             }
         }
         return result;
     }
 
-    bool checkExpr(const VarExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkExpr(const VarExprPtr &expr, Context &context) {
         bool result = true;
         if (!context.lookup(expr->name)) {
             if (context.lookup(context.moduleName + "." + expr->name)) {
                 expr->name = context.moduleName + "." + expr->name;
             }
             else if (std::ranges::find(context.imports, expr->name) == context.imports.end()) {
-                errors.emplace_back(context.filename, "Variable, type, or function with name '" + expr->name + "' does not exist.", expr->loc, false, false);
+                SLANGC_LOG(context.filename, "Variable, type, or function with name '" + expr->name + "' does not exist.", expr->loc, LogLevel::Error, false);
                 result = false;
             }
         }
         return result;
     }
 
-    bool checkExpr(const IndexExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkExpr(const IndexExprPtr &expr, Context &context) {
         bool result = true;
-        result = checkExpr(expr->expr, context, errors);
-        result &= checkExpr(expr->indexExpr, context, errors);
+        result = checkExpr(expr->expr, context);
+        result &= checkExpr(expr->indexExpr, context);
         if (!result) return false;
-        auto exprType = getExprType(expr->expr, context, errors);
-        auto indexType = getExprType(expr->indexExpr, context, errors);
+        auto exprType = getExprType(expr->expr, context);
+        auto indexType = getExprType(expr->indexExpr, context);
 
         if (!exprType.has_value() || !std::holds_alternative<ArrayExprPtr>(exprType.value())) {
             // this code is needed simply to get final type of the array in order to display it in error message
@@ -155,7 +155,7 @@ namespace Slangc::Check {
             std::optional<ExprPtrVariant> type = exprType;
             std::optional<ExprPtrVariant> typeOpt;
             while (ind) {
-                typeOpt = getExprType(ind->get()->expr, context, errors);
+                typeOpt = getExprType(ind->get()->expr, context);
                 ind = std::get_if<IndexExprPtr>(&ind->get()->expr);
                 if (typeOpt) type = typeOpt.value();
                 else break;
@@ -166,26 +166,26 @@ namespace Slangc::Check {
                 else break;
             }
             if (type.has_value())
-                errors.emplace_back(context.filename, "Cannot apply indexing with [] to an expression of type '" + typeToString(type.value()) + "'.",expr->loc, false, false);
+                SLANGC_LOG(context.filename, "Cannot apply indexing with [] to an expression of type '" + typeToString(type.value()) + "'.",expr->loc, LogLevel::Error, false);
             else
-                errors.emplace_back(context.filename, "Cannot apply indexing with [] to an expression of unknown type.", expr->loc, false,false);
+                SLANGC_LOG(context.filename, "Cannot apply indexing with [] to an expression of unknown type.", expr->loc, LogLevel::Error,false);
             return false;
         }
         if (indexType.has_value()) {
             auto typeStr = typeToString(indexType.value());
             if (typeStr != getBuiltInTypeName(BuiltInType::Int)) {
-                errors.emplace_back(context.filename, "Index must be of type 'integer, not '" + typeStr + "'.", expr->loc, false, false);
+                SLANGC_LOG(context.filename, "Index must be of type 'integer, not '" + typeStr + "'.", expr->loc, LogLevel::Error, false);
                 result = false;
             }
         }
         return result;
     }
 
-    bool checkExpr(const CallExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkExpr(const CallExprPtr &expr, Context &context) {
         bool result = true;
-        result = checkExpr(expr->expr, context, errors);
+        result = checkExpr(expr->expr, context);
         for (const auto &arg: expr->args) {
-            result &= checkExpr(arg, context, errors);
+            result &= checkExpr(arg, context);
         }
         if (!result) return false;
         std::optional<DeclPtrVariant> func = std::nullopt;
@@ -198,14 +198,14 @@ namespace Slangc::Check {
         params.reserve(expr->args.size());
         auto zeroLoc = SourceLoc{0, 0};
         for (const auto &arg: expr->args) {
-            params.push_back(create<FuncParamDecStatementNode>(zeroLoc, "", None, getExprType(arg, context, errors).value()));
+            params.push_back(create<FuncParamDecStatementNode>(zeroLoc, "", None, getExprType(arg, context).value()));
         }
         auto funcExpr = create<FuncExprNode>(zeroLoc, create<TypeExprNode>(zeroLoc, getBuiltInTypeName(BuiltInType::Void)), params);
 
-        auto type = getExprType(expr->expr, context, errors);
+        auto type = getExprType(expr->expr, context);
         // check is callable
         if (auto access = std::get_if<AccessExprPtr>(&expr->expr)) {
-            auto accessType = getExprType(access->get()->expr, context, errors);
+            auto accessType = getExprType(access->get()->expr, context);
             std::optional<TypeDecStmtPtr> typeDecl = std::nullopt;
             if (std::holds_alternative<TypeExprPtr>(accessType.value())) {
                 typeDecl = context.symbolTable.lookupType(std::get<TypeExprPtr>(accessType.value())->type);
@@ -263,7 +263,7 @@ namespace Slangc::Check {
                                 }
                                 else {
                                     overloaded = false;  // suppress "no matching function" error
-                                    errors.emplace_back(context.filename, "Cannot call function using function pointer '" + param->name + "' passed as 'out' parameter.", expr->loc, false, false);
+                                    SLANGC_LOG(context.filename, "Cannot call function using function pointer '" + param->name + "' passed as 'out' parameter.", expr->loc, LogLevel::Error, false);
                                     result = false;
                                 }
                             }
@@ -273,7 +273,7 @@ namespace Slangc::Check {
             }
         }
         else if (auto index = std::get_if<IndexExprPtr>(&expr->expr)) {
-            auto indexType = getExprType(*index, context, errors);
+            auto indexType = getExprType(*index, context);
             if (indexType.has_value() && std::holds_alternative<FuncExprPtr>(indexType.value())) {
                 overloaded = true;
                 if (compareFuncSignatures(std::get<FuncExprPtr>(indexType.value()), funcExpr, context, false, true)) {
@@ -283,7 +283,7 @@ namespace Slangc::Check {
             }
         }
         else if (auto call = std::get_if<CallExprPtr>(&expr->expr)) {
-            auto callType = getExprType(*call, context, errors);
+            auto callType = getExprType(*call, context);
             if (callType.has_value() && std::holds_alternative<FuncExprPtr>(callType.value())) {
                 overloaded = true;
                 if (compareFuncSignatures(std::get<FuncExprPtr>(callType.value()), funcExpr, context, false, true)) {
@@ -293,7 +293,7 @@ namespace Slangc::Check {
             }
         }
         if (!func && !funcPtrsArrIndex && !funcCall) {
-            errors.emplace_back(context.filename, overloaded ? "No matching function for call." : "Expression is not callable.", expr->loc, false, false);
+            SLANGC_LOG(context.filename, overloaded ? "No matching function for call." : "Expression is not callable.", expr->loc, LogLevel::Error, false);
             result = false;
         }
         if (expr->funcType.has_value()) {
@@ -306,34 +306,34 @@ namespace Slangc::Check {
         return result;
     }
 
-    bool checkExpr(const NewExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkExpr(const NewExprPtr &expr, Context &context) {
         bool result = true;
-        result &= checkExpr(expr->type, context, errors);
+        result &= checkExpr(expr->type, context);
         if (auto type = std::get_if<TypeExprPtr>(&expr->type)) {
             if (Context::isBuiltInType(type->get()->type)) {
                 auto typeStr = typeToString(expr->type);
-                errors.emplace_back(context.filename, "Cannot call new on type '" + typeStr + "'.", expr->loc, false, false);
+                SLANGC_LOG(context.filename, "Cannot call new on type '" + typeStr + "'.", expr->loc, LogLevel::Error, false);
                 result = false;
             }
         }
         return result;
     }
 
-    bool checkExpr(const AccessExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkExpr(const AccessExprPtr &expr, Context &context) {
         bool result = true;
-        result = checkExpr(expr->expr, context, errors);
+        result = checkExpr(expr->expr, context);
         if (!result) return result;
-        auto exprType = getExprType(expr->expr, context, errors);
+        auto exprType = getExprType(expr->expr, context);
         std::optional<TypeDecStmtPtr> typeOpt = std::nullopt;
         if (!exprType.has_value()) {
-            errors.emplace_back(context.filename, "Failed to get type of expression.", expr->loc, false, false);
+            SLANGC_LOG(context.filename, "Failed to get type of expression.", expr->loc, LogLevel::Error, false);
             return false;
         }
         if (std::holds_alternative<TypeExprPtr>(exprType.value()) && !Context::isBuiltInType(std::get<TypeExprPtr>(exprType.value())->type)) {
             typeOpt = context.symbolTable.lookupType(std::get<TypeExprPtr>(exprType.value())->type);
         }
         else {
-            errors.emplace_back(context.filename, "Type '" + typeToString(exprType.value()) + "' is not accessible.", expr->loc, false, false);
+            SLANGC_LOG(context.filename, "Type '" + typeToString(exprType.value()) + "' is not accessible.", expr->loc, LogLevel::Error, false);
             // result = false;
             return false;
         }
@@ -346,7 +346,7 @@ namespace Slangc::Check {
                 if (auto fieldVar = std::get_if<FieldVarDecPtr>(&field)) {
                     if ((*fieldVar)->name == expr->name) {
                         if ((*fieldVar)->isPrivate && !Context::isPrivateAccessible(context.currType, type->name, context)) {
-                            errors.emplace_back(context.filename, "Cannot access private field '" + expr->name + "' of type '" + type->name + "' from '" + context.currType + "'.", expr->loc, false, false);
+                            SLANGC_LOG(context.filename, "Cannot access private field '" + expr->name + "' of type '" + type->name + "' from '" + context.currType + "'.", expr->loc, LogLevel::Error, false);
                             result = false;
                         }
                         // found = true even if we got error, because we want to suppress final not found error
@@ -357,7 +357,7 @@ namespace Slangc::Check {
                 } else if (const auto &fieldArrayVar = std::get_if<FieldArrayVarDecPtr>(&field)) {
                     if ((*fieldArrayVar)->name == expr->name) {
                         if ((*fieldArrayVar)->isPrivate && !Context::isPrivateAccessible(context.currType, type->name, context)) {
-                            errors.emplace_back(context.filename, "Cannot access private field '" + expr->name + "' of type '" + type->name + "' from '" + context.currType + "'.", expr->loc, false, false);
+                            SLANGC_LOG(context.filename, "Cannot access private field '" + expr->name + "' of type '" + type->name + "' from '" + context.currType + "'.", expr->loc, LogLevel::Error, false);
                             result = false;
                         }
                         found = true;
@@ -367,7 +367,7 @@ namespace Slangc::Check {
                 } else if (auto fieldFuncPointer = std::get_if<FieldFuncPointerStmtPtr>(&field)) {
                     if ((*fieldFuncPointer)->name == expr->name) {
                         if ((*fieldFuncPointer)->isPrivate && !Context::isPrivateAccessible(context.currType, type->name, context)) {
-                            errors.emplace_back(context.filename, "Cannot access private field '" + expr->name + "' of type '" + type->name + "' from '" + context.currType + "'.", expr->loc, false, false);
+                            SLANGC_LOG(context.filename, "Cannot access private field '" + expr->name + "' of type '" + type->name + "' from '" + context.currType + "'.", expr->loc, LogLevel::Error, false);
                             result = false;
                         }
                         found = true;
@@ -382,7 +382,7 @@ namespace Slangc::Check {
                 for (const auto &method: type->methods) {
                     if ((method->name == type->name + "." + expr->name)) {
                         if (method->isPrivate && !Context::isPrivateAccessible(context.currType, type->name, context)) {
-                            errors.emplace_back(context.filename, "Cannot access private method '" + expr->name + "' of type '" + type->name + "' from '" + context.currType + "'.", expr->loc, false, false);
+                            SLANGC_LOG(context.filename, "Cannot access private method '" + expr->name + "' of type '" + type->name + "' from '" + context.currType + "'.", expr->loc, LogLevel::Error, false);
                             result = false;
                         }
                         found = true;
@@ -396,7 +396,7 @@ namespace Slangc::Check {
             else break;
         }
         if (!found) {
-            errors.emplace_back(context.filename, "Type '" + std::get<TypeExprPtr>(exprType.value())->type + "' does not have field or method called '" + expr->name + "'.", expr->loc, false,false);
+            SLANGC_LOG(context.filename, "Type '" + std::get<TypeExprPtr>(exprType.value())->type + "' does not have field or method called '" + expr->name + "'.", expr->loc, LogLevel::Error,false);
             result = false;
         }
         expr->index = index;
@@ -404,11 +404,11 @@ namespace Slangc::Check {
         return result;
     }
 
-    bool checkExpr(const TypeExprPtr &expr, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkExpr(const TypeExprPtr &expr, Context &context) {
         bool result = true;
         if (!context.symbolTable.lookupType(expr->type) && !Context::isBuiltInType(expr->type)) {
             if (!context.symbolTable.lookupType(context.moduleName + "." + expr->type)) {
-                errors.emplace_back(context.filename, "Type '" + expr->type + "' does not exist.", expr->loc, false, false);
+                SLANGC_LOG(context.filename, "Type '" + expr->type + "' does not exist.", expr->loc, LogLevel::Error, false);
                 result = false;
             } else {
                 // update type name
@@ -418,9 +418,9 @@ namespace Slangc::Check {
         return result;
     }
 
-    bool checkExpr(const ExprPtrVariant &expr, Context &context, std::vector<ErrorMessage> &errors) {
+    bool checkExpr(const ExprPtrVariant &expr, Context &context) {
         return std::visit([&](const auto &expr) {
-            return checkExpr(expr, context, errors);
+            return checkExpr(expr, context);
         }, expr);
     }
 }

@@ -7,7 +7,6 @@
 
 #include "common.hpp"
 #include "CompilerOptions.hpp"
-#include "log/Logger.hpp"
 #include "check/Context.hpp"
 #include "opt/Optimizer.hpp"
 
@@ -15,7 +14,7 @@ namespace Slangc {
 
     class Driver {
         CompilerOptions options;
-        std::vector<Slangc::ErrorMessage> errors;
+
     public:
         Driver(int argc, char **argv) : options(argc, argv) {};
         ~Driver() = default;

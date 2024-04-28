@@ -16,9 +16,8 @@ namespace Slangc {
     void Driver::run() {
         auto mainModuleName = options.getInputFilePaths()[0];
         processUnit(mainModuleName, true);
-        for (auto &error : errors)
-            log() << error;
-        if (std::ranges::any_of(errors, [](const ErrorMessage &err) {return !err.isWarning; }))
+
+        if (ERRORS_FOUND())
             return;
         log() << "Linking...\n";
         std::stringstream clangCallStream;
@@ -48,16 +47,16 @@ namespace Slangc {
             std::cout << toString(buffer.takeError()) << std::endl;
             exit(1);
         }
-        auto lexer = Lexer(std::move(buffer.get()), errors);
+        auto lexer = Lexer(std::move(buffer.get()));
         lexer.tokenize();
         auto context = std::make_unique<Context>();
-        auto parser = Parser(filepath, lexer.tokens, *this, *context, errors);
+        auto parser = Parser(filepath, lexer.tokens, *this, *context);
         parser.parse();
 
-        Check::checkAST(parser.moduleAST, *context, errors);
+        Check::checkAST(parser.moduleAST, *context);
         auto codeGen = CodeGen(*context, std::move(parser.moduleAST), isMainModule, options.isDebug(), options.isGCEnabled());
-        if (!containsErrors(errors))
-            codeGen.process(errors);
+        if (!ERRORS_FOUND())
+            codeGen.process();
         else
             return context;
         //codeGen.dumpIRToFile(filepath.string() + ".ll");

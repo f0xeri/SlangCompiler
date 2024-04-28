@@ -12,27 +12,27 @@
 
 namespace Slangc {
     using namespace llvm;
-    auto IntExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto IntExprNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         return ConstantInt::get(Type::getInt32Ty(*context.llvmContext), value, true);
     }
 
-    auto FloatExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto FloatExprNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         return ConstantFP::get(Type::getFloatTy(*context.llvmContext), value);
     }
 
-    auto RealExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto RealExprNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         return ConstantFP::get(Type::getDoubleTy(*context.llvmContext), value);
     }
 
-    auto CharExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto CharExprNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         return ConstantInt::get(Type::getInt8Ty(*context.llvmContext), value);
     }
 
-    auto StringExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto StringExprNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         auto str = context.builder->CreateGlobalStringPtr(value, "", 0, context.module.get());
         return str;
@@ -47,7 +47,7 @@ namespace Slangc {
         return buffer;*/
     }
 
-    auto FormattedStringExprNode::codegen(Slangc::CodeGenContext &context, std::vector<ErrorMessage> &errors) -> llvm::Value * {
+    auto FormattedStringExprNode::codegen(Slangc::CodeGenContext &context) -> llvm::Value * {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         // llvm ir code do something like this:
         /*
@@ -78,7 +78,7 @@ namespace Slangc {
             auto temp = context.loadValue;
             Value* val = nullptr;
 
-            auto exprType = getExprType(arg, context.context, errors).value();
+            auto exprType = getExprType(arg, context.context).value();
             bool charArray = false;
             if (auto arr = std::get_if<ArrayExprPtr>(&exprType)) {
                 if (auto type = std::get_if<TypeExprPtr>(&arr->get()->type)) {
@@ -94,7 +94,7 @@ namespace Slangc {
             }
             else {
                 context.loadValue = true;
-                val = processNode(arg, context, errors);
+                val = processNode(arg, context);
                 context.loadValue = temp;
             }
 
@@ -139,26 +139,26 @@ namespace Slangc {
         return buffer;
     }
 
-    auto TypeExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto TypeExprNode::codegen(CodeGenContext &context) -> Value* {
         return {};
     }
 
-    auto NilExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto NilExprNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         auto irType = context.loadValue ? getIRType(type.value(), context) : getIRType(type.value(), context)->getPointerTo();
         return irType->isVoidTy() ? Constant::getNullValue(context.builder->getPtrTy()) : Constant::getNullValue(irType);
     }
 
-    auto ArrayExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto ArrayExprNode::codegen(CodeGenContext &context) -> Value* {
         return {};
     }
 
-    auto BooleanExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto BooleanExprNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         return ConstantInt::get(Type::getInt1Ty(*context.llvmContext), value);
     }
 
-    auto VarExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto VarExprNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         auto var = context.localsLookup(name);
         if (!var) var = context.globals()[name];
@@ -171,7 +171,7 @@ namespace Slangc {
             if (context.referencing) {
                 context.setReferenced(name, true);
             }
-            declType = getDeclType(localVar.value(), context.context, errors);
+            declType = getDeclType(localVar.value(), context.context);
             if (auto funcParam = std::get_if<FuncParamDecStmtPtr>(&localVar.value())) {
                 if (funcParam->get()->parameterType == Out) {
                     isOut = true;
@@ -182,7 +182,7 @@ namespace Slangc {
             }
         }
         else if (auto globalVar = context.globalsDeclsLookup(name)) {
-            declType = getDeclType(globalVar.value(), context.context, errors);
+            declType = getDeclType(globalVar.value(), context.context);
             if (auto funcParam = std::get_if<FuncParamDecStmtPtr>(&globalVar.value())) {
                 if (funcParam->get()->parameterType == Out) {
                     isOut = true;
@@ -193,7 +193,7 @@ namespace Slangc {
             }
         }
         else if (auto func = context.context.symbolTable.lookupFunc(name, context.currentFuncSignature.value(), context.context)) {
-            declType = getDeclType(*func, context.context, errors);
+            declType = getDeclType(*func, context.context);
             var = getFuncFromExpr(*func, context);
             isFunc = true;
         }
@@ -211,14 +211,14 @@ namespace Slangc {
         return var;
     }
 
-    auto IndexExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto IndexExprNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         auto temp = context.loadValue;
         context.loadValue = true;
-        auto var = processNode(expr, context, errors);
-        auto varType = std::get<ArrayExprPtr>(getExprType(expr, context.context, errors).value());
-        auto indexVal = processNode(indexExpr, context, errors);
-        indexVal = typeCast(indexVal, Type::getInt64Ty(*context.llvmContext), context, errors, getExprLoc(indexExpr));
+        auto var = processNode(expr, context);
+        auto varType = std::get<ArrayExprPtr>(getExprType(expr, context.context).value());
+        auto indexVal = processNode(indexExpr, context);
+        indexVal = typeCast(indexVal, Type::getInt64Ty(*context.llvmContext), context, getExprLoc(indexExpr));
         context.loadValue = false;
         var = context.builder->CreateInBoundsGEP(getIRType(varType->type, context), var, indexVal);
         if (temp) {
@@ -228,11 +228,11 @@ namespace Slangc {
         return var;
     }
 
-    auto UnaryOperatorExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto UnaryOperatorExprNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         auto temp = context.loadValue;
         context.loadValue = true;
-        auto val = processNode(expr, context, errors);
+        auto val = processNode(expr, context);
         context.loadValue = temp;
         if (val->getType()->isIntegerTy())
             return context.builder->CreateNeg(val);
@@ -241,22 +241,22 @@ namespace Slangc {
         return nullptr;
     }
 
-    auto OperatorExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto OperatorExprNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         auto temp = context.loadValue;
         context.loadValue = true;
-        auto leftValue = processNode(left, context, errors);
-        auto rightValue = processNode(right, context, errors);
+        auto leftValue = processNode(left, context);
+        auto rightValue = processNode(right, context);
         context.loadValue = temp;
 
         if (leftValue->getType() != rightValue->getType()) {
-            auto leftType = typeToString(getExprType(left, context.context, errors).value());
-            auto rightType = typeToString(getExprType(right, context.context, errors).value());
+            auto leftType = typeToString(getExprType(left, context.context).value());
+            auto rightType = typeToString(getExprType(right, context.context).value());
             if (Context::isCastToLeft(leftType, rightType, context.context)) {
-                rightValue = typeCast(rightValue, leftValue->getType(), context, errors, getExprLoc(right));
+                rightValue = typeCast(rightValue, leftValue->getType(), context, getExprLoc(right));
             }
             else {
-                leftValue = typeCast(leftValue, rightValue->getType(), context, errors, getExprLoc(left));
+                leftValue = typeCast(leftValue, rightValue->getType(), context, getExprLoc(left));
             }
         }
 
@@ -329,7 +329,7 @@ namespace Slangc {
         return nullptr;
     }
 
-    auto CallExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto CallExprNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         Value* func = nullptr;
         auto temp = context.loadValue;
@@ -340,7 +340,7 @@ namespace Slangc {
             if (std::holds_alternative<MethodDecPtr>(foundFunc.value()) && std::holds_alternative<AccessExprPtr>(expr)) {
                 auto method = std::get<MethodDecPtr>(foundFunc.value());
                 context.loadValue = true;  //"this" is a custom type, so it should be loaded anyway, if it's in array, it should not be loaded after gep
-                auto thisArg = processNode(std::get<AccessExprPtr>(expr)->expr, context, errors);
+                auto thisArg = processNode(std::get<AccessExprPtr>(expr)->expr, context);
                 argsRef.push_back(thisArg);
                 argsOffset = 1;
 
@@ -354,7 +354,7 @@ namespace Slangc {
         }
         else {
             context.loadValue = true;
-            func = processNode(expr, context, errors);
+            func = processNode(expr, context);
         }
 
         for (size_t i = 0; i < args.size(); ++i) {
@@ -364,7 +364,7 @@ namespace Slangc {
             if (std::holds_alternative<FuncExprPtr>(currExpectedArg->type)) {
                 context.currentFuncSignature = std::get<FuncExprPtr>(currExpectedArg->type);
             }
-            auto exprType = getExprType(currCallArg, context.context, errors).value();
+            auto exprType = getExprType(currCallArg, context.context).value();
             auto isOutVar = currExpectedArg->parameterType == Out || currExpectedArg->parameterType == Var;
             bool isVoid = std::holds_alternative<TypeExprPtr>(currExpectedArg->type) && std::get<TypeExprPtr>(currExpectedArg->type)->type == getBuiltInTypeName(BuiltInType::Void);
 
@@ -381,11 +381,11 @@ namespace Slangc {
             if (isArgCustomType) {
                 context.loadValue = true;
             }
-            auto argVal = processNode(currCallArg, context, errors);
+            auto argVal = processNode(currCallArg, context);
 
             auto currExpectedIRType = isOutVar ? getIRPtrType(currExpectedArg->type, context) : getIRType(currExpectedArg->type, context);
             // if func argument is void*, we should not try to cast
-            if (!(isVoid && isOutVar)) argVal = typeCast(argVal, currExpectedIRType, context, errors, getExprLoc(currCallArg));
+            if (!(isVoid && isOutVar)) argVal = typeCast(argVal, currExpectedIRType, context, getExprLoc(currCallArg));
             argsRef.push_back(argVal);
             context.currentFuncSignature = tempSig;
         }
@@ -393,12 +393,12 @@ namespace Slangc {
         return context.builder->CreateCall(getFuncType(funcType.value(), context), func, argsRef);
     }
 
-    auto NewExprNode::codegen(Slangc::CodeGenContext &context, std::vector<ErrorMessage> &errors) -> llvm::Value * {
+    auto NewExprNode::codegen(Slangc::CodeGenContext &context) -> llvm::Value * {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         auto irType = getIRType(type, context);
         Value* val = context.builder->CreateAlloca(irType);
         if (auto arr = std::get_if<ArrayExprPtr>(&type)) {
-            createArrayMalloc(*arr, val, context, errors);
+            createArrayMalloc(*arr, val, context);
         }
         else if (auto typeExpr = std::get_if<TypeExprPtr>(&type)) {
             if (!Context::isBuiltInType(typeExpr->get()->type)) {
@@ -412,13 +412,13 @@ namespace Slangc {
         return val;
     }
 
-    auto AccessExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto AccessExprNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         auto temp = context.loadValue;
         context.loadValue = true;
-        auto var = processNode(expr, context, errors);
+        auto var = processNode(expr, context);
         context.loadValue = temp;
-        auto varType = getExprType(expr, context.context, errors).value();
+        auto varType = getExprType(expr, context.context).value();
         auto typeName = std::get<TypeExprPtr>(varType)->type;
         // TODO: next block looks weird, probably needs refactoring
         if (context.currentFuncSignature.has_value()) {
@@ -431,98 +431,98 @@ namespace Slangc {
         }
 
         auto elementPtr = context.builder->CreateStructGEP(context.allocatedClasses[accessedType], var, index, typeName + "." + name);
-        auto type = getIRType(getExprType(shared_from_this(), context.context, errors).value(), context);
+        auto type = getIRType(getExprType(shared_from_this(), context.context).value(), context);
         if (context.loadValue) {
             elementPtr = context.builder->CreateLoad(type, elementPtr);
         }
         return elementPtr;
     }
 
-    auto DeleteStmtNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto DeleteStmtNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         context.loadValue = false;    // TODO: not sure if it's correct
-        auto var = processNode(expr, context, errors);
+        auto var = processNode(expr, context);
         context.loadValue = false;
 
-        auto type = getExprType(expr, context.context, errors).value();
+        auto type = getExprType(expr, context.context).value();
         if (auto typeExpr = std::get_if<TypeExprPtr>(&type)) {
-            cleanupVar(typeExpr->get()->type, var, context, errors);
+            cleanupVar(typeExpr->get()->type, var, context);
         }
         else if (auto arr = std::get_if<ArrayExprPtr>(&type)) {
-            createArrayFree(*arr, var, context, errors);
+            createArrayFree(*arr, var, context);
             return var;
         }
         else {
             context.builder->CreateCall(context.freeFunc, var);
-            auto notLoadedVar = processNode(expr, context, errors);
+            auto notLoadedVar = processNode(expr, context);
             return context.builder->CreateStore(Constant::getNullValue(notLoadedVar->getType()), notLoadedVar);
         }
     }
 
-    auto BlockStmtNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto BlockStmtNode::codegen(CodeGenContext &context) -> Value* {
         return {};
     }
 
-    auto AssignExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto AssignExprNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
-        auto ltype = getIRType(getExprType(left, context.context, errors).value(), context);
-        auto rtype = getIRType(getExprType(right, context.context, errors).value(), context);
-        auto leftVal = processNode(left, context, errors);
+        auto ltype = getIRType(getExprType(left, context.context).value(), context);
+        auto rtype = getIRType(getExprType(right, context.context).value(), context);
+        auto leftVal = processNode(left, context);
         context.loadValue = true;
         auto tempSig = context.currentFuncSignature;
-        if (std::holds_alternative<FuncExprPtr>(getExprType(left, context.context, errors).value())) {
+        if (std::holds_alternative<FuncExprPtr>(getExprType(left, context.context).value())) {
             context.loadValue = false;
-            context.currentFuncSignature = std::get<FuncExprPtr>(getExprType(left, context.context, errors).value());
+            context.currentFuncSignature = std::get<FuncExprPtr>(getExprType(left, context.context).value());
         }
         context.referencing = true;
-        auto rightVal = processNode(right, context, errors);
+        auto rightVal = processNode(right, context);
         context.referencing = false;
         // if right is new, clean up left
         /*if (auto newExpr = std::get_if<NewExprPtr>(&right)) {
             if (auto arr = std::get_if<ArrayExprPtr>(&newExpr->get()->type)) {
-                createArrayFree(*arr, leftVal, context, errors);
+                createArrayFree(*arr, leftVal, context);
             }
             else if (auto typeExpr = std::get_if<TypeExprPtr>(&newExpr->get()->type)) {
-                cleanupVar(typeExpr->get()->type, leftVal, context, errors);
+                cleanupVar(typeExpr->get()->type, leftVal, context);
             }
         }*/
         context.currentFuncSignature = tempSig;
         context.loadValue = false;
         if (ltype != rightVal->getType()) {
-            rightVal = typeCast(rightVal, ltype, context, errors, getExprLoc(right));
+            rightVal = typeCast(rightVal, ltype, context, getExprLoc(right));
         }
         return context.builder->CreateStore(rightVal, leftVal);
     }
 
-    auto FuncParamDecStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto FuncParamDecStatementNode::codegen(CodeGenContext &context) -> Value* {
         return {};
     }
 
-    auto FuncExprNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto FuncExprNode::codegen(CodeGenContext &context) -> Value* {
         return {};
     }
 
-    auto ReturnStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto ReturnStatementNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         if (std::holds_alternative<TypeExprPtr>(expr) && std::get<TypeExprPtr>(expr)->type == getBuiltInTypeName(BuiltInType::Void))
             return context.builder->CreateRetVoid();
         context.loadValue = true;
         context.referencing = true;
-        auto type = getExprType(expr, context.context, errors).value();
-        auto val = processNode(expr, context, errors);
+        auto type = getExprType(expr, context.context).value();
+        auto val = processNode(expr, context);
         context.referencing = false;
         context.loadValue = false;
-        val = typeCast(val, context.currentReturnType, context, errors, getExprLoc(expr));
-        // cleanupCurrentScope(context, errors);
+        val = typeCast(val, context.currentReturnType, context, getExprLoc(expr));
+        // cleanupCurrentScope(context);
         return context.builder->CreateRet(val);
     }
 
-    auto OutputStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto OutputStatementNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         auto printfFunc = context.module->getOrInsertFunction("printf", FunctionType::get(Type::getInt32Ty(*context.llvmContext), PointerType::get(Type::getInt8Ty(*context.llvmContext), 0), true));
         auto temp = context.loadValue;
         bool charArray = false;
-        auto exprType = getExprType(expr, context.context, errors).value();
+        auto exprType = getExprType(expr, context.context).value();
         if (auto arr = std::get_if<ArrayExprPtr>(&exprType)) {
             if (auto type = std::get_if<TypeExprPtr>(&arr->get()->type)) {
                 if (type->get()->type == getBuiltInTypeName(BuiltInType::Char)) {
@@ -536,7 +536,7 @@ namespace Slangc {
             val = context.builder->CreateGlobalStringPtr(strLiteral->get()->value, "", 0, context.module.get());
         else {
             context.loadValue = true;
-            val = processNode(expr, context, errors);
+            val = processNode(expr, context);
             context.loadValue = temp;
         }
         if (auto arr = std::get_if<StringExprPtr>(&expr)) charArray = true;
@@ -578,15 +578,15 @@ namespace Slangc {
         return printfCall;
     }
 
-    auto InputStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto InputStatementNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         auto scanfFunc = context.module->getOrInsertFunction("scanf", FunctionType::get(Type::getInt32Ty(*context.llvmContext), PointerType::get(Type::getInt8Ty(*context.llvmContext), 0), true));
         auto temp = context.loadValue;
         context.loadValue = false;
-        auto val = processNode(expr, context, errors);
+        auto val = processNode(expr, context);
         context.loadValue = temp;
         bool charArray = false;
-        auto exprType = getExprType(expr, context.context, errors).value();
+        auto exprType = getExprType(expr, context.context).value();
         if (auto arr = std::get_if<ArrayExprPtr>(&exprType)) {
             if (auto type = std::get_if<TypeExprPtr>(&arr->get()->type)) {
                 if (type->get()->type == getBuiltInTypeName(BuiltInType::Char)) {
@@ -628,7 +628,7 @@ namespace Slangc {
         return context.builder->CreateCall(scanfFunc, printArgs);
     }
 
-    auto VarDecStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto VarDecStatementNode::codegen(CodeGenContext &context) -> Value* {
         auto type = getIRType(typeExpr.type, context);
         type = (Context::isBuiltInType(typeExpr.type) && typeExpr.type != getBuiltInTypeName(BuiltInType::Void)) ? type : getIRPtrType(typeExpr.type, context);
         Value* var = nullptr;
@@ -639,12 +639,12 @@ namespace Slangc {
             if (expr.has_value()) {
                 context.loadValue = true;
                 context.referencing = true;
-                rightVal = processNode(expr.value(), context, errors);
+                rightVal = processNode(expr.value(), context);
                 context.referencing = false;
                 context.loadValue = false;
                 // TODO: do type cast
                 if (rightVal->getType() != type) {
-                    rightVal = typeCast(rightVal, type, context, errors, getExprLoc(expr.value()));
+                    rightVal = typeCast(rightVal, type, context, getExprLoc(expr.value()));
                 }
                 context.builder->CreateStore(rightVal, var);
             }
@@ -671,7 +671,7 @@ namespace Slangc {
             if (!isExtern) {
                 if (expr.has_value()) {
                     context.loadValue = true;
-                    rightVal = processNode(expr.value(), context, errors);
+                    rightVal = processNode(expr.value(), context);
                     context.loadValue = false;
                     global->setInitializer(dyn_cast<Constant>(rightVal));
                 }
@@ -709,7 +709,7 @@ namespace Slangc {
         return var;
     }
 
-    auto FuncPointerStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto FuncPointerStatementNode::codegen(CodeGenContext &context) -> Value* {
         auto type = getIRType(expr, context);
         Value* var = nullptr;
         Value* assignValue = nullptr;
@@ -718,7 +718,7 @@ namespace Slangc {
             context.loadValue = false;
             auto tempSig = context.currentFuncSignature;
             context.currentFuncSignature = expr;
-            assignValue = processNode(assignExpr.value(), context, errors);
+            assignValue = processNode(assignExpr.value(), context);
             context.currentFuncSignature = tempSig;
             context.loadValue = temp;
         }
@@ -731,7 +731,7 @@ namespace Slangc {
             if (assignExpr.has_value())
                 context.builder->CreateStore(assignValue, var);
             if (context.debug) {
-                context.debugBuilder->createLocalVar(name, getDebugType(expr, context, errors), var, loc);
+                context.debugBuilder->createLocalVar(name, getDebugType(expr, context), var, loc);
             }
         }
         else {
@@ -750,14 +750,14 @@ namespace Slangc {
             context.globalsDecls()[name] = shared_from_this();
             var = global;
             if (context.debug) {
-                auto dbgInfo = context.debugBuilder->createGlobalVar(name, getDebugType(expr, context, errors), loc, isPrivate);
+                auto dbgInfo = context.debugBuilder->createGlobalVar(name, getDebugType(expr, context), loc, isPrivate);
                 global->addDebugInfo(dbgInfo);
             }
         }
         return var;
     }
 
-    auto ArrayDecStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto ArrayDecStatementNode::codegen(CodeGenContext &context) -> Value* {
         auto type = getIRType(expr, context);
         Value* var = nullptr;
         if (!isGlobal) {
@@ -767,18 +767,18 @@ namespace Slangc {
             context.localsDecls()[name] = shared_from_this();
             context.referenced()[name] = false;
             if (context.debug) {
-                context.debugBuilder->createLocalVar(name, getDebugType(expr, context, errors), var, loc);
+                context.debugBuilder->createLocalVar(name, getDebugType(expr, context), var, loc);
             }
             if (assignExpr.has_value()) {
                 context.loadValue = true;
                 context.referencing = true;
-                auto assignVal = processNode(assignExpr.value(), context, errors);
+                auto assignVal = processNode(assignExpr.value(), context);
                 context.referencing = false;
                 context.loadValue = false;
                 context.builder->CreateStore(assignVal, var);
                 //context.referenced()[name] = true;  // if string literal assigned, we should not try to clear this variable
             }
-            else createArrayMalloc(expr, var, context, errors);
+            else createArrayMalloc(expr, var, context);
         }
         else {
             bool tempDebugFlag = context.debug;
@@ -800,11 +800,11 @@ namespace Slangc {
 
                 if (assignExpr.has_value()) {
                     context.loadValue = true;
-                    auto assignVal = processNode(assignExpr.value(), context, errors);
+                    auto assignVal = processNode(assignExpr.value(), context);
                     context.loadValue = false;
                     context.builder->CreateStore(assignVal, global);
                 }
-                else createArrayMalloc(expr, global, context, errors);
+                else createArrayMalloc(expr, global, context);
                 context.builder->CreateRetVoid();
                 context.popBlock();
             }
@@ -813,14 +813,14 @@ namespace Slangc {
             var = global;
             context.debug = tempDebugFlag;
             if (context.debug) {
-                auto dbgInfo = context.debugBuilder->createGlobalVar(name, getDebugType(expr, context, errors), loc, isPrivate);
+                auto dbgInfo = context.debugBuilder->createGlobalVar(name, getDebugType(expr, context), loc, isPrivate);
                 global->addDebugInfo(dbgInfo);
             }
         }
         return var;
     }
 
-    auto FuncDecStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto FuncDecStatementNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         auto funcType = getFuncType(expr, context);
         auto funcName = isExtern ? name : name + "." + getMangledFuncName(expr);
@@ -828,7 +828,7 @@ namespace Slangc {
         auto func = context.module->getFunction(funcName);
         DISubprogram* dbgFunc = nullptr;
         if (context.debug) {
-            dbgFunc = context.debugBuilder->createFunction(this, context, errors);
+            dbgFunc = context.debugBuilder->createFunction(this, context);
             context.debugBuilder->lexicalBlocks.push_back(dbgFunc);
             context.debugBuilder->emitLocation(loc);
         }
@@ -853,7 +853,7 @@ namespace Slangc {
                 context.builder->CreateStore(argsValues, var);
 
                 if (context.debug) {
-                    auto dbgType = getDebugType(param->get()->type, context, errors);
+                    auto dbgType = getDebugType(param->get()->type, context);
                     if (param->get()->parameterType != In) dbgType = context.debugBuilder->getPointerType(dbgType);
                     context.debugBuilder->createLocalFuncParam(param->get()->name, dbgType, var, loc, dbgFunc, argNo);
                 }
@@ -864,7 +864,7 @@ namespace Slangc {
             context.currentReturnType = getIRType(expr->type, context);
             if (std::holds_alternative<FuncExprPtr>(expr->type))
                 context.currentFuncSignature = std::get<FuncExprPtr>(expr->type);
-            auto val = processNode(stmt, context, errors);
+            auto val = processNode(stmt, context);
             if (std::holds_alternative<ReturnStatementPtr>(stmt)) {
                 hasReturn = true;
                 break;
@@ -874,7 +874,7 @@ namespace Slangc {
         }
         context.currentReturnType = nullptr;
         if (!hasReturn) {
-            // cleanupCurrentScope(context, errors);
+            // cleanupCurrentScope(context);
         }
         if (!isFunction) context.builder->CreateRetVoid();
         else {
@@ -897,7 +897,7 @@ namespace Slangc {
         return {};
     }
 
-    auto FieldVarDecNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto FieldVarDecNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         auto type = getIRType(typeExpr.type, context);
         Value* rightVal = nullptr;
@@ -911,31 +911,31 @@ namespace Slangc {
             if (constructor) context.builder->CreateCall(constructor, arg);
         }
         if (expr.has_value()) {
-            rightVal = processNode(expr.value(), context, errors);
+            rightVal = processNode(expr.value(), context);
             if (rightVal->getType() != type) {
-                rightVal = typeCast(rightVal, type, context, errors, getExprLoc(expr.value()));
+                rightVal = typeCast(rightVal, type, context, getExprLoc(expr.value()));
             }
             return context.builder->CreateStore(rightVal, elementPtr);
         }
         return elementPtr;
     }
 
-    auto FieldArrayVarDecNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto FieldArrayVarDecNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         auto type = getIRType(expr, context);
         auto elementPtr = context.builder->CreateStructGEP(context.allocatedClasses[typeName.type], context.currentTypeLoad, index, typeName.type + "." + name);
 
         if (assignExpr.has_value()) {
             context.loadValue = true;
-            auto assignVal = processNode(assignExpr.value(), context, errors);
+            auto assignVal = processNode(assignExpr.value(), context);
             context.loadValue = false;
             context.builder->CreateStore(assignVal, elementPtr);
         }
-        else createArrayMalloc(expr, elementPtr, context, errors);
+        else createArrayMalloc(expr, elementPtr, context);
         return elementPtr;
     }
 
-    auto FieldFuncPointerStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto FieldFuncPointerStatementNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         auto type = getIRType(expr, context);
         auto elementPtr = context.builder->CreateStructGEP(context.allocatedClasses[typeName.type], context.currentTypeLoad, index, typeName.type + "." + name);
@@ -943,7 +943,7 @@ namespace Slangc {
             auto temp = context.loadValue;
             context.loadValue = false;
             context.currentFuncSignature = expr;
-            auto assignVal = processNode(assignExpr.value(), context, errors);
+            auto assignVal = processNode(assignExpr.value(), context);
             context.currentFuncSignature = std::nullopt;
             context.loadValue = temp;
             context.builder->CreateStore(assignVal, elementPtr);
@@ -951,14 +951,14 @@ namespace Slangc {
         return elementPtr;
     }
 
-    auto MethodDecNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto MethodDecNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         auto temp = create<FuncDecStatementNode>(loc, name, expr, block, true, isFunction, false);
-        auto res = temp->codegen(context, errors);
+        auto res = temp->codegen(context);
         return res;
     }
 
-    auto TypeDecStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto TypeDecStatementNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         if (name == "Object") return nullptr;
         context.allocatedClasses[name] = StructType::create(*context.llvmContext, name);
@@ -975,7 +975,7 @@ namespace Slangc {
             types.push_back(PointerType::get(StructType::create(*context.llvmContext, "vtable_" + name), 0));
         }
         for (; index < fields.size(); ++index) {
-            types.push_back(getIRType(getDeclType(fields[index], context.context, errors).value(), context));
+            types.push_back(getIRType(getDeclType(fields[index], context.context).value(), context));
         }
         context.allocatedClasses[name]->setBody(types);
         // predefine default constructor and destructor
@@ -983,22 +983,22 @@ namespace Slangc {
         auto dtor = context.module->getOrInsertFunction(name + "._default_destructor", FunctionType::get(Type::getVoidTy(*context.llvmContext), PointerType::get(context.allocatedClasses[name], 0), false));
         context.context.enterScope(name);
         for (auto &method : methods) {
-            method->codegen(context, errors);
+            method->codegen(context);
         }
 
-        if (vtableRequired) createVTable(this, context, errors);
-        if (context.debug) context.debugBuilder->createType(this, context, errors);
-        createDefaultConstructor(this, context, errors, context.currentDeclImported);
-        createDefaultDestructor(this, context, errors, context.currentDeclImported);
+        if (vtableRequired) createVTable(this, context);
+        if (context.debug) context.debugBuilder->createType(this, context);
+        createDefaultConstructor(this, context, context.currentDeclImported);
+        createDefaultDestructor(this, context, context.currentDeclImported);
         context.context.exitScope();
         return nullptr;
     }
 
-    auto ElseIfStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto ElseIfStatementNode::codegen(CodeGenContext &context) -> Value* {
         return {};
     }
 
-    auto IfStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto IfStatementNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         auto func = context.builder->GetInsertBlock()->getParent();
         auto trueBB = BasicBlock::Create(*context.llvmContext, "then", func);
@@ -1006,7 +1006,7 @@ namespace Slangc {
         auto endBB = BasicBlock::Create(*context.llvmContext, "ifend", func);
         auto temp = context.loadValue;
         context.loadValue = true;
-        context.builder->CreateCondBr(processNode(condition, context, errors), trueBB, falseBB);
+        context.builder->CreateCondBr(processNode(condition, context), trueBB, falseBB);
         context.loadValue = temp;
         context.pushBlock(trueBB);
         context.builder->SetInsertPoint(trueBB);
@@ -1014,7 +1014,7 @@ namespace Slangc {
         bool hasReturn = false;
         if (context.debug) context.debugBuilder->emitLocation(loc);
         for (auto &&stmt : trueBlock->statements) {
-            auto val = processNode(stmt, context, errors);
+            auto val = processNode(stmt, context);
             if (std::holds_alternative<ReturnStatementPtr>(stmt)) hasReturn = true;
         }
         if (!hasReturn) context.builder->CreateBr(endBB);
@@ -1029,7 +1029,7 @@ namespace Slangc {
             auto elseifBBTrue = BasicBlock::Create(*context.llvmContext, "elseifthen", func);
             auto elseifBBFalse = BasicBlock::Create(*context.llvmContext, "elseifelse", func);
             context.loadValue = true;
-            context.builder->CreateCondBr(processNode(elseif->condition, context, errors), elseifBBTrue, elseifBBFalse);
+            context.builder->CreateCondBr(processNode(elseif->condition, context), elseifBBTrue, elseifBBFalse);
             context.loadValue = temp;
             context.pushBlock(elseifBBTrue);
             context.builder->SetInsertPoint(elseifBBTrue);
@@ -1037,7 +1037,7 @@ namespace Slangc {
             hasReturn = false;
             context.context.enterScope("else-if#" + std::to_string(elseif->loc.line) + ":" + std::to_string(elseif->loc.column));
             for (auto &&stmt : elseif->trueBlock->statements) {
-                auto val = processNode(stmt, context, errors);
+                auto val = processNode(stmt, context);
                 if (std::holds_alternative<ReturnStatementPtr>(stmt)) hasReturn = true;
             }
             if (!hasReturn) context.builder->CreateBr(endBB);
@@ -1053,7 +1053,7 @@ namespace Slangc {
             context.context.enterScope("else#" + std::to_string(loc.line) + ":" + std::to_string(loc.column));
             if (context.debug) context.debugBuilder->emitLocation(loc);
             for (auto &&stmt : falseBlock.value()->statements) {
-                auto val = processNode(stmt, context, errors);
+                auto val = processNode(stmt, context);
                 if (std::holds_alternative<ReturnStatementPtr>(stmt)) hasReturn = true;
             }
             context.context.exitScope();
@@ -1071,7 +1071,7 @@ namespace Slangc {
         return endBB;
     }
 
-    auto WhileStatementNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto WhileStatementNode::codegen(CodeGenContext &context) -> Value* {
         if (context.debug) context.debugBuilder->emitLocation(loc);
         if (context.debug) context.debugBuilder->emitLocation(loc);
         auto func = context.builder->GetInsertBlock()->getParent();
@@ -1083,7 +1083,7 @@ namespace Slangc {
         context.builder->SetInsertPoint(whileCheck);
         auto temp = context.loadValue;
         context.loadValue = true;
-        context.builder->CreateCondBr(processNode(condition, context, errors), whileIter, whileEnd);
+        context.builder->CreateCondBr(processNode(condition, context), whileIter, whileEnd);
         context.loadValue = temp;
         context.popBlock();
         context.pushBlock(whileIter);
@@ -1092,7 +1092,7 @@ namespace Slangc {
         context.context.enterScope("while#" + std::to_string(loc.line) + ":" + std::to_string(loc.column));
         if (context.debug) context.debugBuilder->emitLocation(loc);
         for (auto &&stmt : block->statements) {
-            auto val = processNode(stmt, context, errors);
+            auto val = processNode(stmt, context);
             if (std::holds_alternative<ReturnStatementPtr>(stmt)) hasReturn = true;
         }
         context.context.exitScope();
@@ -1103,7 +1103,7 @@ namespace Slangc {
         return whileEnd;
     }
 
-    auto ModuleDeclNode::codegen(CodeGenContext &context, std::vector<ErrorMessage>& errors) -> Value* {
+    auto ModuleDeclNode::codegen(CodeGenContext &context) -> Value* {
         return {};
     }
 

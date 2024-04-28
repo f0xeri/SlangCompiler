@@ -65,7 +65,6 @@ add_executable(slangc main.cpp common.hpp source/SourceBuffer.cpp source/SourceB
         codegen/CodeGenHelpers.cpp
         driver/Driver.cpp
         driver/Driver.hpp
-        log/Logger.hpp
         opt/Optimizer.cpp
         opt/Optimizer.hpp
         codegen/DebugInfoBuilder.cpp

@@ -13,8 +13,8 @@
 #include "CodeGenContext.hpp"
 
 namespace Slangc {
-    llvm::Value* processNode(const auto& node, CodeGenContext &codeGenContext, std::vector<ErrorMessage>& errors) {
-        auto call = [&](auto& expr) -> llvm::Value* { return expr.get()->codegen(codeGenContext, errors); };
+    llvm::Value* processNode(const auto& node, CodeGenContext &codeGenContext) {
+        auto call = [&](auto& expr) -> llvm::Value* { return expr.get()->codegen(codeGenContext); };
         return std::visit(call, node);
     }
     class CodeGen {
@@ -23,11 +23,11 @@ namespace Slangc {
             moduleAST(std::move(moduleAST)), isMainModule(isMainModule),
             codeGenContext(context, debug, gcEnabled) {}
 
-        void process(std::vector<ErrorMessage>& errors) {
+        void process() {
 
             for (auto& symbol: context.symbolTable.symbols /*| std::views::filter([&](const auto&s) { return s.moduleName == moduleAST->name; })*/) {
                 if (symbol.isImported) codeGenContext.currentDeclImported = true;
-                processNode(symbol.declaration, codeGenContext, errors);
+                processNode(symbol.declaration, codeGenContext);
                 codeGenContext.currentDeclImported = false;
             }
 
@@ -35,9 +35,9 @@ namespace Slangc {
                 codeGenContext.startMainFunc();
                 if (codeGenContext.debug) codeGenContext.debugBuilder->emitLocation(moduleAST->block->loc);
                 for (auto&stmt: moduleAST->block->statements) {
-                    processNode(stmt, codeGenContext, errors);
+                    processNode(stmt, codeGenContext);
                 }
-                // cleanupCurrentScope(codeGenContext, errors);
+                // cleanupCurrentScope(codeGenContext);
                 codeGenContext.endMainFunc();
             }
             llvm::verifyModule(*codeGenContext.module, &llvm::errs());

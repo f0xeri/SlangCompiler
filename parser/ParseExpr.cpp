@@ -18,7 +18,7 @@ namespace Slangc {
             auto opToken = prevToken();
             auto rhs = parseAnd();
             if (!rhs.has_value()) {
-                errors.emplace_back(filename, "Expected expression after operator.", opToken.location, false, false);
+                SLANGC_LOG(filename, "Expected expression after operator.", opToken.location, LogLevel::Error, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -36,7 +36,7 @@ namespace Slangc {
             auto opToken = prevToken();
             auto rhs = parseEquality();
             if (!rhs.has_value()) {
-                errors.emplace_back(filename, "Expected expression after operator.", opToken.location, false, false);
+                SLANGC_LOG(filename, "Expected expression after operator.", opToken.location, LogLevel::Error, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -54,7 +54,7 @@ namespace Slangc {
             auto opToken = prevToken();
             auto rhs = parseCmp();
             if (!rhs.has_value()) {
-                errors.emplace_back(filename, "Expected expression after operator.", opToken.location, false, false);
+                SLANGC_LOG(filename, "Expected expression after operator.", opToken.location, LogLevel::Error, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -72,7 +72,7 @@ namespace Slangc {
             auto opToken = prevToken();
             auto rhs = parseAddSub();
             if (!rhs.has_value()) {
-                errors.emplace_back(filename, "Expected expression after operator.", opToken.location, false, false);
+                SLANGC_LOG(filename, "Expected expression after operator.", opToken.location, LogLevel::Error, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -90,7 +90,7 @@ namespace Slangc {
             auto opToken = prevToken();
             auto rhs = parseMulDiv();
             if (!rhs.has_value()) {
-                errors.emplace_back(filename, "Expected expression after operator.", opToken.location, false, false);
+                SLANGC_LOG(filename, "Expected expression after operator.", opToken.location, LogLevel::Error, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -108,7 +108,7 @@ namespace Slangc {
             auto opToken = prevToken();
             auto rhs = parseUnary();
             if (!rhs.has_value()) {
-                errors.emplace_back(filename, "Expected expression after operator.", opToken.location, false, false);
+                SLANGC_LOG(filename, "Expected expression after operator.", opToken.location, LogLevel::Error, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -122,7 +122,7 @@ namespace Slangc {
             auto opToken = prevToken();
             auto expr = parseCall();
             if (!expr.has_value()) {
-                errors.emplace_back(filename, "Expected expression after operator.", opToken.location, false, false);
+                SLANGC_LOG(filename, "Expected expression after operator.", opToken.location, LogLevel::Error, false);
                 hasError = true;
                 return std::nullopt;
             }
@@ -144,7 +144,7 @@ namespace Slangc {
                     do {
                         auto argExpr = parseExpr();
                         if (!argExpr.has_value()) {
-                            errors.emplace_back(filename, "Expected expression after '('.", opToken.location, false, false);
+                            SLANGC_LOG(filename, "Expected expression after '('.", opToken.location, LogLevel::Error, false);
                             hasError = true;
                             return std::nullopt;
                         }
@@ -167,7 +167,7 @@ namespace Slangc {
                 do {
                     auto indexExpr = parseExpr();
                     if (!indexExpr.has_value()) {
-                        errors.emplace_back(filename, "Expected expression after '['.", opToken.location, false, false);
+                        SLANGC_LOG(filename, "Expected expression after '['.", opToken.location, LogLevel::Error, false);
                         hasError = true;
                         return std::nullopt;
                     }
@@ -205,7 +205,7 @@ namespace Slangc {
             consume(TokenType::RParen);
             return expr;
         }
-        errors.emplace_back(filename, "Failed to parse expression.", loc);
+        SLANGC_LOG(filename, "Failed to parse expression.", loc, LogLevel::Error);
         return std::nullopt;
     }
 
@@ -239,7 +239,7 @@ namespace Slangc {
                 do {
                     auto indexExpr = parseExpr();
                     if (!indexExpr.has_value()) {
-                        errors.emplace_back(filename, "Expected expression after '['.", opToken.location, false, false);
+                        SLANGC_LOG(filename, "Expected expression after '['.", opToken.location, LogLevel::Error, false);
                         hasError = true;
                         return std::nullopt;
                     }
@@ -285,15 +285,15 @@ namespace Slangc {
                     else
                     if (!currentValue.empty()) {
                         auto buffer = SourceBuffer::CreateFromString(currentValue);
-                        Lexer lexer(std::move(buffer), errors);
+                        Lexer lexer(std::move(buffer));
                         lexer.tokenize();
-                        Parser parser(filepath, lexer.tokens, driver, context, errors);
+                        Parser parser(filepath, lexer.tokens, driver, context);
                         auto expr = parser.parseExpr();
                         if (expr.has_value() && parser.token == parser.tokens.end() - 1) {
                             values.push_back(std::move(expr.value()));
                         }
                         else {
-                            errors.emplace_back(filename, "Failed to parse expression in formatted string literal.", loc);
+                            SLANGC_LOG(filename, "Failed to parse expression in formatted string literal.", loc, LogLevel::Error);
                             hasError = true;
                         }
                         currentValue.clear();
@@ -308,7 +308,7 @@ namespace Slangc {
                 values.push_back(createExpr<StringExprNode>(loc, currentValue));
             }
             if (!closedFmt) {
-                errors.emplace_back(filename, "Failed to parse formatted string literal: missing closing '}'.", loc);
+                SLANGC_LOG(filename, "Failed to parse formatted string literal: missing closing '}'.", loc, LogLevel::Error);
                 hasError = true;
             }
             return createExpr<FormattedStringExprNode>(loc, std::move(values));
@@ -328,7 +328,7 @@ namespace Slangc {
         SourceLoc loc = tok.location;
         auto type = parseType();
         if (!type.has_value()) {
-            errors.emplace_back(filename, "Failed to parse type expression.", loc);
+            SLANGC_LOG(filename, "Failed to parse type expression.", loc, LogLevel::Error);
             hasError = true;
             return std::nullopt;
         }
